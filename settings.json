@@ -1,0 +1,241 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(brew install:*)",
+      "Bash(git clone:*)",
+      "Bash(tree:*)",
+      "Bash(node:*)",
+      "Bash(npm run build)",
+      "Bash(rm -rf dist && npm run build)",
+      "Bash(npm install:*)",
+      "Bash(npm run dev:*)",
+      "Bash(open:*)",
+      "WebFetch(domain:localhost)",
+      "Bash(curl:*)",
+      "Bash(npm i:*)",
+      "Bash(npx turbo dev:*)",
+      "Bash(xargs:*)",
+      "Bash(npx ast-grep:*)",
+      "Bash(npx claude-code-templates@latest:*)",
+      "Bash(cat:*)",
+      "Bash(find:*)",
+      "Bash(unzip:*)",
+      "Bash(for:*)",
+      "Bash(do echo:*)",
+      "Bash(fi:*)",
+      "Bash(done)",
+      "Bash([:*)",
+      "Bash(do:*)",
+      "Bash(echo:*)",
+      "Bash(npx eslint:*)",
+      "Bash(pkill:*)",
+      "Bash(chmod:*)",
+      "Bash(npx ts-node:*)",
+      "Bash(npm run type-check:*)",
+      "Bash(npm run lint)",
+      "Bash(npm audit:*)",
+      "Bash(npx vite build:*)",
+      "Bash(npm run test)",
+      "Bash(npm test:*)",
+      "Bash(awk:*)",
+      "Bash(python3:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm init @eslint/config:*)",
+      "Bash(npm ls:*)",
+      "Bash(npm update:*)",
+      "Bash(npm view:*)",
+      "Bash(timeout 15s npm run dev:*)",
+      "WebSearch",
+      "Bash(PORT=3002 npx ts-node:*)",
+      "Bash(PORT=3003 npx ts-node:*)",
+      "Bash(PORT=3010 npx ts-node:*)",
+      "Bash(lsof:*)",
+      "Bash(npm run server:test:*)",
+      "Bash(npm run)",
+      "Bash(npm run test:*)",
+      "Bash(npx jest:*)",
+      "Bash(gh repo create:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Bash(gh repo edit:*)",
+      "Bash(npm run start:simple:*)",
+      "Bash(npm run:*)",
+      "Bash(kill:*)",
+      "Bash(git restore:*)",
+      "Bash(timeout:*)",
+      "Bash(mkdir:*)",
+      "Bash(NODE_OPTIONS='--experimental-vm-modules' npx jest:*)",
+      "Bash(tee:*)",
+      "Bash(NODE_OPTIONS='--experimental-vm-modules' jest:*)",
+      "Bash(RUN_REAL_API_TESTS=true NODE_OPTIONS='--experimental-vm-modules' npx jest:*)",
+      "Bash(git log:*)",
+      "Bash(git checkout:*)",
+      "Bash(vercel --prod)",
+      "Bash(vercel:*)",
+      "Bash(ast-grep:*)",
+      "Bash(git pull:*)",
+      "Bash(git rm:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(npx vitest run:*)",
+      "Bash(npx biome check:*)",
+      "Bash(gh pr view:*)",
+      "Bash(agent-browser:*)",
+      "Bash(gh pr close:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(git stash:*)",
+      "Bash(npx @anthropic-ai/agent-browser:*)",
+      "Bash(git reset:*)",
+      "Bash(gh api:*)",
+      "Bash(gh repo view:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(ls:*)",
+      "Bash(command:*)",
+      "Bash(bd:*)",
+      "Bash(~/.zshrc)",
+      "Bash(source:*)",
+      "Bash(wrangler:*)",
+      "Bash(npx wrangler:*)",
+      "Bash(npx wrangler deploy:*)",
+      "Bash(npx wrangler secret put:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh auth status:*)",
+      "Bash(gh repo list:*)",
+      "Bash(npm run deploy:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf /)",
+      "Bash(rm -rf ~)",
+      "Bash(rm -rf .)",
+      "Bash(rm -rf ..)",
+      "Bash(rm -r /*)",
+      "Bash(rm -r /)",
+      "Bash(rm -fr *)",
+      "Bash(sudo rm *)",
+      "Bash(sudo rmdir *)",
+      "Bash(git clean -fd*)",
+      "Bash(git clean -fdx*)",
+      "Bash(git reset --hard*)",
+      "Bash(git checkout .)",
+      "Bash(git restore .)",
+      "Bash(git branch -D *)",
+      "Bash(git push --force*)",
+      "Bash(git push -f *)",
+      "Bash(dd if=*)",
+      "Bash(mkfs*)",
+      "Bash(chmod -R 777 /*)",
+      "Bash(chown -R * /*)"
+    ],
+    "ask": [
+      "Bash(rm *)",
+      "Bash(rmdir *)",
+      "Bash(mv * /dev/null)",
+      "Bash(git stash drop*)",
+      "Bash(git branch -d *)"
+    ],
+    "defaultMode": "plan"
+  },
+  "hooks": {
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bd prime"
+          },
+          {
+            "type": "command",
+            "command": "bash $HOME/.claude/skills/exec-plan/scripts/pre-compact-sync.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/skills/hooks/pre-bash.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/skills/hooks/post-edit-write.sh",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bd init --quiet --skip-hooks 2>/dev/null || true",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bd prime"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/skills/taskmaster/hooks/check-completion.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ls tools/debug-sessions/ 2>/dev/null | head -1 || true",
+            "timeout": 3,
+            "async": true
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "browserbase@claude-code-plugin": false,
+    "typescript-lsp@claude-plugins-official": true,
+    "rust-analyzer-lsp@claude-plugins-official": true
+  },
+  "alwaysThinkingEnabled": true,
+  "effortLevel": "high",
+  "mcpServers": {
+    "cloudflare-api": {
+      "url": "https://mcp.cloudflare.com/mcp"
+    }
+  }
+}
