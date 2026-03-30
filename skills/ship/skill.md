@@ -10,6 +10,61 @@ Execute safe **production deployment** directly with comprehensive quality gates
 
 **Default behavior: Deploys directly to PRODUCTION**
 
+## MANDATORY: FIX ALL ISSUES EVERY RUN (ZERO EXCEPTIONS)
+
+**Every `/ship` invocation MUST execute ALL fix phases in order. NEVER skip a phase for efficiency, even if the code change is small or "just a copy change".**
+
+The following phases are **MANDATORY on every run** — treat them as a checklist:
+
+| Phase | Gate | Must reach |
+|-------|------|-----------|
+| 0 | Lint (full project — Biome/ESLint) | 0 errors, 0 warnings |
+| 0 (Stage 1.5) | `npm audit` / security audit | 0 vulnerabilities |
+| 1 | Build (`tsc --noEmit` + build tool) | Exit 0 |
+| 1 | Tests (targeted, with timeout) | All pass |
+| 1 | Project-specific test suites (if `package.json` has `test:worker`, `test:integration`, etc.) | All pass |
+| 1.1 | Frontend-backend API contract | 0 missing routes |
+| 1.25 | Security audit + Dependabot alerts | 0 open alerts with available fix |
+| 1.26 | Code scanning hygiene | Auto-fix all |
+| 1.3 | React scope + env safety | No blockers |
+| 1.4 | SEO/sitemap consistency | No conflicts |
+| 1.42 | Deploy session invalidation | Handlers exist |
+| 1.45 | Third-party config, XSS, auth guards | No blockers |
+
+**If a phase finds issues, FIX THEM INLINE before moving to the next phase.** Do not defer. Do not warn-and-continue for fixable issues. The goal is: every `/ship` run leaves the repo in a strictly better state than it found it.
+
+**Warnings are NOT acceptable.** Lint must return 0 errors AND 0 warnings. Fix warnings by: (1) auto-fixing, (2) manually fixing remaining issues, or (3) suppressing false positives in linter config with justification. "Pre-existing warnings" is not an excuse — fix them all.
+
+**Dependabot is NOT optional.** If `gh api repos/{owner}/{repo}/dependabot/alerts` returns open alerts with available fixes, add overrides to `package.json`, run install, verify build, commit, and push — all within this run.
+
+**Stale lockfile check (MANDATORY).** Before fixing Dependabot alerts, check which lockfile(s) the alerts reference (`manifest_path` in the API response). If alerts reference a lockfile the project doesn't use (e.g., `pnpm-lock.yaml` when project uses `bun.lock`, or `package-lock.json` when project uses `pnpm`), the stale lockfile MUST be deleted from git and added to `.gitignore`. Overrides only fix the active lockfile — stale lockfiles cause false Dependabot alerts that can never close.
+
+```bash
+# Detect active package manager
+ACTIVE_LOCK=""
+[ -f bun.lock ] && ACTIVE_LOCK="bun.lock"
+[ -f pnpm-lock.yaml ] && ACTIVE_LOCK="pnpm-lock.yaml"
+[ -f package-lock.json ] && ACTIVE_LOCK="package-lock.json"
+
+# Remove any OTHER tracked lockfiles that aren't the active one
+for STALE in pnpm-lock.yaml package-lock.json bun.lock yarn.lock; do
+  if [ "$STALE" != "$ACTIVE_LOCK" ] && git ls-files --error-unmatch "$STALE" 2>/dev/null; then
+    git rm --cached "$STALE"
+    echo "$STALE" >> .gitignore
+    echo "Removed stale lockfile: $STALE (was causing false Dependabot alerts)"
+  fi
+done
+```
+
+**After fixing Dependabot alerts, VERIFY they actually closed.** Wait 60s after push, then re-check:
+```bash
+sleep 60
+REMAINING=$(gh api "repos/${REPO}/dependabot/alerts" --jq '[.[] | select(.state=="open")] | length')
+if [ "$REMAINING" -gt 0 ]; then
+  gh api "repos/${REPO}/dependabot/alerts" --jq '.[] | select(.state=="open") | "\(.number): \(.dependency.manifest_path)"'
+fi
+```
+
 ## Usage
 
 ```
@@ -378,6 +433,50 @@ timeout 180 npx vitest run 2>&1; pkill -f vitest 2>/dev/null
 - **If ANY test fails**: BLOCK deployment, display failure report. Do NOT retry automatically.
 - **If tests show 100% pass**: Proceed to Phase 1.1
 - If skipped tests detected: Issue warning but allow proceed if no failures
+
+### PROJECT-SPECIFIC TEST SUITES (AUTO-DETECT)
+
+After the generic `vitest run --changed` pass, auto-detect and run any project-specific test suites from `package.json`. Each is BLOCKING.
+
+```bash
+# Auto-detect available test scripts and run them
+for SCRIPT in test:worker test:docuseal test:integration; do
+  if grep -q "\"$SCRIPT\"" package.json 2>/dev/null; then
+    echo "Running $SCRIPT..."
+    timeout 60 npx vitest run $(node -e "console.log(JSON.parse(require('fs').readFileSync('package.json','utf8')).scripts['$SCRIPT'].replace('vitest run ',''))" 2>/dev/null) 2>&1
+    EXIT=$?; pkill -f vitest 2>/dev/null
+    if [ $EXIT -ne 0 ]; then
+      echo "BLOCK: $SCRIPT failed (exit $EXIT)"
+    fi
+  fi
+done
+
+# ESLint a11y (if configured)
+if grep -q '"lint:a11y"' package.json 2>/dev/null; then
+  timeout 60 npx eslint "src/react-app/**/*.{ts,tsx}" 2>&1
+fi
+
+# Module-scope throw check (React apps)
+if [ -d "src/react-app" ]; then
+  MATCHES=$(grep -rn "^throw \|^  throw " src/react-app/ --include="*.ts" --include="*.tsx" \
+    | grep -v ".test." | grep -v "node_modules" \
+    | grep -v "main.tsx.*Root element" | grep -v "utils/api.ts" || true)
+  if [ -n "$MATCHES" ]; then
+    echo "BLOCK: Found throw at module scope in react-app"
+    echo "$MATCHES"
+  fi
+fi
+```
+
+**Post-deploy production tests** (run in Phase 4.1 after deployment):
+```bash
+# If project has production integration tests, run them after deploy
+if grep -q '"test:integration:prod"' package.json 2>/dev/null; then
+  timeout 60 TEST_BASE_URL=$DEPLOY_URL npx vitest run tests/worker-integration.test.ts 2>&1
+  pkill -f vitest 2>/dev/null
+  # WARN if fails (already deployed, but flag for investigation)
+fi
+```
 
 ---
 
@@ -1178,6 +1277,16 @@ curl -s -H "User-Agent: Twitterbot/1.0" -o /tmp/served.png "$(curl -s -H 'User-A
 |-------|------|-----------|
 | **Page metadata** | og:image URL for page | Card Validator or `?v=N` on page URL |
 | **Image CDN** | Image bytes at CDN | `?v=YYYYMMDD` on image URL in meta tags |
+
+### Production Integration Tests (post-deploy)
+```bash
+# If project has production integration tests, run them against live site
+if grep -q '"test:integration:prod"' package.json 2>/dev/null; then
+  timeout 60 TEST_BASE_URL=$DEPLOY_URL npx vitest run tests/worker-integration.test.ts 2>&1
+  pkill -f vitest 2>/dev/null
+  # WARN if fails (already deployed) — flag for investigation, do not auto-rollback
+fi
+```
 
 ### Sitemap Live Check
 ```bash
