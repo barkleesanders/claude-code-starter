@@ -41,7 +41,7 @@ Universal engineering agent for building, debugging, fixing, reviewing, and ship
 
 ### BANNED COLORS — NEVER USE IN ANY UI
 
-The following Tailwind classes and hex ranges are permanently banned from all design work. They all render as purple or purple-adjacent on the dark navy backgrounds used in yourapp.example.com and similar apps:
+The following Tailwind classes and hex ranges are permanently banned from all design work. They all render as purple or purple-adjacent on the dark navy backgrounds used in aivaclaims.com and similar apps:
 
 | Category | Banned Tailwind Classes |
 |----------|------------------------|
@@ -59,7 +59,7 @@ The following Tailwind classes and hex ranges are permanently banned from all de
 - **Pink and rose Tailwind classes look purple on dark navy** — `pink-400/30` on a `bg-navy-900` background reads as a purple border. This is NOT obvious from the class name.
 - **Indigo spans two perceptual regions** — lower indigo shades (100–400) read as blue, but upper shades (500–900) and `indigo-*` in general are effectively purple.
 - A sweep that only looks for `purple` misses the entire `pink-*`, `rose-*`, and `indigo-*` class families. ALWAYS search all six families together.
-- This caused a production purple border bug on yourapp.example.com (2026-03) that required multiple hotfix deployments to fully eradicate.
+- This caused a production purple border bug on aivaclaims.com (2026-03) that required multiple hotfix deployments to fully eradicate.
 
 ### REQUIRED COLOR SCAN — RUN AFTER EVERY UI CHANGE
 
@@ -73,9 +73,9 @@ grep -rn "purple\|violet\|fuchsia\|pink\|rose\|indigo" --include="*.tsx" --inclu
 
 If ANY color match is found, replace it with an approved VA Design System color (see below).
 
-### APPROVED CANONICAL PALETTE — yourapp.example.com
+### APPROVED CANONICAL PALETTE — aivaclaims.com
 
-Use ONLY these colors for yourapp.example.com UI. They match VA.gov's design system, building veteran trust through design familiarity.
+Use ONLY these colors for aivaclaims.com UI. They match VA.gov's design system, building veteran trust through design familiarity.
 
 | Purpose | Color Name | Hex | Tailwind Arbitrary |
 |---------|-----------|-----|-------------------|
@@ -744,6 +744,10 @@ Remaining questions or areas needing clarification.
 | Template `${var}` in HTML attribute without escapeHtml() | Attribute breakout — `"` in value breaks `href=""` / `content=""` attributes |
 | `href={dynamicUrl}` without URL scheme validation | javascript: URI injection — blocks JS execution via `<a href="javascript:...">` |
 | Incomplete escapeHtml() (missing `& > ' \``) | Partial escaping leaves attack surface — must cover all 6 chars |
+| Data hook without `visibilitychange` refresh | Admin changes invisible to users — every hook reading admin-writable data needs `silentFetch` + visibility listener |
+| URL-persisted state (`?step=`, `?tab=`) without auto-advance | State never recalculates when underlying data changes externally — stale navigation |
+| Optimistic update without server re-sync | `fetchData()` must be called after successful PUT to pull server-computed side effects |
+| Admin write endpoint without dependent field cleanup | Setting `status=completed` but leaving `flag_message="Missing docs"` — dirty write |
 
 #### ⚠️ High Priority
 
@@ -1016,6 +1020,24 @@ const { data: todos } = useQuery({ queryKey: ['todos'], queryFn: fetchTodos });
 | Missing `?.` on nullable values in JSX | Runtime crash | Add optional chaining |
 | `alert(message)` in catch block | Jarring UX, not styleable | Inline `setError(message)` |
 | Async handler, no `disabled` on trigger | Double-click → duplicate requests | `disabled={isLoading}` + spinner |
+
+#### ESLint a11y & React Hooks Detection (MANDATORY ON EVERY REVIEW)
+
+**Run this scan on every code review — 0 errors required:**
+```bash
+timeout 60 npx eslint "src/react-app/**/*.{ts,tsx}" 2>&1 | grep "error"
+# MUST return 0 errors. "Pre-existing" errors are NOT acceptable — fix them.
+```
+
+**Common ESLint error patterns and fixes:**
+
+| ESLint Rule | Pattern | Fix |
+|-------------|---------|-----|
+| `react-hooks/refs` — "Cannot access refs during render" | `const x = useInView(); ... x.ref ... x.isInView` | Destructure: `const { ref: xRef, isInView: xInView } = useInView()` |
+| `react-hooks/refs` — "Cannot update ref during render" | `someRef.current = value` in render body | Move to `useEffect(() => { someRef.current = value; }, [value])` |
+| `jsx-a11y/no-noninteractive-element-interactions` | `onLoad` on `<img>` | `eslint-disable-next-line` with justification (onLoad is lifecycle, not interaction) |
+| `jsx-a11y/no-noninteractive-tabindex` | `tabIndex={0}` on `<iframe>` | `eslint-disable/enable` block with justification |
+| `jsx-a11y/prefer-tag-over-role` | `role="dialog"` on `<div>` | Use `<dialog>` element instead (warning, not error) |
 
 ---
 
@@ -1807,7 +1829,13 @@ If you discover a reusable pattern, add it to `## Codebase Patterns` at the TOP 
 - Phase 4: Implementation (failing test first, single fix, verify)
 - **Red flags — STOP and return to Phase 1:** "Quick fix for now", "Just try changing X", "I don't fully understand but this might work", "One more fix attempt" (after 2+ failures)
 - 3-failure limit: if 3 fixes fail, force architectural reassessment — the approach is wrong
-- Reference: `~/.claude/skills/systematic-debugging/` for full methodology + techniques
+- **"Data appears stale" shortcut:** If the bug is "admin changed X but user still sees old X", skip generic debugging and go straight to the admin-user sync decision tree:
+  1. Does the user hook have `visibilitychange` refresh? → If no, that's the bug
+  2. Does the admin endpoint clean up dependent fields? → If no, dirty write
+  3. Does the admin UI re-sync after optimistic update? → If no, split-brain
+  4. Is the user's navigation state URL-persisted and not recalculating? → If yes, stale pointer
+  5. Are data indicators (progress %) and navigation indicators (Step X) using different sources? → If yes, split-brain
+- Reference: `/debug` skill for full methodology, patterns, and techniques
 
 **3. Autonomous Bug Fixing**
 - When given a bug report: just fix it. Don't ask for hand-holding
@@ -1815,7 +1843,21 @@ If you discover a reusable pattern, add it to `## Codebase Patterns` at the TOP 
 - Zero context switching required from the user
 - Go fix failing CI tests without being told how
 
-**4. Demand Elegance (Balanced)**
+**4. Dual-Portal Sync Checklist (MANDATORY when feature touches admin + user views)**
+
+When building ANY feature where admin writes data that users read, complete this before marking the story done:
+
+- [ ] Every user-facing data hook has `silentFetch` + `visibilitychange` listener (no spinner on tab switch)
+- [ ] Admin write endpoint clears dependent fields on status change (e.g., `flag_message = NULL` when completing)
+- [ ] Admin optimistic update calls `fetchData()` after successful API response
+- [ ] URL-persisted navigation state (`?step=`, `?tab=`) auto-advances when data changes
+- [ ] Multi-view displays use data-derived values (`useMemo`), not navigation state
+- [ ] Admin write endpoint uses correct audit action (not `VIEW` for a `PUT`)
+- [ ] Data-driven indicators (progress bar, counts) and navigation indicators (Step X of Y) use the same source of truth
+
+If ANY checkbox is unchecked, the story is not done.
+
+**5. Demand Elegance (Balanced)**
 - For non-trivial changes: pause and ask "is there a more elegant way?"
 - If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"
 - Skip this for simple, obvious fixes — don't over-engineer
@@ -2896,7 +2938,7 @@ Use these when investigating Cloudflare-hosted services:
 
 ## Cloudflare Workers Admin Auth Pattern (AIVA / Hono)
 
-**CRITICAL: Never write a custom `requireAdmin()` that only checks Clerk metadata.** The production admin at `admin@yourapp.example.com` uses `is_admin = 1` in the DB — NOT Clerk `publicMetadata.role`. A metadata-only check silently returns 403 for the real admin on every route it guards.
+**CRITICAL: Never write a custom `requireAdmin()` that only checks Clerk metadata.** The production admin at `help@aivaclaims.com` uses `is_admin = 1` in the DB — NOT Clerk `publicMetadata.role`. A metadata-only check silently returns 403 for the real admin on every route it guards.
 
 ### The Rule
 
@@ -3152,6 +3194,217 @@ Each catch block should log:
 - **Which operation** failed (JWT verify, API call, DB query)
 - **The actual error message** (`error.message`, not just "Unknown error")
 - **Context** (userId, endpoint, request ID if available)
+
+### URL-Persisted State Desync (Stale Step/Tab/View Bug)
+
+**#4 production UX bug.** State derived from URL params (`?step=`, `?tab=`, `?page=`) never recalculates when underlying data changes, causing the UI to show stale information while data-driven indicators (progress bars, counts) update correctly.
+
+#### Symptoms
+- Progress bar says 71% but step indicator says "Step 1 of 7"
+- Admin marks items complete but end user sees old state
+- Data refreshes (counts update) but navigation/selection doesn't advance
+- Page reload doesn't fix it (URL param persists)
+
+#### Step 1: Find URL-Persisted State
+```bash
+# Find state derived from URL search params
+grep -n "searchParams.get\|useSearchParams\|URLSearchParams" --include="*.tsx" --include="*.ts" -r src/
+
+# Find useEffect guards that skip recalculation
+grep -B2 -A5 "=== null" --include="*.tsx" -r src/ | grep -A5 "activeStep\|activeIndex\|currentStep"
+```
+
+#### Step 2: Verify Recalculation Logic
+For each URL-derived state variable, check:
+1. Is there a useEffect that only initializes when state is `null`?
+2. Does the useEffect re-run when data changes but state is already set?
+3. If the state points to a "completed" or stale item, does it auto-advance?
+
+```tsx
+// ❌ BUG: Only initializes once, never recalculates
+useEffect(() => {
+  if (activeIndex === null) {
+    setActiveIndex(findBestIndex());  // Only runs when null
+  }
+}, [data, activeIndex]);
+
+// ✅ FIX: Also recalculates when active item becomes stale
+useEffect(() => {
+  if (activeIndex === null) {
+    setActiveIndex(findBestIndex());
+    return;
+  }
+  // Auto-advance if current item was completed externally
+  if (data[activeIndex]?.status === "completed") {
+    const hasIncomplete = data.some((d) => d.status !== "completed");
+    if (hasIncomplete) setActiveIndex(findBestIndex());
+  }
+}, [data, activeIndex]);
+```
+
+#### Step 3: Check Multi-View Consistency
+If the same state is displayed on multiple tabs/views:
+```bash
+# Find all places the state variable is rendered
+grep -n "activeStepIndex\|activeIndex" --include="*.tsx" -r src/ | grep -v "import\|const\|set"
+```
+- If one view nullifies the state (e.g., `activeTab !== "claim" → null`), other views using the same variable will show fallback values
+- Fix: compute a separate display value for views where the URL state isn't active
+
+#### Step 4: Verify Admin→User Data Flow
+When admin updates data that affects user display:
+1. **Backend**: Does the update endpoint clear related fields? (e.g., clear `flag_message` when marking step "completed")
+2. **Admin UI**: Does optimistic update re-sync with server after success? (call `fetchData()` after PUT)
+3. **User UI**: Is there a background refresh mechanism? (visibility-change listener, polling)
+4. **Audit**: Is the audit action correct for write operations? (not a "view" action for a "write")
+
+#### Step 5: Detection Commands
+```bash
+# Find useEffect guards that may block recalculation
+grep -B5 "=== null" --include="*.tsx" -r src/ | grep "useEffect\|activeStep\|activeIndex\|currentItem"
+
+# Find optimistic updates without refetch
+grep -A10 "Optimistic update" --include="*.tsx" -r src/ | grep -v "fetch\|refetch\|reload"
+
+# Find admin write endpoints using wrong audit action
+grep -B5 "ADMIN_VIEW" --include="*.ts" -r src/worker/ | grep -B5 "PUT\|POST\|DELETE\|update\|create\|delete"
+```
+
+### Admin-User Portal Sync Audit (MANDATORY for dual-portal apps)
+
+**#5 production UX bug class.** When an app has both admin and end-user portals sharing the same database, data written by admin must be correctly reflected in the user's view. This class of bug is insidious because each portal works fine in isolation — the bug only appears when admin acts while the user is already viewing.
+
+#### The Three Sync Failure Modes
+
+| Mode | What Breaks | Example | Root Cause |
+|------|------------|---------|------------|
+| **Stale Navigation** | Data updates but UI pointer doesn't | Progress=71% but shows Step 1 | URL-persisted state not recalculated (see above) |
+| **Stale Data** | User's data never refreshes | Admin marks complete, user still sees "pending" | No background refresh, no polling, no visibility handler |
+| **Dirty Write** | Admin writes incomplete data | Admin marks step complete but flag_message persists | Backend endpoint doesn't clean up related fields |
+
+#### Step 1: Map All Admin Write → User Read Paths
+
+For every admin endpoint that modifies data, trace the full path:
+
+```bash
+# Find all admin PUT/POST/DELETE endpoints
+grep -n "app\.\(put\|post\|delete\).*admin" --include="*.ts" -r src/worker/
+
+# For each endpoint, identify:
+# 1. What table/fields does it write?
+# 2. What user-facing endpoint reads those fields?
+# 3. What user-facing component displays them?
+# 4. How does the component refresh its data?
+```
+
+**Document as a table:**
+```
+Admin Endpoint              → DB Write           → User Endpoint    → User Component     → Refresh Mechanism
+PUT /admin/steps/:id        → steps.status       → GET /api/steps   → Dashboard.tsx       → mount-only (BUG!)
+PUT /admin/clients/:id      → intake.*           → GET /api/intake  → IntakeForm.tsx      → mount-only (BUG!)
+POST /admin/messages        → admin_messages     → GET /api/messages→ Dashboard.tsx       → polling 30s (OK)
+```
+
+Any row where "Refresh Mechanism" is "mount-only" is a bug. User will never see admin changes without manual reload.
+
+#### Step 2: Verify Background Refresh Exists
+
+Every user-facing hook that reads admin-writable data MUST have at least one of:
+
+```bash
+# Check 1: visibilitychange listener (minimum viable sync)
+grep -A20 "useEffect" --include="*.ts" -r src/react-app/hooks/ | grep "visibilitychange"
+
+# Check 2: Polling interval
+grep -n "setInterval\|useInterval" --include="*.ts" -r src/react-app/hooks/
+
+# Check 3: WebSocket/SSE subscription
+grep -n "WebSocket\|EventSource\|onmessage" --include="*.ts" -r src/react-app/
+
+# Check 4: Focus refetch (React Query / SWR pattern)
+grep -n "refetchOnWindowFocus\|revalidateOnFocus" --include="*.ts" -r src/react-app/
+```
+
+**Rule**: If NONE of the above exist for a hook, the user will NEVER see admin changes without manual F5. Add at minimum a `visibilitychange` silent refetch.
+
+**Critical**: Silent refetch must NOT set `isLoading=true`. If it does, returning to the tab shows a full-screen spinner. Use a separate `silentFetch` function that only updates data state, not loading state.
+
+#### Step 3: Verify Admin Write Endpoints Clean Up Related Fields
+
+When admin advances a status (e.g., step → completed), all fields that only make sense for the previous status must be cleared:
+
+```bash
+# Find admin UPDATE statements
+grep -A5 "UPDATE.*SET.*status" --include="*.ts" -r src/worker/ | grep -v "flag_message\|notes\|reason"
+# If the UPDATE only sets status but not related fields → BUG
+```
+
+**Common dirty write patterns:**
+- Step marked "completed" but `flag_message` ("Missing documents") still shows on user dashboard
+- Claim status changed to "approved" but `rejection_reason` still populated
+- User deactivated but `session_token` not invalidated
+
+**Rule**: Every admin status-change endpoint must include a CASE clause or explicit NULL set for dependent fields:
+```sql
+-- ✅ CORRECT: Clear flag when completing
+UPDATE steps SET status = ?, 
+  flag_message = CASE WHEN ? = 'completed' THEN NULL ELSE flag_message END
+WHERE ...
+```
+
+#### Step 4: Verify Optimistic Updates Re-Sync
+
+Admin UIs often use optimistic updates for responsiveness. But optimistic state can diverge from server truth if it never re-syncs:
+
+```bash
+# Find optimistic updates
+grep -B5 -A15 "Optimistic update\|optimistic" --include="*.tsx" -r src/react-app/pages/Admin
+
+# For each, verify: after the API call succeeds, is fetchData() called?
+# Pattern to look for:
+#   try { await securePut(...); await fetchClientData(); }  ← CORRECT
+#   try { await securePut(...); haptic.success(); }         ← BUG: no re-sync
+```
+
+**Rule**: Every optimistic update MUST call `fetchData()` after successful API response to pull back server-computed side effects (intake.is_complete, cleared flags, computed timestamps).
+
+#### Step 5: Verify Audit Actions Match Operation Type
+
+Admin write operations must log the correct audit action — not a "view" action:
+
+```bash
+# Find write endpoints using view audit actions
+grep -B10 "AuditActions\.\(ADMIN_VIEW\|VIEW\)" --include="*.ts" -r src/worker/ | grep -B10 "PUT\|POST\|DELETE"
+```
+
+**Rule**: `PUT`/`POST`/`DELETE` handlers must use write-specific audit actions (`ADMIN_UPDATE_*`, `ADMIN_CREATE_*`, `ADMIN_DELETE_*`). Using `ADMIN_VIEW_CLIENT` for a write operation makes audit logs useless for investigating who changed what.
+
+#### Step 6: Verify Multi-View Consistency
+
+If the same data appears on multiple tabs/views, each view must show the correct current state:
+
+```bash
+# Find state variables used across multiple tab views
+grep -n "activeStepIndex\|activeTab\|currentStep" --include="*.tsx" -r src/react-app/pages/ | \
+  grep -v "const\|set\|import" | awk -F: '{print $2}' | sort -u
+```
+
+**Common trap**: State derived from URL params (e.g., `activeStepIndex`) is nullified when user is on a different tab. If the overview tab renders "Step X of Y" using the same variable, it shows the fallback value (usually Step 1) instead of the actual next step.
+
+**Rule**: Data-driven display values should be computed from data (useMemo), not from navigation state. Navigation state tells you *where the user is*; data tells you *what to show*.
+
+#### Pre-Ship Checklist for Admin-User Sync
+
+Run this checklist before shipping ANY change that touches admin endpoints or user data display:
+
+- [ ] Every admin write endpoint clears dependent fields on status change
+- [ ] Every admin write endpoint uses the correct audit action (not VIEW for writes)
+- [ ] Every admin optimistic update calls fetchData after success
+- [ ] Every user-facing data hook has visibility-change silent refetch
+- [ ] Silent refetch does NOT trigger loading spinner (separate silentFetch function)
+- [ ] URL-persisted navigation state auto-advances when data changes
+- [ ] Multi-tab/multi-view displays use data-derived values, not navigation state
+- [ ] No useEffect that only initializes once but depends on externally-changeable data
 
 ## Deploy Session Invalidation (SPA + Cloudflare Workers)
 
@@ -3543,7 +3796,7 @@ Before investigating bugs or verifying fixes on deployed sites, warm up Chrome C
 CDP="node $HOME/.claude/skills/chrome-cdp/scripts/cdp.mjs"
 
 # Find the production tab (adjust URL for the project)
-TARGET=$($CDP list 2>/dev/null | grep "yourapp.pages.dev\|yourapp.example.com" | awk '{print $1}' | head -1)
+TARGET=$($CDP list 2>/dev/null | grep "aiva-m9t.pages.dev\|aivaclaims.com" | awk '{print $1}' | head -1)
 
 # If found, pre-warm the daemon (avoids "Allow" popup on subsequent commands)
 if [ -n "$TARGET" ]; then
@@ -3590,6 +3843,9 @@ Before marking ANY task complete, you MUST achieve ZERO lint errors and ZERO sec
 
 ```bash
 # LINT: Fix ALL errors to zero — no "pre-existing" exceptions
+# This applies to BOTH Biome AND ESLint. Both must reach 0 errors.
+
+# BIOME:
 # Step 1: Ensure biome.json properly excludes non-source paths (dist/, node_modules/)
 # Step 2: Run biome check --fix . to auto-fix what it can
 # Step 3: Manually fix ALL remaining errors (missing keys, formatting, etc.)
@@ -3597,6 +3853,13 @@ Before marking ANY task complete, you MUST achieve ZERO lint errors and ZERO sec
 # Step 5: Verify: npx biome check . → MUST show 0 errors, 0 warnings
 npx biome check --fix . 2>&1
 npx biome check . 2>&1  # MUST be clean
+
+# ESLINT a11y/React:
+# Step 6: Run ESLint on React source
+# Step 7: Fix ALL errors using patterns from "ESLint a11y & React Hooks Detection" section
+# Step 8: Verify: npx eslint "src/react-app/**/*.{ts,tsx}" → MUST show 0 errors
+timeout 60 npx eslint "src/react-app/**/*.{ts,tsx}" 2>&1
+# 0 errors required. See "ESLint a11y & React Hooks Detection" table for fix patterns.
 
 # SECURITY: Fix ALL vulnerabilities to zero — no severity exceptions
 # Step 1: npm audit → identify all vulnerabilities

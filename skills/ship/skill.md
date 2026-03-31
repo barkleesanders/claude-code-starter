@@ -18,11 +18,14 @@ The following phases are **MANDATORY on every run** — treat them as a checklis
 
 | Phase | Gate | Must reach |
 |-------|------|-----------|
-| 0 | Lint (full project — Biome/ESLint) | 0 errors, 0 warnings |
-| 0 (Stage 1.5) | `npm audit` / security audit | 0 vulnerabilities |
-| 1 | Build (`tsc --noEmit` + build tool) | Exit 0 |
-| 1 | Tests (targeted, with timeout) | All pass |
-| 1 | Project-specific test suites (if `package.json` has `test:worker`, `test:integration`, etc.) | All pass |
+| 0 | Biome lint (full project) | 0 errors, 0 warnings |
+| 0 (Stage 1.5) | `npm audit` | 0 vulnerabilities |
+| 1 | Build (`tsc --noEmit` + `vite build`) | Exit 0 |
+| 1 | Tests (`vitest run --changed` with timeout) | All pass |
+| 1 | Worker route ordering (`test:worker`) | Pass |
+| 1 | DocuSeal integration (`test:docuseal`) | Pass |
+| 1 | ESLint a11y (`lint:a11y`) | 0 errors |
+| 1 | Module-scope throw check | 0 matches |
 | 1.1 | Frontend-backend API contract | 0 missing routes |
 | 1.25 | Security audit + Dependabot alerts | 0 open alerts with available fix |
 | 1.26 | Code scanning hygiene | Auto-fix all |
@@ -30,10 +33,11 @@ The following phases are **MANDATORY on every run** — treat them as a checklis
 | 1.4 | SEO/sitemap consistency | No conflicts |
 | 1.42 | Deploy session invalidation | Handlers exist |
 | 1.45 | Third-party config, XSS, auth guards | No blockers |
+| 1.46 | Admin-user portal sync verification | No BLOCK findings |
 
 **If a phase finds issues, FIX THEM INLINE before moving to the next phase.** Do not defer. Do not warn-and-continue for fixable issues. The goal is: every `/ship` run leaves the repo in a strictly better state than it found it.
 
-**Warnings are NOT acceptable.** Lint must return 0 errors AND 0 warnings. Fix warnings by: (1) auto-fixing, (2) manually fixing remaining issues, or (3) suppressing false positives in linter config with justification. "Pre-existing warnings" is not an excuse — fix them all.
+**Warnings are NOT acceptable.** `biome check .` must return 0 errors AND 0 warnings. Fix warnings by: (1) auto-fixing with `biome check --fix`, (2) manually fixing remaining issues, or (3) suppressing false positives in biome.json overrides with justification. "Pre-existing warnings" is not an excuse — fix them all.
 
 **Dependabot is NOT optional.** If `gh api repos/{owner}/{repo}/dependabot/alerts` returns open alerts with available fixes, add overrides to `package.json`, run install, verify build, commit, and push — all within this run.
 
@@ -61,6 +65,8 @@ done
 sleep 60
 REMAINING=$(gh api "repos/${REPO}/dependabot/alerts" --jq '[.[] | select(.state=="open")] | length')
 if [ "$REMAINING" -gt 0 ]; then
+  # Check manifest_path — if still referencing deleted lockfile, alerts will auto-close
+  # If referencing active lockfile, overrides didn't work — investigate
   gh api "repos/${REPO}/dependabot/alerts" --jq '.[] | select(.state=="open") | "\(.number): \(.dependency.manifest_path)"'
 fi
 ```
@@ -261,7 +267,17 @@ Use standard tools (Grep, Glob, Read) for code discovery. Use `ogrep` if availab
 
 ### Stage 1: Biome Auto-Fix (Standard)
 - Detect Biome configuration (biome.json)
-- If not configured: Skip to Phase 0.5
+- **If not configured: AUTO-SETUP Biome before proceeding** (MANDATORY):
+  1. Run `npx @biomejs/biome init` to create biome.json
+  2. Configure for the project's tech stack:
+     - For React/TSX: ensure JSX support enabled
+     - Add `"files": { "ignore": ["dist/", "node_modules/", "*.min.js"] }` to exclude build output
+     - If Tailwind CSS: add `"css": { "linter": { "enabled": false } }` to avoid @tailwind false positives
+  3. Run `npx @biomejs/biome check --fix .` to auto-fix all fixable issues
+  4. Manually fix any remaining errors
+  5. Run `npx tsc --noEmit --skipLibCheck` to verify no type regressions
+  6. Stage and commit: `git add biome.json && git commit -m "chore: add Biome linter configuration"`
+  7. Continue with normal Biome lint flow below
 - If configured:
   - Run pre-fix scan: `biome check .` to establish baseline
   - Parse output: Extract error count, warning count, fixable issue count
@@ -273,7 +289,11 @@ Use standard tools (Grep, Glob, Read) for code discovery. Use `ogrep` if availab
 
 #### ZERO-TOLERANCE LINT POLICY (MANDATORY — FIX ALL ERRORS)
 
-**There is NO "pre-existing noise" exception.** ALL lint errors in the project must reach 0 before shipping. If `biome check .` reports errors in ANY file (src/, dist/, tools/, anywhere), they MUST be fixed or the biome config must be updated to properly exclude non-source paths.
+**There is NO "pre-existing noise" exception.** ALL lint errors from ALL linters in the project must reach 0 before shipping. This applies to BOTH:
+- **Biome**: `biome check .` — 0 errors
+- **ESLint a11y/React**: `npx eslint "src/react-app/**/*.{ts,tsx}"` — 0 errors
+
+If EITHER tool reports errors, they MUST be fixed. "Pre-existing" errors are NOT an excuse to skip — they are bugs that must be fixed NOW.
 
 **Step 1: Ensure biome.json excludes build output and non-source files**
 ```bash
@@ -288,19 +308,44 @@ Use standard tools (Grep, Glob, Read) for code discovery. Use `ogrep` if availab
 # Use "overrides" to suppress specific rules for specific files
 ```
 
-**Step 2: Fix ALL remaining source errors — no exceptions**
+**Step 2: Fix ALL remaining source errors from BOTH linters — no exceptions**
 ```bash
 # Run biome on entire project
 npx biome check .
 
-# Common fixes that must be applied:
+# Run ESLint a11y on React source
+npx eslint "src/react-app/**/*.{ts,tsx}" 2>&1 | grep "error"
+
+# Common biome fixes:
 # - Missing key props in .map() → add key={uniqueValue}
 # - dangerouslySetInnerHTML with static content → suppress via overrides in biome.json
 # - @tailwind directives → disable CSS linter in biome.json
 # - Formatting issues → npx biome check --fix .
 ```
 
-**Decision rule:** `biome check .` MUST return `0 errors` before proceeding. NOT "0 errors in changed files" — 0 errors TOTAL. Pre-existing issues are bugs that must be fixed NOW, not deferred.
+**Step 2b: ESLint a11y/React Auto-Fix Patterns**
+```bash
+# Common ESLint error patterns and their fixes:
+
+# react-hooks/refs — "Cannot access refs during render"
+# Root cause: useInView/useRef hook returns object with .ref and state, accessed as hero.ref/hero.isInView
+# Fix: Destructure at call site: const { ref: heroRef, isInView: heroInView } = useInView()
+# Then use heroRef and heroInView separately in JSX
+
+# react-hooks/refs — "Cannot update ref during render"
+# Root cause: someRef.current = value during render body
+# Fix: Move into useEffect(() => { someRef.current = value; }, [value])
+
+# jsx-a11y/no-noninteractive-element-interactions — onLoad on <img>
+# onLoad is a media lifecycle event, not a user interaction
+# Fix: eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
+
+# jsx-a11y/no-noninteractive-tabindex — tabIndex on iframe
+# iframes need tabIndex for keyboard navigation
+# Fix: Wrap with eslint-disable/enable block with justification comment
+```
+
+**Decision rule:** BOTH `biome check .` AND `npx eslint "src/react-app/**/*.{ts,tsx}"` MUST return `0 errors` before proceeding. NOT "0 errors in changed files" — 0 errors TOTAL. Pre-existing issues are bugs that must be fixed NOW, not deferred.
 
 ### Stage 2: AI-Powered Manual Fix (INTELLIGENT — NO LIMIT)
 **Trigger**: If errors remain after Stage 1
@@ -434,48 +479,43 @@ timeout 180 npx vitest run 2>&1; pkill -f vitest 2>/dev/null
 - **If tests show 100% pass**: Proceed to Phase 1.1
 - If skipped tests detected: Issue warning but allow proceed if no failures
 
-### PROJECT-SPECIFIC TEST SUITES (AUTO-DETECT)
+### TARGETED TEST SUITES (MANDATORY — replaces GitHub Actions CI)
 
-After the generic `vitest run --changed` pass, auto-detect and run any project-specific test suites from `package.json`. Each is BLOCKING.
+After the generic `vitest run --changed` pass, run these specific test suites that the CI workflow used to handle. Each is BLOCKING — if any fail, stop deployment.
 
 ```bash
-# Auto-detect available test scripts and run them
-for SCRIPT in test:worker test:docuseal test:integration; do
-  if grep -q "\"$SCRIPT\"" package.json 2>/dev/null; then
-    echo "Running $SCRIPT..."
-    timeout 60 npx vitest run $(node -e "console.log(JSON.parse(require('fs').readFileSync('package.json','utf8')).scripts['$SCRIPT'].replace('vitest run ',''))" 2>/dev/null) 2>&1
-    EXIT=$?; pkill -f vitest 2>/dev/null
-    if [ $EXIT -ne 0 ]; then
-      echo "BLOCK: $SCRIPT failed (exit $EXIT)"
-    fi
-  fi
-done
+# 1. Worker route ordering — catch-all route must be LAST
+timeout 60 npx vitest run src/worker/index.test.ts 2>&1; EXIT=$?; pkill -f vitest 2>/dev/null
+# BLOCK if exit != 0 — means app.all("*") is before API routes
 
-# ESLint a11y (if configured)
-if grep -q '"lint:a11y"' package.json 2>/dev/null; then
-  timeout 60 npx eslint "src/react-app/**/*.{ts,tsx}" 2>&1
-fi
+# 2. DocuSeal integration — signing flow must not regress
+timeout 60 npx vitest run tests/docuseal-integration.test.ts 2>&1; EXIT=$?; pkill -f vitest 2>/dev/null
+# BLOCK if exit != 0 — DocuSeal integration is fragile, took multiple attempts to stabilize
 
-# Module-scope throw check (React apps)
-if [ -d "src/react-app" ]; then
-  MATCHES=$(grep -rn "^throw \|^  throw " src/react-app/ --include="*.ts" --include="*.tsx" \
-    | grep -v ".test." | grep -v "node_modules" \
-    | grep -v "main.tsx.*Root element" | grep -v "utils/api.ts" || true)
-  if [ -n "$MATCHES" ]; then
-    echo "BLOCK: Found throw at module scope in react-app"
-    echo "$MATCHES"
-  fi
+# 3. ESLint a11y — accessibility + React hooks rules
+timeout 60 npx eslint "src/react-app/**/*.{ts,tsx}" 2>&1; EXIT=$?
+# BLOCK if exit != 0
+# There is NO "pre-existing" exception for ESLint errors.
+# ALL errors (jsx-a11y/*, react-hooks/refs, etc.) MUST be fixed before deploying.
+# See "Step 2b: ESLint a11y/React Auto-Fix Patterns" in ZERO-TOLERANCE LINT POLICY above.
+# If errors exist, FIX THEM using the documented patterns, then re-run.
+
+# 4. Module-scope throw check — React silent startup killer
+MATCHES=$(grep -rn "^throw \|^  throw " src/react-app/ --include="*.ts" --include="*.tsx" \
+  | grep -v ".test." | grep -v "node_modules" \
+  | grep -v "main.tsx.*Root element" | grep -v "utils/api.ts" || true)
+if [ -n "$MATCHES" ]; then
+  echo "BLOCK: Found throw at module scope in react-app"
+  echo "$MATCHES"
 fi
 ```
 
-**Post-deploy production tests** (run in Phase 4.1 after deployment):
+**Post-deploy production tests** (run in Phase 4.1 after wrangler deploy):
 ```bash
-# If project has production integration tests, run them after deploy
-if grep -q '"test:integration:prod"' package.json 2>/dev/null; then
-  timeout 60 TEST_BASE_URL=$DEPLOY_URL npx vitest run tests/worker-integration.test.ts 2>&1
-  pkill -f vitest 2>/dev/null
-  # WARN if fails (already deployed, but flag for investigation)
-fi
+# 5. Production integration tests — verifies live endpoints
+timeout 60 TEST_BASE_URL=https://aivaclaims.com npx vitest run tests/worker-integration.test.ts 2>&1
+pkill -f vitest 2>/dev/null
+# WARN if fails (don't block — already deployed, but flag for investigation)
 ```
 
 ---
@@ -974,6 +1014,90 @@ Required protocol:
 
 ---
 
+## Phase 1.46: ADMIN-USER SYNC VERIFICATION (BLOCKING)
+
+**Purpose**: Detect admin-to-user data sync gaps that cause the "admin marks something but user doesn't see it" class of bugs. Runs automatically when changes touch admin endpoints, user-facing hooks, or shared data models.
+
+**Trigger**: Auto-detect if staged changes touch any of:
+- `src/worker/` files with "admin" in path or containing admin route handlers
+- `src/react-app/hooks/` (data fetching hooks)
+- `src/react-app/pages/Dashboard` or `src/react-app/pages/Admin`
+- Database migration files
+
+If none of the above are touched, skip to Phase 1.5.
+
+### Check 1: Admin Write Endpoints Must Clean Up Related Fields
+```bash
+# Find admin UPDATE statements that set status but don't handle dependent fields
+grep -A3 "UPDATE.*SET.*status" --include="*.ts" -r src/worker/ | grep -v "flag_message\|notes\|reason\|NULL"
+```
+- If admin status-change UPDATE doesn't handle dependent fields: **WARN** — stale data may show on user side
+
+### Check 2: User Data Hooks Must Have Background Refresh
+```bash
+# List all custom hooks that call secureFetch/fetch for user data
+HOOKS=$(grep -l "secureFetch\|fetch(" --include="*.ts" src/react-app/hooks/ 2>/dev/null)
+for hook in $HOOKS; do
+  HOOKNAME=$(basename "$hook")
+  HAS_VISIBILITY=$(grep -c "visibilitychange" "$hook" 2>/dev/null || echo 0)
+  HAS_POLLING=$(grep -c "setInterval\|useInterval" "$hook" 2>/dev/null || echo 0)
+  if [ "$HAS_VISIBILITY" = "0" ] && [ "$HAS_POLLING" = "0" ]; then
+    echo "WARN: $HOOKNAME has no background refresh (no visibilitychange or polling)"
+  fi
+done
+```
+- If any user data hook lacks background refresh: **WARN** — admin changes invisible until manual reload
+
+### Check 3: Silent Refetch Must Not Trigger Loading Spinner
+```bash
+# Find visibility/polling refetch that calls the main fetch (which sets isLoading=true)
+for hook in $(grep -l "visibilitychange" --include="*.ts" src/react-app/hooks/ 2>/dev/null); do
+  HOOKNAME=$(basename "$hook")
+  # Check if visibility handler calls the spinner-triggering fetch vs a silent version
+  VISIBILITY_CALLS=$(grep -A5 "visibilitychange" "$hook" | grep -o "[a-zA-Z]*[Ff]etch[a-zA-Z]*" | head -1)
+  if echo "$VISIBILITY_CALLS" | grep -qv "silent\|Silent\|quiet\|background"; then
+    # Check if that function sets isLoading
+    if grep -A10 "const $VISIBILITY_CALLS" "$hook" | grep -q "setIsLoading(true)\|setLoading(true)"; then
+      echo "BLOCK: $HOOKNAME visibility refetch triggers loading spinner (will flash on tab switch)"
+    fi
+  fi
+done
+```
+- If visibility refetch triggers spinner: **BLOCK** — full-screen flash every time user switches tabs
+
+### Check 4: Optimistic Updates Must Re-Sync
+```bash
+# Find optimistic updates in admin pages
+grep -B2 -A20 "Optimistic update\|optimistic" --include="*.tsx" -r src/react-app/pages/Admin 2>/dev/null | \
+  grep -c "fetchClientData\|refetch\|fetchData" || echo "0"
+```
+- If optimistic update block has no fetchData call after success: **WARN** — server-computed side effects lost
+
+### Check 5: URL-Persisted State Must Auto-Advance
+```bash
+# Find useEffect guards that skip recalculation when state is already set
+grep -B2 -A8 "=== null" --include="*.tsx" -r src/react-app/pages/ | \
+  grep -B5 "activeStep\|activeIndex\|currentStep\|activeTab" | \
+  grep "useEffect\|return;"
+```
+- If useEffect only initializes when state is null but data can change externally: **WARN** — stale navigation
+
+### Check 6: Admin Write Audit Actions Match Operation
+```bash
+# Find write endpoints using view/read audit actions
+grep -B15 "AuditActions" --include="*.ts" -r src/worker/ | \
+  grep -B15 "ADMIN_VIEW\|VIEW_CLIENT\|VIEW_CASE" | \
+  grep "put\|post\|delete\|PUT\|POST\|DELETE\|update\|create" 2>/dev/null
+```
+- If write endpoint uses a "VIEW" audit action: **WARN** — audit trail is misleading
+
+### Decision Logic
+- **If any BLOCK found**: Fix inline before continuing
+- **If only WARNs**: Display all warnings, continue (not a deploy blocker but should be fixed)
+- **If clean**: Display "Admin-user sync: all checks passed" and continue
+
+---
+
 ## Phase 1.5: DEPLOYMENT VERIFICATION (CONDITIONAL)
 
 **Auto-detect risky changes** by scanning staged changes for:
@@ -1242,7 +1366,7 @@ curl -s "$DEPLOY_URL" | grep -oP '(og|twitter):image" content="\K[^"]+'
 agent-browser open "https://www.opengraph.xyz"
 sleep 2
 agent-browser snapshot -i -c
-agent-browser fill "@eN" "https://yourapp.example.com"
+agent-browser fill "@eN" "https://aivaclaims.com"
 agent-browser press Enter
 sleep 5
 agent-browser screenshot --path /tmp/og-preview-twitter.png
@@ -1250,12 +1374,12 @@ agent-browser scroll down 500
 agent-browser screenshot --path /tmp/og-preview-full.png
 
 # Also screenshot direct OG image
-agent-browser open "https://yourapp.example.com/images/og-social-card.png?v=20260306"
+agent-browser open "https://aivaclaims.com/images/og-social-card.png?v=20260306"
 sleep 2
 agent-browser screenshot --path /tmp/og-image-direct.png
 
 # Trigger Twitter re-scrape
-agent-browser open "https://x.com/intent/tweet?text=https://yourapp.example.com"
+agent-browser open "https://x.com/intent/tweet?text=https://aivaclaims.com"
 sleep 3
 ```
 
@@ -1268,7 +1392,7 @@ sleep 3
 # Download Twitter's cached card image
 curl -s -o /tmp/twitter-cached.jpg "https://pbs.twimg.com/card_img/XXXXX/XXXXX?format=jpg&name=medium"
 # Download what our server actually serves
-curl -s -H "User-Agent: Twitterbot/1.0" -o /tmp/served.png "$(curl -s -H 'User-Agent: Twitterbot/1.0' https://yourapp.example.com/ | grep -oP 'twitter:image" content="\K[^"]+')"
+curl -s -H "User-Agent: Twitterbot/1.0" -o /tmp/served.png "$(curl -s -H 'User-Agent: Twitterbot/1.0' https://aivaclaims.com/ | grep -oP 'twitter:image" content="\K[^"]+')"
 # Compare: if different = cache issue (add ?v=), if same = image file needs updating
 ```
 
@@ -1278,14 +1402,12 @@ curl -s -H "User-Agent: Twitterbot/1.0" -o /tmp/served.png "$(curl -s -H 'User-A
 | **Page metadata** | og:image URL for page | Card Validator or `?v=N` on page URL |
 | **Image CDN** | Image bytes at CDN | `?v=YYYYMMDD` on image URL in meta tags |
 
-### Production Integration Tests (post-deploy)
+### Production Integration Tests (replaces CI `test-production` job)
 ```bash
-# If project has production integration tests, run them against live site
-if grep -q '"test:integration:prod"' package.json 2>/dev/null; then
-  timeout 60 TEST_BASE_URL=$DEPLOY_URL npx vitest run tests/worker-integration.test.ts 2>&1
-  pkill -f vitest 2>/dev/null
-  # WARN if fails (already deployed) — flag for investigation, do not auto-rollback
-fi
+# Run the same integration tests the CI ran against live production
+timeout 60 TEST_BASE_URL=https://aivaclaims.com npx vitest run tests/worker-integration.test.ts 2>&1
+pkill -f vitest 2>/dev/null
+# If fails: WARN (already deployed) — flag for investigation, do not auto-rollback
 ```
 
 ### Sitemap Live Check
@@ -1748,6 +1870,10 @@ After push: `gh pr checks <PR_NUMBER> --watch`
 - Phase 4: BLOCK if `CLOUDFLARE_API_TOKEN` in `.env.local` overrides wrangler OAuth (auth conflict)
 - Phase 4: Verify `version.json` is in `.gitignore` and not git-tracked (prevents stale commits)
 - Phase 4: Verify service worker has `version.json` in NETWORK_ONLY patterns (prevents SW caching)
+- Phase 1.46: BLOCK if visibility refetch triggers loading spinner (full-screen flash on tab switch)
+- Phase 1.46: WARN if user data hooks lack background refresh (admin changes invisible until reload)
+- Phase 1.46: WARN if admin status-change endpoints don't clean up dependent fields
+- Phase 1.46: WARN if optimistic updates don't re-sync with server after success
 - Phase 1.45: BLOCK if critical third-party env vars missing from wrangler config
 - Phase 1.45: BLOCK if raw `.innerHTML =` without escapeHtml() (XSS risk — especially entry points outside src/)
 - Phase 1.45: BLOCK if dangerouslySetInnerHTML without DOMPurify (XSS risk)

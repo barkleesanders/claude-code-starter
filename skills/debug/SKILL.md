@@ -134,11 +134,11 @@ Full guide: `/carmack` Silent React Startup Failure section
 
 ### Pattern 4: Cloudflare WWW Redirect Auth Break
 
-Cookies set on `yourapp.example.com` aren't sent to `www.yourapp.example.com`. Edge cache serves HTML before Worker redirect runs.
+Cookies set on `aivaclaims.com` aren't sent to `www.aivaclaims.com`. Edge cache serves HTML before Worker redirect runs.
 
 #### Quick Detection
 ```bash
-curl -sI "https://www.yourapp.example.com" | grep -E "^(HTTP|location)"
+curl -sI "https://www.aivaclaims.com" | grep -E "^(HTTP|location)"
 # Should return 301 to non-www
 ```
 
@@ -662,7 +662,7 @@ Custom `requireAdmin()` functions in route files that only check Clerk `publicMe
 
 #### Symptoms
 - Admin tabs (Referrals, Users, etc.) show "Could not load data" or "Failed to load" for the real admin
-- `/api/admin/*` routes return 403 for `admin@yourapp.example.com`
+- `/api/admin/*` routes return 403 for `help@aivaclaims.com`
 - No error in logs because the `throw new Error("Admin access required")` is caught and returned as 403
 - Works fine in local dev if you set Clerk metadata there but not in production
 
@@ -671,7 +671,7 @@ Two separate admin authorization mechanisms exist:
 1. **`adminMiddleware`** in `src/worker/index.ts` — checks Clerk metadata OR DB `is_admin=1` (correct)
 2. **Custom `requireAdmin()`** in individual route files — may only check Clerk metadata (wrong)
 
-The production admin (`admin@yourapp.example.com`) uses `is_admin = 1` in the DB. It does NOT have `publicMetadata.role === "admin"` in Clerk. Any route that uses a metadata-only check returns 403 for this user.
+The production admin (`help@aivaclaims.com`) uses `is_admin = 1` in the DB. It does NOT have `publicMetadata.role === "admin"` in Clerk. Any route that uses a metadata-only check returns 403 for this user.
 
 #### Quick Detection
 ```bash
@@ -712,7 +712,7 @@ async function requireAdmin(c: Context<{ Bindings: Env }>) {
 ```
 
 #### Real-World Case: AIVA adminClerk.ts (2026-03-13)
-- **Symptom**: Referrals tab, user lookup, referrers list all showed "Could not load data" for `admin@yourapp.example.com`
+- **Symptom**: Referrals tab, user lookup, referrers list all showed "Could not load data" for `help@aivaclaims.com`
 - **Root cause**: `requireAdmin()` was synchronous and metadata-only. Production admin has `is_admin=1` but no Clerk metadata role.
 - **Fix**: Made `requireAdmin` async with DB `is_admin` fallback; updated all 6 call sites from `requireAdmin(c)` to `await requireAdmin(c)`. Added `Context<{ Bindings: Env }>` type so `c.env.DB` was accessible.
 - **Files**: `src/worker/routes/adminClerk.ts`
@@ -988,13 +988,67 @@ npm run build 2>&1
 - If something goes sideways, STOP and re-plan immediately — don't keep pushing the same approach.
 - If a fix feels hacky: "Knowing everything I know now, implement the elegant solution."
 
-**3. Systematic Debugging (4-Phase from obra/superpowers — S9.2 rated)**
-- Phase 1: Root Cause Investigation — reproduce, trace data flow, check recent changes
-- Phase 2: Pattern Analysis — find working examples, compare, identify differences
-- Phase 3: Hypothesis Testing — single hypothesis only, test minimally, verify
-- Phase 4: Implementation — failing test first, single fix, verify
-- **3-failure rule:** if 3 fixes fail, the approach is wrong — force architectural reassessment
-- For deep systematic debugging: use `/systematic-debugging` skill (full 4-phase methodology + techniques)
+**3. Systematic Debugging (4-Phase — Iron Law)**
+
+```
+NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
+```
+
+If you haven't completed Phase 1, you cannot propose fixes. Use ESPECIALLY when under time pressure, when "just one quick fix" seems obvious, or when previous fixes didn't work.
+
+**Phase 1: Root Cause Investigation**
+1. Read error messages carefully — stack traces, line numbers, error codes
+2. Reproduce consistently — exact steps, every time, or gather more data
+3. Check recent changes — git diff, new dependencies, config, environment
+4. Multi-component systems — log data at EACH component boundary (entry/exit), run once, find WHERE it breaks
+5. Admin-user data sync — if "admin changed X but user sees old X", use the decision tree:
+   - a) Hook has visibilitychange? b) URL state auto-advances? c) Endpoint cleans dependent fields? d) Optimistic update re-syncs? e) Same data source for indicators?
+6. Trace data flow — where does bad value originate? Trace backward through call chain to source. Fix at source, not symptom
+
+**Phase 2: Pattern Analysis**
+1. Find working examples — similar working code in same codebase
+2. Compare against references — read reference implementation COMPLETELY, don't skim
+3. Identify differences — list every difference, however small
+4. Understand dependencies — components, settings, config, assumptions
+
+**Phase 3: Hypothesis and Testing**
+1. Form SINGLE hypothesis — "I think X is the root cause because Y" — write it down
+2. Test minimally — smallest possible change, one variable at a time
+3. Verify before continuing — worked → Phase 4; didn't → NEW hypothesis (don't stack fixes)
+
+**Phase 4: Implementation**
+1. Create failing test case — simplest reproduction, automated if possible
+2. Implement SINGLE fix — address root cause, ONE change, no "while I'm here" improvements
+3. Verify fix — test passes? No other tests broken? Issue actually resolved?
+4. **3-failure rule:** if 3 fixes fail, STOP — question the architecture, not the fix. Discuss with human before attempting more.
+
+**Red Flags (STOP and return to Phase 1):**
+- "Quick fix for now" / "Just try changing X" / "I don't fully understand but this might work"
+- "One more fix attempt" (after 2+ failures)
+- Each fix reveals new problem in different place → architectural problem
+- Proposing solutions before tracing data flow
+
+**Supporting Techniques:**
+
+*Root Cause Tracing* — Bugs manifest deep in the stack. Trace BACKWARD:
+1. Observe symptom → 2. Find immediate cause → 3. What called this? → 4. Keep tracing up → 5. Find original trigger → 6. Fix at source + add validation at each layer (defense-in-depth)
+- Add instrumentation: `console.error('DEBUG:', { directory, cwd, stack: new Error().stack })`
+- For test pollution: run tests one-by-one with bisection to find polluter
+
+*Defense-in-Depth* — After fixing a bug, validate at EVERY layer data passes through:
+- Layer 1: Entry point validation (reject invalid input at API boundary)
+- Layer 2: Business logic validation (data makes sense for this operation)
+- Layer 3: Environment guards (refuse dangerous operations in specific contexts)
+- Layer 4: Debug instrumentation (capture context for forensics)
+- Single validation = "fixed the bug". Four layers = "made the bug impossible"
+
+*Condition-Based Waiting* — Replace arbitrary `sleep`/`setTimeout` with condition polling:
+```typescript
+// ❌ Guessing: await sleep(50); const result = getResult();
+// ✅ Waiting: await waitFor(() => getResult() !== undefined);
+```
+- Poll every 10ms, always include timeout with clear error message
+- Only use arbitrary timeout for known timing behavior (debounce intervals) — document WHY
 
 **4. Verify The Fix Actually Works**
 - Never mark a bug as fixed without proving it.
@@ -1006,6 +1060,78 @@ npm run build 2>&1
 - After ANY correction from the user: write a lesson to memory.
 - Write rules that prevent the same mistake.
 - If you fixed the wrong thing twice, the third attempt must use a fundamentally different approach.
+
+### Pattern 16: Data Stale Between Admin and User Portals
+
+**Symptoms:**
+- Admin marks step/claim/document as complete, but user still sees old status
+- Progress bar shows correct % but navigation says "Step 1 of 7"
+- Data-driven indicators update but navigation/selection doesn't advance
+- User must manually F5 to see admin changes
+- Works fine if user loads page AFTER admin change, but not if page was already open
+
+**Root Causes (decision tree — check in order):**
+1. **No background refresh** — User hook fetches on mount only, no `visibilitychange` listener
+2. **URL-persisted stale pointer** — `?step=1` in URL, useEffect only initializes when `null`, never recalculates
+3. **Dirty write** — Admin marks step "completed" but `flag_message="Missing docs"` persists
+4. **Optimistic desync** — Admin UI uses optimistic update but never calls `fetchData()` after success
+5. **Split-brain display** — Progress bar reads from data (correct), step indicator reads from URL state (stale)
+
+**Quick Detection:**
+```bash
+# Find hooks without background refresh
+for f in src/react-app/hooks/*.ts; do
+  if grep -q "secureFetch" "$f" && ! grep -q "visibilitychange" "$f"; then
+    echo "STALE: $(basename $f) — no background refresh"
+  fi
+done
+
+# Find URL-derived state that only initializes once
+grep -n "=== null" --include="*.tsx" -r src/react-app/pages/ | grep -i "step\|index\|active"
+
+# Find admin UPDATEs without field cleanup
+grep -A3 "UPDATE.*SET.*status" --include="*.ts" -r src/worker/ | grep -v "flag_message\|NULL\|CASE"
+
+# Find optimistic updates without refetch
+grep -B2 -A15 "Optimistic" --include="*.tsx" -r src/react-app/pages/Admin | grep -c "fetchClientData"
+```
+
+**Fix Pattern:**
+```typescript
+// 1. Add silentFetch (no spinner) + visibilitychange to every user hook
+const silentFetch = useCallback(async () => {
+  try {
+    const res = await secureFetch("/api/data");
+    if (res.ok) setData(await res.json());
+  } catch (err) { console.error("Silent refetch failed:", err); }
+}, []);
+
+useEffect(() => {
+  fetchData(); // initial (shows spinner)
+  const handler = () => { if (document.visibilityState === "visible") silentFetch(); };
+  document.addEventListener("visibilitychange", handler);
+  return () => document.removeEventListener("visibilitychange", handler);
+}, [fetchData, silentFetch]);
+
+// 2. Auto-advance URL state when active item is completed
+if (data[activeIndex]?.status === "completed") {
+  const next = data.findIndex(d => d.status !== "completed");
+  if (next !== -1) setActiveIndex(next);
+}
+
+// 3. Clear dependent fields in admin write endpoint
+UPDATE steps SET status = ?,
+  flag_message = CASE WHEN ? = 'completed' THEN NULL ELSE flag_message END
+WHERE ...
+
+// 4. Re-sync after optimistic update
+await securePut(url, body);
+await fetchClientData(); // pull server-computed side effects
+```
+
+**Real-world case (2026-03-30):** AIVA Claims dashboard showed "Step 1 of 7" with 71% progress. `activeStepIndex` was URL-persisted via `?step=1` and the useEffect only initialized when `null`. Admin marked 5 steps complete but user's pointer never advanced. Fixed by: auto-advance logic + silentFetch on all 6 user-facing data hooks.
+
+---
 
 ## Instructions
 
