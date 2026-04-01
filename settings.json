@@ -1,4 +1,7 @@
 {
+  "env": {
+    "ENABLE_TOOL_SEARCH": "false"
+  },
   "permissions": {
     "allow": [
       "Bash(brew install:*)",
@@ -22,8 +25,12 @@
       "Bash(unzip:*)",
       "Bash(for:*)",
       "Bash(do echo:*)",
+      "Bash(if [ -f \"/Users/barkleesanders/AIVA/components/$file\" ])",
+      "Bash(then echo \"✅ EXISTS\")",
+      "Bash(else echo \"❌ MISSING\")",
       "Bash(fi:*)",
       "Bash(done)",
+      "Bash(if [ -f \"/Users/barkleesanders/AIVA/contexts/$file\" ])",
       "Bash([:*)",
       "Bash(do:*)",
       "Bash(echo:*)",
@@ -46,6 +53,7 @@
       "Bash(npm view:*)",
       "Bash(timeout 15s npm run dev:*)",
       "WebSearch",
+      "WebFetch(domain:openrouter.ai)",
       "Bash(PORT=3002 npx ts-node:*)",
       "Bash(PORT=3003 npx ts-node:*)",
       "Bash(PORT=3010 npx ts-node:*)",
@@ -75,11 +83,14 @@
       "Bash(git checkout:*)",
       "Bash(vercel --prod)",
       "Bash(vercel:*)",
+      "WebFetch(domain:aiva-2f3i2o7m8-barkleesanders-projects.vercel.app)",
       "Bash(ast-grep:*)",
       "Bash(git pull:*)",
       "Bash(git rm:*)",
       "Bash(git rev-parse:*)",
       "Bash(npx vitest run:*)",
+      "Bash(/Users/barkleesanders/tools/debug-sessions/va-report-path-traversal/final-verification.sh:*)",
+      "Bash(osgrep:*)",
       "Bash(npx biome check:*)",
       "Bash(gh pr view:*)",
       "Bash(agent-browser:*)",
@@ -88,6 +99,8 @@
       "Bash(git stash:*)",
       "Bash(npx @anthropic-ai/agent-browser:*)",
       "Bash(git reset:*)",
+      "Bash(/usr/local/bin/agent-browser:*)",
+      "Bash(/opt/homebrew/Cellar/node/25.4.0/bin/agent-browser:*)",
       "Bash(gh api:*)",
       "Bash(gh repo view:*)",
       "WebFetch(domain:raw.githubusercontent.com)",
@@ -104,7 +117,42 @@
       "Bash(gh issue view:*)",
       "Bash(gh auth status:*)",
       "Bash(gh repo list:*)",
-      "Bash(npm run deploy:*)"
+      "Bash(npm run deploy:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git tag:*)",
+      "Bash(git remote:*)",
+      "Bash(wc:*)",
+      "Bash(diff:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(sort:*)",
+      "Bash(uniq:*)",
+      "Bash(wrangler whoami:*)",
+      "Bash(wrangler pages:*)",
+      "Bash(wrangler d1:*)",
+      "Bash(wrangler kv:*)",
+      "Bash(biome check:*)",
+      "Bash(biome check --fix:*)",
+      "Bash(npx biome:*)",
+      "Bash(gh run:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh issue list:*)",
+      "Bash(sleep:*)",
+      "Bash(date:*)",
+      "Bash(which:*)",
+      "Bash(type:*)",
+      "Bash(realpath:*)",
+      "Bash(dirname:*)",
+      "Bash(basename:*)",
+      "Bash(ogrep:*)",
+      "Bash(qmd:*)",
+      "Bash(cargo fmt:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(cargo test:*)",
+      "Bash(cargo build:*)",
+      "Bash(cargo check:*)"
     ],
     "deny": [
       "Bash(rm -rf /*)",
@@ -188,6 +236,16 @@
             "type": "command",
             "command": "bd init --quiet --skip-hooks 2>/dev/null || true",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "$HOME/claude-code-boilerplate/scripts/patch-claude-models.sh --check 2>/dev/null || true",
+            "timeout": 3
+          },
+          {
+            "type": "command",
+            "command": "$HOME/claude-code-boilerplate/scripts/backup-claude-config.sh 2>/dev/null || true",
+            "timeout": 30
           }
         ]
       },
@@ -226,16 +284,51 @@
       }
     ]
   },
+  "statusLine": {
+    "type": "command",
+    "command": "node /Users/barkleesanders/claude-hud/dist/index.js"
+  },
   "enabledPlugins": {
     "browserbase@claude-code-plugin": false,
     "typescript-lsp@claude-plugins-official": true,
-    "rust-analyzer-lsp@claude-plugins-official": true
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "codex@openai-codex": true
+  },
+  "extraKnownMarketplaces": {
+    "openai-codex": {
+      "source": {
+        "source": "github",
+        "repo": "openai/codex-plugin-cc"
+      }
+    }
   },
   "alwaysThinkingEnabled": true,
   "effortLevel": "high",
+  "voiceEnabled": true,
+  "skipDangerousModePermissionPrompt": true,
   "mcpServers": {
+    "financial-datasets": {
+      "command": "/opt/homebrew/bin/uv",
+      "args": [
+        "--directory",
+        "/Users/barkleesanders/tools/financial-datasets-mcp",
+        "run",
+        "server.py"
+      ]
+    },
     "cloudflare-api": {
       "url": "https://mcp.cloudflare.com/mcp"
+    },
+    "stitch": {
+      "command": "npx",
+      "args": [
+        "@_davideast/stitch-mcp",
+        "proxy"
+      ],
+      "env": {
+        "STITCH_API_KEY": "YOUR_STITCH_API_KEY_HERE"
+      }
     }
-  }
+  },
+  "customApiKeyResponsibility": true
 }
