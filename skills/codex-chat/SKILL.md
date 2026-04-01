@@ -1,5 +1,6 @@
 ---
 name: codex-chat
+user-invocable: true
 description: Talk to OpenAI Codex CLI from Claude Code. Send prompts, delegate tasks, get second opinions, and run parallel investigations. Use when the user says "ask codex", "codex chat", "talk to codex", "get codex opinion", "codex-chat", or wants to delegate work to Codex for a second perspective.
 allowed-tools:
   - Bash
@@ -210,7 +211,17 @@ $CX exec "Create a rate limiter middleware for Hono that uses Cloudflare KV for 
 
 ## Auth Management
 
-Codex auth tokens expire. Run `codex login` to re-authenticate when needed.
+Codex auth tokens expire and the refresh token gets consumed. Instead of `codex login` (requires browser), sync from cli-proxy-api:
+
+```bash
+# Sync fresh tokens from cli-proxy-api to Codex
+bash ~/.claude/skills/codex-chat/scripts/sync-codex-auth.sh
+
+# Or specify a custom token file
+bash ~/.claude/skills/codex-chat/scripts/sync-codex-auth.sh /path/to/tokens.json
+```
+
+**How it works**: cli-proxy-api on your VPS auto-refreshes Codex OAuth tokens. The sync script copies `access_token`, `refresh_token`, and `id_token` from `~/.cli-proxy-api/codex-barkleesanders@gmail.com.json` into Codex's `~/.codex/auth.json`.
 
 **When to run**: If you see `refresh_token_reused` or `401 Unauthorized` errors from Codex.
 
@@ -219,7 +230,7 @@ Codex auth tokens expire. Run `codex login` to re-authenticate when needed.
 | Problem | Fix |
 |---------|-----|
 | "stdin is not a terminal" | Use `codex exec` not bare `codex` |
-| `refresh_token_reused` / 401 | Run `codex login` to refresh tokens |
+| `refresh_token_reused` / 401 | `sync-codex-auth.sh` (syncs tokens from cli-proxy-api) |
 | Tmux session already exists | `$CX stop` then `$CX start` |
 | Output empty | Check `-o` path exists and is writable |
 | Codex hung/unresponsive | `$CX stop` and try exec mode instead |

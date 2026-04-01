@@ -1,5 +1,6 @@
 ---
 name: file-search
+user-invocable: true
 description: This skill should be used when agents need to search codebases for text patterns or structural code patterns. Provides fast search using ripgrep for text and ast-grep for syntax-aware code search.
 license: MIT
 ---
