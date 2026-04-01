@@ -899,6 +899,34 @@ done
 
 **CSP Lesson (DocuSeal)**: Third-party embeds often load assets from CDNs/cloud storage, not their main domain. Trace actual resource URLs in browser network tab. DocuSeal serves document images from `*.s3.amazonaws.com`, not `docuseal.com`.
 
+**1b. CSP Third-Party Domain Audit (BLOCKING)**:
+
+Third-party services (Clerk, Brevo, DocuSeal, etc.) load images, scripts, and fonts from CDN domains that differ from their API domains. If these CDN domains aren't in the CSP, assets silently fail to load — resulting in broken icons, missing images, or invisible UI elements with no console errors.
+
+```bash
+# Cross-reference: for each third-party used, verify ALL their asset domains are in CSP
+CSP_FILE="src/worker/middleware/securityHeaders.ts"
+
+# Clerk: needs img.clerk.com for social provider icons (Google, Apple logos)
+grep -q "img.clerk.com" "$CSP_FILE" || echo "BLOCK: img-src missing https://img.clerk.com (social login icons will be broken)"
+grep -q "clerk-telemetry" "$CSP_FILE" || echo "WARN: connect-src missing https://*.clerk-telemetry.com (Clerk telemetry blocked)"
+
+# Brevo: needs cdn.brevo.com for widget assets
+grep -q "cdn.brevo.com" "$CSP_FILE" || echo "BLOCK: script-src missing https://cdn.brevo.com"
+
+# DocuSeal: needs *.s3.amazonaws.com for document images
+grep -q "s3.amazonaws.com" "$CSP_FILE" || echo "BLOCK: img-src missing https://*.s3.amazonaws.com (DocuSeal document images)"
+
+# Facebook: needs both www.facebook.com (img pixel) and connect.facebook.net (script)
+grep -q "www.facebook.com" "$CSP_FILE" || echo "BLOCK: img-src missing https://www.facebook.com (Meta Pixel)"
+grep -q "connect.facebook.net" "$CSP_FILE" || echo "BLOCK: script-src missing https://connect.facebook.net"
+
+# Google: needs googletagmanager.com for GA4
+grep -q "googletagmanager.com" "$CSP_FILE" || echo "BLOCK: script-src missing https://www.googletagmanager.com"
+```
+- If ANY third-party asset domain is missing from CSP: **BLOCK** — assets silently fail with no console errors
+- **Rule**: When adding a new third-party service, always check which CDN domains it loads assets from (img, script, style, font, connect) and add ALL of them to the CSP
+
 **2. Admin Auth Parity Check (Cloudflare Workers / Hono)**:
 ```bash
 # Find custom requireAdmin functions in route files
@@ -1874,6 +1902,7 @@ After push: `gh pr checks <PR_NUMBER> --watch`
 - Phase 1.46: WARN if user data hooks lack background refresh (admin changes invisible until reload)
 - Phase 1.46: WARN if admin status-change endpoints don't clean up dependent fields
 - Phase 1.46: WARN if optimistic updates don't re-sync with server after success
+- Phase 1.45: BLOCK if CSP img-src/script-src/connect-src missing third-party CDN domains (broken icons with no console errors)
 - Phase 1.45: BLOCK if critical third-party env vars missing from wrangler config
 - Phase 1.45: BLOCK if raw `.innerHTML =` without escapeHtml() (XSS risk — especially entry points outside src/)
 - Phase 1.45: BLOCK if dangerouslySetInnerHTML without DOMPurify (XSS risk)

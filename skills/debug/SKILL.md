@@ -20,6 +20,7 @@ Fast reference for known production failure patterns. For deep debugging, use `/
 - `/debug react undefined` — React "X is not defined" scope bug
 - `/debug silent startup` — React silently fails to mount
 - `/debug auth failed` — Generic auth error hiding real cause
+- `/debug broken icons` — Third-party icons/images missing (CSP blocking)
 
 ## Known Production Failure Patterns
 
@@ -400,6 +401,24 @@ Three separate deploys needed because CSP was fixed incrementally instead of com
 - **Deploy 3**: Added `*.s3.amazonaws.com` to `img-src` — document finally rendered
 - **Root cause**: DocuSeal serves document page images from **presigned AWS S3 URLs** (`docuseal.s3.amazonaws.com`), not from `docuseal.com`
 - **Lesson**: Always trace the actual resource URLs an embed loads (check network tab or the embed's JS source), don't assume they come from the main domain
+
+#### Real-World Case: AIVA Clerk Social Login Icons (2026-03-31)
+Social provider icons (Google, Apple) on `/sign-up` and `/sign-in` were completely broken — empty boxes with no images, NO console errors (CSP violations don't always surface in console).
+- **Root cause**: `img-src` CSP was missing `https://img.clerk.com`. Clerk serves provider logos from that CDN, not from `*.clerk.com`
+- **Fix**: Added `https://img.clerk.com` to `img-src` in `securityHeaders.ts`
+- **Lesson**: When icons/images from a third-party are broken, ALWAYS check CSP `img-src` FIRST — before assuming CSS color issues. CSP blocks are silent (no console errors by default)
+
+#### Required CSP Domains for Common Third Parties
+```bash
+# Quick audit: verify all third-party CDN domains are in CSP
+CSP_FILE="src/worker/middleware/securityHeaders.ts"
+grep -q "img.clerk.com" "$CSP_FILE"          || echo "MISSING: img-src → https://img.clerk.com (social login icons)"
+grep -q "clerk-telemetry" "$CSP_FILE"         || echo "MISSING: connect-src → https://*.clerk-telemetry.com"
+grep -q "s3.amazonaws.com" "$CSP_FILE"        || echo "MISSING: img-src → https://*.s3.amazonaws.com (DocuSeal images)"
+grep -q "cdn.brevo.com" "$CSP_FILE"           || echo "MISSING: script-src → https://cdn.brevo.com (Brevo widget)"
+grep -q "www.facebook.com" "$CSP_FILE"        || echo "MISSING: img-src → https://www.facebook.com (Meta Pixel)"
+grep -q "googletagmanager.com" "$CSP_FILE"    || echo "MISSING: script-src → https://www.googletagmanager.com (GA4)"
+```
 
 ---
 
@@ -1140,4 +1159,4 @@ When this skill is invoked:
 1. If user provides a pattern name, show the relevant pattern section
 2. If user describes a symptom, match it to the closest known pattern
 3. If the issue needs deep investigation, recommend `/carmack`
-4. **NEVER deploy to production automatically.** If a fix is ready, tell the user what was fixed and ask: "Ready to deploy? I can run `/ship` when you give the go-ahead." Do NOT invoke `/ship` without explicit user approval.
+4. **DEPLOYMENT PROHIBITION (MANDATORY):** NEVER deploy to production. NEVER run `wrangler deploy`, `npm run deploy`, `vercel deploy --prod`, or any production deployment command. If a fix is implemented and committed, STOP and tell the user: "Fix is committed and ready. Run `/ship` to deploy to production." Wait for explicit user approval. Do NOT invoke `/ship` autonomously.

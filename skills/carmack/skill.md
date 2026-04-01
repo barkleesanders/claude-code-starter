@@ -1,7 +1,7 @@
 ---
 name: carmack
 user-invocable: true
-description: "Universal engineering agent: build features, fix bugs, deep debugging. Covers planning (PRDs, brainstorming), code review (TypeScript/React 19, Rust, security, performance), feature implementation (ralph mode), git safety, browser automation, task tracking, Codex second-opinion, and web research. The one skill for all engineering work."
+description: "Universal engineering agent: build features, fix bugs, deep debugging. Covers planning (PRDs, brainstorming), code review (TypeScript/React 19, Rust, security, performance), feature implementation (ralph mode), git safety, browser automation, task tracking, Codex review & rescue, and web research. The one skill for all engineering work."
 ---
 
 # /carmack - Engineering Agent
@@ -329,6 +329,18 @@ grep -rn "grid-cols-2" --include="*.tsx" src/ | grep -v "sm:grid-cols"
 
 # 6. Find user preference writes without App.tsx restoration
 grep -rn "localStorage.setItem" --include="*.tsx" src/react-app/ | grep -v "App.tsx"
+
+# 7. CSP blocking third-party assets (broken icons/images with NO console errors)
+# When images/icons are broken, ALWAYS check CSP before assuming color/CSS issues
+CSP_FILE=$(find src/worker -name "securityHeaders*" -o -name "csp*" 2>/dev/null | head -1)
+if [ -n "$CSP_FILE" ]; then
+  echo "=== CSP Third-Party Domain Audit ==="
+  grep -q "img.clerk.com" "$CSP_FILE" || echo "MISSING: img-src needs https://img.clerk.com (Clerk social icons)"
+  grep -q "clerk-telemetry" "$CSP_FILE" || echo "MISSING: connect-src needs https://*.clerk-telemetry.com"
+  grep -q "cdn.brevo.com" "$CSP_FILE" || echo "MISSING: script-src needs https://cdn.brevo.com"
+  grep -q "s3.amazonaws.com" "$CSP_FILE" || echo "MISSING: img-src needs https://*.s3.amazonaws.com (DocuSeal)"
+  grep -q "www.facebook.com" "$CSP_FILE" || echo "MISSING: img-src needs https://www.facebook.com (Meta Pixel)"
+fi
 ```
 
 ### UX Pre-Check Triage Table
@@ -344,6 +356,7 @@ grep -rn "localStorage.setItem" --include="*.tsx" src/react-app/ | grep -v "App.
 | `<iframe>` with blob URL for PDFs | P1 — Blank on iOS | Detect iOS, show Open/Download buttons instead |
 | `max-h-[90vh]` on modals | P2 — iOS address bar | Use `max-h-[90dvh]` (dynamic viewport height) |
 | `opacity-0 group-hover:opacity-100` only | P2 — Invisible on touch | Add always-visible alternative button |
+| Broken/missing third-party icons (no console errors) | P1 — CSP blocking assets | Check `img-src` in CSP for third-party CDN domains (e.g., `img.clerk.com`) |
 
 ### iOS Safari Compatibility Quick Scan
 
@@ -1651,6 +1664,8 @@ Check for:
 - [ ] Hono HTML: Flex layouts use `shrink-0` on icons and `min-w-0` on text wrappers
 - [ ] Hono HTML: No rigid `min-w-[Npx]` on flex children (use `shrink-0` instead)
 - [ ] Hono HTML: Fixed-width columns (`w-28`, `w-20`) use `sm:` breakpoint or stack on mobile
+- [ ] CSP: Every third-party service's CDN domains are in `img-src`/`script-src`/`connect-src` (missing = broken icons with NO console errors)
+- [ ] CSP: When adding a new third-party integration, trace its actual asset CDN domains (often different from API domain — e.g., Clerk API is `*.clerk.com` but icons are `img.clerk.com`)
 
 ---
 
@@ -1829,6 +1844,7 @@ If you discover a reusable pattern, add it to `## Codebase Patterns` at the TOP 
 - Phase 4: Implementation (failing test first, single fix, verify)
 - **Red flags — STOP and return to Phase 1:** "Quick fix for now", "Just try changing X", "I don't fully understand but this might work", "One more fix attempt" (after 2+ failures)
 - 3-failure limit: if 3 fixes fail, force architectural reassessment — the approach is wrong
+  - Offer Codex rescue as an alternative: `/codex:rescue [issue + evidence gathered]`
 - **"Data appears stale" shortcut:** If the bug is "admin changed X but user still sees old X", skip generic debugging and go straight to the admin-user sync decision tree:
   1. Does the user hook have `visibilitychange` refresh? → If no, that's the bug
   2. Does the admin endpoint clean up dependent fields? → If no, dirty write
@@ -1887,6 +1903,9 @@ If ANY checkbox is unchecked, the story is not done.
 - **TypeScript/React**: `npm run build && timeout 120 npx vitest run --changed`
 - **Rust**: `cargo fmt --all -- --check && cargo clippy --all-targets && cargo check`
 - **Python**: `ruff check . && mypy . && pytest`
+
+**Optional Codex review gate:**
+After quality checks pass, offer `/codex:review --background` for cross-model validation. Check `/codex:status` before marking the entire feature complete.
 
 #### Browser Testing (Required for Frontend Stories)
 
@@ -2582,98 +2601,66 @@ bd stats                                     # Project statistics
 
 ---
 
-## Second Opinion (Codex)
+## Codex Integration
 
-Use Codex CLI for complex debugging, code analysis, and getting a second perspective on difficult problems.
+Use the Codex plugin for structured code review, adversarial security analysis, and rescue escalation. These replace the old `codex exec` file pipe.
 
-### When to Use Codex
+### Codex Review (Quality Gate)
 
-- Debugging subtle bugs (bitstream alignment, off-by-one errors)
-- Analyzing complex algorithms against specifications
-- Getting a detailed code review with specific bug identification
-- Understanding obscure file formats or protocols
-- When you've tried multiple approaches and are stuck
+Run `/codex:review` for structured review with JSON findings (severity, file, line, confidence, recommendation).
 
-### The File-Based Pattern
+**When carmack triggers it:**
+- **Phase 4 (Implementation & Verification):** Before presenting a fix to the user, run:
+  `/codex:review --wait --scope working-tree`
+  Present findings alongside the fix. Never auto-apply Codex recommendations.
+- **Ralph Mode (after story commit):** After quality checks pass, offer:
+  `/codex:review --background --scope working-tree`
+  Continue to next story; check `/codex:status` before marking the feature complete.
 
-**Step 1: Create a question file**
+**Interpreting results:**
+- `verdict: "approve"` — No material issues. Proceed.
+- `verdict: "needs-attention"` — Present all findings to user by severity. Do NOT auto-fix.
+- High-confidence findings (>0.8) on critical/high severity = strong signal to address before shipping.
 
-```
-Write to /tmp/question.txt:
-- Clear problem statement
-- The specific error or symptom
-- The relevant code (full functions, not snippets)
-- What you've already tried
-- Specific questions you want answered
+### Adversarial Review (Security-Sensitive Changes)
 
-Example structure:
-I have a [component] that fails with [specific error].
+Run `/codex:adversarial-review` when changes touch security-sensitive code. Always optional, never mandatory.
 
-Here is the full function:
-```c
-[paste complete code]
-```
+**Suggest adversarial review when changes touch:**
+- Auth, permissions, tenant isolation
+- Payment processing, billing logic
+- Data deletion, migrations, schema changes
+- Rate limiting, CORS, API keys
+- Session handling, token validation
 
-Key observations:
-1. [What works]
-2. [What fails]
+**Example:** `/codex:adversarial-review --background focus: auth bypass via publicMetadata race condition`
 
-Can you identify:
-1. [Specific question 1]
-2. [Specific question 2]
+**Phase 0b integration:** After lint/security scan passes and before marking task complete, if changed files match security-sensitive patterns above, suggest running adversarial review.
 
-Please write a detailed analysis to /tmp/reply.txt
-```
+### Codex Rescue (Escalation)
 
-**Step 2: Invoke Codex**
+Use `/codex:rescue` when carmack is stuck. Delegates substantial work to a Codex subagent.
 
-```bash
-cat /tmp/question.txt | codex exec -o /tmp/reply.txt --full-auto
-```
+**Escalation triggers (offer, never auto-trigger):**
+1. **3-failure limit:** After 3 failed fix attempts, offer: "Delegate to Codex rescue for independent investigation?"
+2. **Stuck in Phase 1:** No root cause after extended investigation. Offer rescue with gathered evidence.
 
-Flags: `exec` (non-interactive), `-o /tmp/reply.txt` (output file), `--full-auto` (run autonomously).
+**Example:** `/codex:rescue Investigate intermittent 500 on /api/auth -- tried X, Y, Z. Evidence: [logs]. Root cause unknown.`
 
-**Step 3: Read the reply**
+Codex rescue is write-capable by default. Review any changes it makes before accepting.
+Use `--resume` to continue a previous rescue session, `--fresh` to start clean.
 
-```bash
-# Use the Read tool on /tmp/reply.txt
-```
+### Background Job Management
 
-Evaluate suggestions critically — Codex may identify real bugs but can occasionally misinterpret specifications.
+- `/codex:status` — Check active/recent Codex jobs for this repo
+- `/codex:result [job-id]` — Get full output for a finished job (includes session ID for `codex resume`)
+- `/codex:cancel [job-id]` — Cancel an active job
 
-### Quick Pattern (Short Questions)
+### Review Gate (Optional Safety Net)
 
-```bash
-echo "Explain the JPEG progressive AC refinement algorithm" | codex exec --full-auto
-```
-
-### Tips
-
-1. **Provide complete code**: Don't truncate functions. Codex needs full context.
-2. **Be specific**: "Why does Huffman decoding fail after 1477 blocks in AC refinement?" not "Why does this fail?"
-3. **Include the spec**: If debugging against a standard (JPEG, PNG), mention relevant spec sections.
-4. **Verify suggestions**: Always verify against authoritative sources.
-5. **Iterate**: If first response doesn't solve it, create a new question.txt with additional context.
-
-### Models Available via VibeProxy
-
-```bash
-# Default — uses gpt-5.1-codex via VibeProxy on port 8317
-cat /tmp/question.txt | codex exec -o /tmp/reply.txt --full-auto
-
-# Higher reasoning effort
-cat /tmp/question.txt | codex exec -m gpt-5.1-codex-max -o /tmp/reply.txt --full-auto
-```
-
-Available models: `gpt-5.1-codex` (default), `gpt-5.1-codex-low`, `gpt-5.1-codex-medium`, `gpt-5.1-codex-high`, `gpt-5.1-codex-max`, `gpt-5.1-codex-max-high`, `gpt-5.1-codex-max-xhigh`.
-
-Codex config: `~/.codex/config.toml` — base URL: `http://127.0.0.1:8317/v1`
-
-### Common Issues
-
-- **"stdin is not a terminal"**: Use `codex exec` not bare `codex`
-- **No output**: Check that `-o` flag has a valid path
-- **Timeout**: For very complex questions, `--full-auto` flag avoids interactive prompts that would block
+Enable stop-time review gate to have Codex automatically review the last turn before session end:
+`/codex:setup --enable-review-gate`
+Warning: Can create long-running Claude/Codex loops. Only enable when actively monitoring.
 
 ---
 
@@ -2821,7 +2808,7 @@ After delivering, offer: "Want another prompt? Just tell me what you're creating
 1. **Root Cause Investigation** — Gather evidence, no assumptions
 2. **Pattern Analysis** — Find similar issues, related code
 3. **Hypothesis & Testing** — Form and test theories
-4. **Implementation & Verification** — Fix with approval checkpoint
+4. **Implementation & Verification** — Fix with approval checkpoint; offer `/codex:review --wait` before presenting fix
 5. **Session Persistence** — Save state for resumability
 
 ## Code Search Tools
@@ -3911,6 +3898,25 @@ Apply the change to **ALL** instances found — not just the first one. If you o
 
 **The rule**: If grep finds N instances, your PR must touch all N. Document any intentional exceptions.
 
+**DEPLOYMENT PROHIBITION (MANDATORY — NEVER VIOLATE):**
+
+**/carmack does NOT deploy to production. EVER.** Carmack builds, implements, tests, and commits — but NEVER runs deployment commands. When implementation is complete:
+
+1. **STOP** before deploying
+2. **Tell the user** what was built, what was committed, and that it's ready to deploy
+3. **Suggest `/ship`** for production deployment
+4. **Wait for explicit user approval** — do NOT proceed to deploy autonomously
+
+**BLOCKED commands** (never execute from /carmack):
+- `wrangler deploy` — BLOCKED
+- `npm run deploy` — BLOCKED
+- `vercel deploy --prod` — BLOCKED
+- Any command that pushes code to a production environment
+
+**Why:** User requires separation between implementation and deployment. Carmack bypassed /ship quality gates by deploying directly. Deployment decisions belong to the user.
+
+**Incident (2026-03-26):** Carmack deployed directly via `wrangler deploy` without asking, bypassing all /ship quality gates. User set this as a permanent rule.
+
 1. **For feature requests**: Run the Build Decision Framework FIRST — check if the user is about to build something that already exists as a service/library. Flag time sinks before writing code.
 2. **For bugs/debugging**: Use the 5-Phase Workflow with repro harnesses and debugger attachment.
 3. Use the Task tool with `subagent_type: carmack-mode-engineer`
@@ -3918,8 +3924,10 @@ Apply the change to **ALL** instances found — not just the first one. If you o
 5. The agent will build repro harnesses and attach debuggers as needed
 6. Approval checkpoint before implementing fixes
 7. **After every git push**: Run GitHub Actions CI Gate — detect if repo has workflows, watch all checks with `gh pr checks --watch` or `gh run watch`, and if any fail: read logs with `gh run view --log-failed`, fix the issue, commit, push, and repeat (max 3 retries). Do NOT consider the task complete until all CI checks are green.
+8. **NEVER deploy** — when done, tell the user to run `/ship` for production deployment.
 
 ```
 Launch carmack-mode-engineer agent now with the user's issue description.
 IMPORTANT: After EVERY git push, check if the repo has GitHub Actions workflows (ls .github/workflows/ or gh run list --limit 3). If yes, watch all checks until they complete. If any check fails, read the failure logs with `gh run view <RUN_ID> --log-failed`, fix the issue, commit, push, and repeat — up to 3 retry cycles. Do NOT consider the task complete until all CI checks are green.
+CRITICAL: Do NOT deploy to production. Do NOT run `wrangler deploy`, `npm run deploy`, `vercel deploy --prod`, or any production deployment command. When implementation is complete, STOP and tell the user to run `/ship` for deployment. This is a hard rule — the user requires explicit approval before any production deploy.
 ```
