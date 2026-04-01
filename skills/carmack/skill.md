@@ -69,6 +69,7 @@ Determine mode from the user's request, then read ONLY the relevant reference fi
 **Additional context (load when applicable):**
 - If working in an AIVA project (cwd contains "aiva" or project references aivaclaims.com): also read `aiva-guidelines.md`
 - For all modes except research/browser: also read `preflight-checks.md`
+- **For ALL modes**: also read `~/.claude/skills/shared/ant-verification-protocol.md` (ant-level quality gates)
 
 All reference files are in `~/.claude/skills/carmack/references/`.
 
@@ -127,6 +128,7 @@ Vitest fork workers leak ~5GB memory each when they hang:
 | `task-tracking.md` | PRD to prd.json conversion, agent-testable tasks, beads tracking |
 | `aiva-guidelines.md` | AIVA-specific: color ban, VA palette, OG/favicon standards, admin auth pattern |
 | `preflight-checks.md` | Pre-flight: CDP warmup, codebase audit, code coverage, lint/security auto-fix |
+| `~/.claude/skills/shared/ant-verification-protocol.md` | **Ant-level quality gates**: OWASP Top 10 sweep, truthfulness protocol, closed-loop verification, enhanced review |
 
 ---
 
@@ -182,6 +184,14 @@ Before invoking the Task tool, print a brief status message:
 2. Read the relevant reference files from `~/.claude/skills/carmack/references/`
 3. If working in an AIVA project directory, also read `aiva-guidelines.md`
 4. For implementation/debug modes, also read `preflight-checks.md`
+
+**STEP 1.5 — Apply Ant-Level Verification Protocol (MANDATORY):**
+
+Load `~/.claude/skills/shared/ant-verification-protocol.md` and apply:
+- **debug mode**: Security Review Gate (Section 1) on all files in the investigation
+- **feature mode**: Full OWASP sweep + Truthfulness Protocol on implementation
+- **review mode**: Enhanced Code Review (Section 5) on top of existing checklists
+- **ALL modes**: Closed-Loop Verification (Section 3) — never declare done without evidence
 
 **STEP 2 — Launch the agent:**
 

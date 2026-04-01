@@ -81,6 +81,7 @@ All reference files are in `~/.claude/skills/debug/references/`.
 | `csp-cache-patterns.md` | Social card cache (#5), CSP multi-layer blocking (#9), www redirect (#4), deploy chunk invalidation, CF Pages stale deploy |
 | `infrastructure-patterns.md` | Infra destruction (#6), Rust cross-platform lint (#7), Homebrew keg-only (#8), serde config crash (#10), XSS innerHTML, JSON-LD breakout |
 | `debugging-discipline.md` | 4-phase workflow, diagnostic checklist (20 items), lint/security cleanup, data stale admin/user (#16) |
+| `~/.claude/skills/shared/ant-verification-protocol.md` | **Ant-level quality gates**: OWASP sweep, truthfulness protocol, closed-loop verification |
 
 ---
 
@@ -131,10 +132,15 @@ When this skill is invoked:
 
 1. Parse the user's symptom or pattern name against the **Pattern Routing** table above
 2. Read ONLY the matching reference file from `~/.claude/skills/debug/references/`
-3. Show the relevant pattern section to the user
-4. If the symptom doesn't match any pattern, show the **Quick Diagnostic Checklist** and recommend `/carmack` for deep investigation
-5. If a fix is needed, follow the 4-phase debugging discipline (load `debugging-discipline.md`)
-6. After any fix: run lint + security cleanup (load `debugging-discipline.md` for the commands)
+3. **Load `~/.claude/skills/shared/ant-verification-protocol.md`** and apply:
+   - Truthfulness Protocol (Section 2): never guess root causes — gather evidence first
+   - Closed-Loop Verification (Section 3): reproduce failure BEFORE and AFTER fix
+   - Security Review Gate (Section 1): if symptom touches auth/input/data handling
+4. Show the relevant pattern section to the user
+5. If the symptom doesn't match any pattern, show the **Quick Diagnostic Checklist** and recommend `/carmack` for deep investigation
+6. If a fix is needed, follow the 4-phase debugging discipline (load `debugging-discipline.md`)
+7. After any fix: run lint + security cleanup (load `debugging-discipline.md` for the commands)
+8. **Ant verification**: never say "fixed" without running the verification checklist from Section 2
 
 ```
 Load the matching reference file and show the relevant pattern.

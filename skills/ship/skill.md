@@ -184,6 +184,7 @@ All reference files are in `~/.claude/skills/ship/references/`. Read the relevan
 | `infra-and-admin.md` | 1.45, 1.46, 1.5 | Third-party config, CSP audit, XSS checks, admin auth, infra protection, admin-user sync, risky change verification |
 | `deployment.md` | 2, 3, 3.5, 4 | Override path, GitHub push, README/changelog, Vercel/Cloudflare/Docker deploy |
 | `post-deploy.md` | 4.1-4.6, 5, 6 | Post-deploy verification, multi-agent review, web perf, visual regression, rollback, CI gate, monitoring, PR babysitter |
+| `~/.claude/skills/shared/ant-verification-protocol.md` | 1.27, 1.28 | **Ant-level quality gates**: OWASP Top 10 sweep, supply chain audit, enhanced security review |
 
 ---
 
@@ -204,6 +205,8 @@ Read ALL reference files at the start of a `/ship` run. Execute phases in this e
 11. **Phase 1.4**: SEO & sitemap consistency (from `seo-and-session.md`)
 12. **Phase 1.42**: Session invalidation check (from `seo-and-session.md`)
 13. **Phase 1.45**: Third-party config & infra protection (from `infra-and-admin.md`)
+13.5. **Phase 1.27**: OWASP Top 10 sweep on changed files (from `ant-verification-protocol.md` Section 1)
+13.6. **Phase 1.28**: Supply chain & enhanced review on new deps (from `ant-verification-protocol.md` Section 5)
 14. **Phase 1.46**: Admin-user sync verification (from `infra-and-admin.md`)
 15. **Phase 1.5**: Deployment verification for risky changes (from `infra-and-admin.md`)
 16. **Phase 2**: Manual override path (from `deployment.md`)
@@ -375,12 +378,15 @@ When this skill is invoked:
 
 **STEP 1 — Read all reference files:**
 
-Read all 9 reference files from `~/.claude/skills/ship/references/` to have full deployment protocol available.
+Read all 9 reference files from `~/.claude/skills/ship/references/` PLUS `~/.claude/skills/shared/ant-verification-protocol.md` (ant-level quality gates) to have full deployment protocol available.
 
 **STEP 2 — Execute phases in order:**
 
 Follow the Phase Execution Order above, reading the detailed instructions from the corresponding reference file for each phase. Fix all issues inline before advancing to the next phase.
 
-**STEP 3 — Verify before declaring success:**
+**STEP 3 — Verify before declaring success (Ant-Level Truthfulness Protocol):**
 
-Run the Pre-Ship Verification Checklist. Do NOT say "deployed successfully" until every item passes.
+Run the Pre-Ship Verification Checklist. Apply the Truthfulness Protocol from ant-verification-protocol.md Section 2:
+- Every claim must be backed by command output (curl, build log, test result)
+- Never say "deployed successfully" without curl evidence of new bundle hash
+- If ANY check fails, fix it — don't report success with caveats
