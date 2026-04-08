@@ -90,6 +90,7 @@ Or if you're ready to deploy:
 | `/ralph` | Autonomous feature implementation |
 | `/prd` | Product requirements document generation |
 | `/brainstorming` | AI-assisted brainstorming |
+| `/token-usage` | Analyze token usage across all projects and sessions |
 | + many more | See `skills/` directory |
 
 ### Commands (21)
@@ -154,6 +155,31 @@ Production deployment with comprehensive quality gates:
 | 1 | ship-working-code | Silent failures, security, tests |
 | 2 | systematic-debugging | Blind spots, test quality, rate limits |
 | 3 | carmack-mode-engineer | Code archaeology, critical paths |
+
+## Token Usage Tracking
+
+Track how many tokens your Claude Code sessions consume across all projects:
+
+```
+/token-usage              # All time usage
+/token-usage 7            # Last 7 days
+/token-usage 2025-01-15   # Since specific date
+```
+
+Or run the script directly:
+
+```bash
+python3 ~/.claude/skills/token-usage/token-usage.py
+SINCE_DAYS=7 python3 ~/.claude/skills/token-usage/token-usage.py
+```
+
+Generates a report at `~/.claude/usage/token_report.md` with:
+- Total tokens across all projects and sessions
+- Per-project breakdown (input, cache, output)
+- Top 25 costliest sessions with first prompt context
+- Subagent token consumption analysis
+
+All data stays local — nothing is sent anywhere.
 
 ## Debug Session Persistence
 
