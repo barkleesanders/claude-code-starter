@@ -63,6 +63,9 @@ Match the user's symptom to the right reference file, then load ONLY that file.
 | serde, deny_unknown_fields, config crash | Serde Config Crash (#10) | `infrastructure-patterns.md` |
 | innerHTML, XSS, dangerouslySetInnerHTML | XSS via innerHTML | `infrastructure-patterns.md` |
 | JSON-LD, script breakout | JSON-LD Breakout | `infrastructure-patterns.md` |
+| cannot find module, postinstall, npm install broke, every update breaks | File Extension Mismatch / Broken Postinstall (#17/#18) | `infrastructure-patterns.md` |
+| npm-cli.js, shell script, SyntaxError unexpected string | npm-cli.js Shell Script Corruption (#17) | `infrastructure-patterns.md` |
+| installing deps one by one, each reveals another missing | Non-Fatal Postinstall Cascade (#18) | `infrastructure-patterns.md` |
 | stale data, admin user sync, visibilitychange | Data Stale Admin/User (#16) | `debugging-discipline.md` |
 | systematic, 4-phase, root cause, discipline | Debugging Discipline | `debugging-discipline.md` |
 | lint, biome, npm audit, security cleanup | Lint & Security Cleanup | `debugging-discipline.md` |
@@ -99,8 +102,10 @@ When debugging any production error, check in order:
 8. Check CSP (all six directives for embeds?)
 9. Text overflow on mobile? (`min-w-0` missing, `grid-cols-2` without `sm:`)
 10. Preference not persisting? (localStorage writer without App.tsx reader)
+11. "Cannot find module" after every update? Run `file <path>.js` — may be a shell script (#17)
+12. Installing missing deps one-by-one, each reveals another? STOP — postinstall is broken (#18)
 
-For the full 20-item checklist, load `debugging-discipline.md`.
+For the full 22-item checklist, load `debugging-discipline.md`.
 
 ---
 

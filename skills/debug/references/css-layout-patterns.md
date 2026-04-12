@@ -87,7 +87,7 @@ grep -rn "justify-between" --include="*.tsx" src/ | grep -v "flex-1"
 - [ ] Card container: `overflow-hidden` (safety net -- clipping only, not a substitute for min-w-0)
 - [ ] 2-col grids: test at 375px or change to `grid-cols-1 sm:grid-cols-2`
 
-### Real-World Case: AIVA Dashboard (2026-03-13)
+### Real-World Case: Production App Dashboard (2026-03-13)
 - **Symptom**: "Templates", "Referral Program" text escaping card boxes on iPhone
 - **Root cause**: `grid-cols-2` -> 65px cells, but text divs had `min-width: auto` -> claimed ~70px
 - **Fix**: `min-w-0 flex-1` on flex containers, `flex-shrink-0` on icons, `grid-cols-1 sm:grid-cols-2`
@@ -143,7 +143,7 @@ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
 - **Blob URL lifetime** -- iOS Safari may garbage-collect blob URLs faster than desktop. Don't revoke URLs while they're still in use
 - **`<input type="file">`** -- iOS opens the photo picker, not file system. Use `accept` attribute to filter
 
-### Real-World Case: AIVA (2026-03-15)
+### Real-World Case: Production App (2026-03-15)
 - **Symptom**: Document preview worked on desktop, blank/unresponsive on iPhone
 - **Root cause**: `PDFPreview.tsx` used `<iframe src={blobUrl}>` -- iOS Safari can't render PDFs in iframes
 - **Fix**: Detect iOS, show "Open PDF" + "Download PDF" buttons instead of iframe. Desktop keeps inline viewer.

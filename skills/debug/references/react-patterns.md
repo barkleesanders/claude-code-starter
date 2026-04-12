@@ -159,7 +159,7 @@ grep -n "localStorage.getItem" src/react-app/App.tsx
 grep -rn "document.documentElement.style" --include="*.tsx" src/react-app/ | grep -v "App.tsx"
 ```
 
-### Real-World Case: AIVA Text Size (2026-03-13)
+### Real-World Case: Production App Text Size (2026-03-13)
 - **Symptom**: A+/A-/A text size selection saved but reset on every page refresh
 - **Root cause**: `TextSizeControl.tsx` wrote to localStorage, but no App.tsx reader -- DOM reverted to `html { font-size: 16px }` on every new load
 - **Fix**: Added `useEffect([], [])` to `App.tsx` that reads `dashboardFontSize` and applies to `document.documentElement.style.fontSize` on mount

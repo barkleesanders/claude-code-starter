@@ -9,7 +9,7 @@ Before investigating bugs or verifying fixes on deployed sites, warm up Chrome C
 CDP="node $HOME/.claude/skills/chrome-cdp/scripts/cdp.mjs"
 
 # Find the production tab (adjust URL for the project)
-TARGET=$($CDP list 2>/dev/null | grep "aiva-m9t.pages.dev\|aivaclaims.com" | awk '{print $1}' | head -1)
+TARGET=$($CDP list 2>/dev/null | grep "your-app.pages.dev\|your-app.com" | awk '{print $1}' | head -1)
 
 # If found, pre-warm the daemon (avoids "Allow" popup on subsequent commands)
 if [ -n "$TARGET" ]; then

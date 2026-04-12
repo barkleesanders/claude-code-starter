@@ -2,11 +2,11 @@
 
 ## Pattern 4: Cloudflare WWW Redirect Auth Break
 
-Cookies set on `aivaclaims.com` aren't sent to `www.aivaclaims.com`. Edge cache serves HTML before Worker redirect runs.
+Cookies set on `your-app.com` aren't sent to `www.your-app.com`. Edge cache serves HTML before Worker redirect runs.
 
 ### Quick Detection
 ```bash
-curl -sI "https://www.aivaclaims.com" | grep -E "^(HTTP|location)"
+curl -sI "https://www.your-app.com" | grep -E "^(HTTP|location)"
 # Should return 301 to non-www
 ```
 
@@ -62,7 +62,7 @@ grep -rn "og-card\|og-social\|og-image\|og_image" index.html src/worker/seo/ src
 ### Why File Rename Alone Doesn't Work
 Renaming `og-social-card.png` -> `og-card-2026.png` busts the image CDN cache but NOT the page metadata cache. Twitter still serves its cached card for `yoursite.com` until re-crawled. The `?v=` param on the image URL busts BOTH layers because Twitter treats it as a new image URL it has never fetched.
 
-### Real-World Case: AIVA OG Card (2026-03-06)
+### Real-World Case: Production App OG Card (2026-03-06)
 - **Symptom**: Twitter showed $1.38M card, server had $1.42M card
 - **Investigation**: File rename + meta tag fixes deployed, but Twitter's `pbs.twimg.com` CDN still served old image
 - **Root cause**: Two cache layers -- page metadata AND image CDN both stale
@@ -124,7 +124,7 @@ curl -s "https://api.docuseal.com/templates/$ID" -H "X-Auth-Token: $KEY"
 3. Check where the embed serves **images** from -- it's often a CDN subdomain, NOT the main domain
 4. Redeploy and verify the full form renders (not just form fields)
 
-### Real-World Case: AIVA DocuSeal (2026-03-08)
+### Real-World Case: Production App DocuSeal (2026-03-08)
 Three separate deploys needed because CSP was fixed incrementally instead of comprehensively:
 - **Deploy 1**: Added `docuseal.com` to `frame-src`, `connect-src`, `script-src` -- form fields appeared but document was blank
 - **Deploy 2**: Added `docuseal.com` to `img-src`, `style-src`, `font-src` -- still blank document
@@ -132,7 +132,7 @@ Three separate deploys needed because CSP was fixed incrementally instead of com
 - **Root cause**: DocuSeal serves document page images from **presigned AWS S3 URLs** (`docuseal.s3.amazonaws.com`), not from `docuseal.com`
 - **Lesson**: Always trace the actual resource URLs an embed loads (check network tab or the embed's JS source), don't assume they come from the main domain
 
-### Real-World Case: AIVA Clerk Social Login Icons (2026-03-31)
+### Real-World Case: Production App Clerk Social Login Icons (2026-03-31)
 Social provider icons (Google, Apple) on `/sign-up` and `/sign-in` were completely broken -- empty boxes with no images, NO console errors (CSP violations don't always surface in console).
 - **Root cause**: `img-src` CSP was missing `https://img.clerk.com`. Clerk serves provider logos from that CDN, not from `*.clerk.com`
 - **Fix**: Added `https://img.clerk.com` to `img-src` in `securityHeaders.ts`
@@ -173,7 +173,7 @@ grep "CDN-Cache-Control" src/worker/middleware/securityHeaders.ts         # Edge
 2. **ErrorBoundary**: Detect `ChunkLoadError` / `dynamically imported module` and auto-reload once
 3. **securityHeaders**: Add `CDN-Cache-Control: no-store` header to prevent CF edge caching stale HTML
 
-### Real-World Case: AIVA (2026-03-15)
+### Real-World Case: Production App (2026-03-15)
 - **Symptom**: User had to re-login after every `wrangler deploy`
 - **Root cause**: CF edge cached HTML with old chunk refs. Old chunks 404'd as HTML (SPA fallback). React crashed.
 - **Fix**: Three-layer defense (client preload recovery + ErrorBoundary chunk detection + CDN cache header)

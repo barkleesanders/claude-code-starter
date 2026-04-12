@@ -25,7 +25,7 @@ nano-banana must also be installed (see `/nano-banana` skill).
 ```bash
 # Premium quality (OmniHuman 1.5) — ~$3.68 for 30s
 ~/.claude/skills/avatar-video/scripts/generate-avatar.sh \
-  "Hi, I'm your AIVA Claims assistant. I'm here to help you navigate your VA disability claim." \
+  "Hi, I'm your your app assistant. I'm here to help you navigate your VA disability claim." \
   --quality premium
 
 # Budget quality (Infinite Talk) — ~$1.88 for 30s
@@ -42,7 +42,7 @@ nano-banana "professional headshot of a woman, studio lighting, neutral backgrou
 
 # 2. Generate voice (MiniMax Speech)
 ~/.claude/skills/avatar-video/scripts/minimax-tts.sh \
-  "Hello, welcome to AIVA Claims" \
+  "Hello, welcome to your app" \
   --voice Friendly_Person \
   --output speech.mp3
 

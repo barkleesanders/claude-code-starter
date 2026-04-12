@@ -97,7 +97,7 @@ fi
 **Post-deploy production tests** (run in Phase 4.1 after wrangler deploy):
 ```bash
 # 5. Production integration tests — verifies live endpoints
-timeout 60 TEST_BASE_URL=https://aivaclaims.com npx vitest run tests/worker-integration.test.ts 2>&1
+timeout 60 TEST_BASE_URL=https://your-app.com npx vitest run tests/worker-integration.test.ts 2>&1
 pkill -f vitest 2>/dev/null
 # WARN if fails (don't block — already deployed, but flag for investigation)
 ```

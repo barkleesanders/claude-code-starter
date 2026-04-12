@@ -65,9 +65,9 @@ Determine mode from the user's request, then read ONLY the relevant reference fi
 | task, prd.json, stories, tracking | **task** | `task-tracking.md` |
 | deploy, CI, push, ship (read-only context) | **deploy** | `deploy-patterns.md` |
 | UX, accessibility, responsive, mobile | **ux** | `ux-patterns.md`, `responsive-design.md` |
+| audit docs, check for lies, verify against source, legal document, fabrication, hallucination | **legal-audit** | `legal-document-audit.md` |
 
 **Additional context (load when applicable):**
-- If working in an AIVA project (cwd contains "aiva" or project references aivaclaims.com): also read `aiva-guidelines.md`
 - For all modes except research/browser: also read `preflight-checks.md`
 - **For ALL modes**: also read `~/.claude/skills/shared/ant-verification-protocol.md` (ant-level quality gates)
 
@@ -106,6 +106,28 @@ Vitest fork workers leak ~5GB memory each when they hang:
 - **ALWAYS** show `terraform plan` output and get approval before any `apply`
 - Before ANY infra command: what resources are affected? Is it reversible? Could it affect unintended resources?
 
+### Post-Change Verification (MANDATORY — from internal VERIFICATION_AGENT pattern)
+
+After implementing ANY code change:
+1. **Read the changed file(s) back** — verify the edit was applied correctly
+2. **If tests exist**, run them (with `timeout 120`)
+3. **If the change affects a build**, run the build and confirm exit 0
+4. **If the change is a bug fix**, verify the original symptom no longer reproduces
+5. **Never report "done" based on the edit alone** — verify the outcome with evidence
+
+Word budget: **25 words max between tool calls, 100 words max final answer.** Lead with action, not explanation.
+
+---
+
+## Agent Spawning Rules (from internal Coordinator Mode)
+
+When using the Agent tool to delegate work:
+1. **Each agent prompt MUST be fully self-contained** — include all file paths, context, constraints, and verification steps
+2. **Never reference "the current file" or "what we discussed"** — the subagent has zero context from this conversation
+3. **Include the verification step in the agent prompt itself** — don't rely on post-agent verification
+4. **Synthesize findings before delegating follow-up** — never chain agents blindly
+5. **Use parallel agents when work is independent** — launch multiple Agent calls in a single message
+
 ---
 
 ## Reference Files Index
@@ -126,8 +148,8 @@ Vitest fork workers leak ~5GB memory each when they hang:
 | `research.md` | Last30days web research, Reddit/X/web synthesis, prompt generation |
 | `skill-creation.md` | Creating & editing SKILL.md files, frontmatter, progressive disclosure |
 | `task-tracking.md` | PRD to prd.json conversion, agent-testable tasks, beads tracking |
-| `aiva-guidelines.md` | AIVA-specific: color ban, VA palette, OG/favicon standards, admin auth pattern |
 | `preflight-checks.md` | Pre-flight: CDP warmup, codebase audit, code coverage, lint/security auto-fix |
+| `legal-document-audit.md` | 5 hallucination patterns (fabricated citations, fake phones, invented people, name transposition, exhibit drift), audit procedure, sweep script |
 | `~/.claude/skills/shared/ant-verification-protocol.md` | **Ant-level quality gates**: OWASP Top 10 sweep, truthfulness protocol, closed-loop verification, enhanced review |
 
 ---
@@ -182,8 +204,7 @@ Before invoking the Task tool, print a brief status message:
 
 1. Parse the user's request against the Mode Detection table above
 2. Read the relevant reference files from `~/.claude/skills/carmack/references/`
-3. If working in an AIVA project directory, also read `aiva-guidelines.md`
-4. For implementation/debug modes, also read `preflight-checks.md`
+3. For implementation/debug modes, also read `preflight-checks.md`
 
 **STEP 1.5 — Apply Ant-Level Verification Protocol (MANDATORY):**
 

@@ -49,7 +49,7 @@ curl -s "$DEPLOY_URL" | grep -oP '(og|twitter):image" content="\K[^"]+'
 agent-browser open "https://www.opengraph.xyz"
 sleep 2
 agent-browser snapshot -i -c
-agent-browser fill "@eN" "https://aivaclaims.com"
+agent-browser fill "@eN" "https://your-app.com"
 agent-browser press Enter
 sleep 5
 agent-browser screenshot --path /tmp/og-preview-twitter.png
@@ -57,12 +57,12 @@ agent-browser scroll down 500
 agent-browser screenshot --path /tmp/og-preview-full.png
 
 # Also screenshot direct OG image
-agent-browser open "https://aivaclaims.com/images/og-social-card.png?v=20260306"
+agent-browser open "https://your-app.com/images/og-social-card.png?v=20260306"
 sleep 2
 agent-browser screenshot --path /tmp/og-image-direct.png
 
 # Trigger Twitter re-scrape
-agent-browser open "https://x.com/intent/tweet?text=https://aivaclaims.com"
+agent-browser open "https://x.com/intent/tweet?text=https://your-app.com"
 sleep 3
 ```
 
@@ -75,7 +75,7 @@ sleep 3
 # Download Twitter's cached card image
 curl -s -o /tmp/twitter-cached.jpg "https://pbs.twimg.com/card_img/XXXXX/XXXXX?format=jpg&name=medium"
 # Download what our server actually serves
-curl -s -H "User-Agent: Twitterbot/1.0" -o /tmp/served.png "$(curl -s -H 'User-Agent: Twitterbot/1.0' https://aivaclaims.com/ | grep -oP 'twitter:image" content="\K[^"]+')"
+curl -s -H "User-Agent: Twitterbot/1.0" -o /tmp/served.png "$(curl -s -H 'User-Agent: Twitterbot/1.0' https://your-app.com/ | grep -oP 'twitter:image" content="\K[^"]+')"
 # Compare: if different = cache issue (add ?v=), if same = image file needs updating
 ```
 
@@ -88,7 +88,7 @@ curl -s -H "User-Agent: Twitterbot/1.0" -o /tmp/served.png "$(curl -s -H 'User-A
 ### Production Integration Tests (replaces CI `test-production` job)
 ```bash
 # Run the same integration tests the CI ran against live production
-timeout 60 TEST_BASE_URL=https://aivaclaims.com npx vitest run tests/worker-integration.test.ts 2>&1
+timeout 60 TEST_BASE_URL=https://your-app.com npx vitest run tests/worker-integration.test.ts 2>&1
 pkill -f vitest 2>/dev/null
 # If fails: WARN (already deployed) — flag for investigation, do not auto-rollback
 ```

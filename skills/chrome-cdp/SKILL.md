@@ -19,7 +19,7 @@ The "Allow debugging" modal fires **once per tab** when a daemon first connects.
 
 1. **Pre-warm daemons** for tabs you use often (production sites, staging):
    ```bash
-   bash ~/.claude/skills/chrome-cdp/scripts/ensure-cdp.sh https://aiva-m9t.pages.dev/
+   bash ~/.claude/skills/chrome-cdp/scripts/ensure-cdp.sh https://your-app.pages.dev/
    ```
    This finds or opens the tab, warms the daemon (one popup), then all subsequent commands work instantly for 20 minutes.
 

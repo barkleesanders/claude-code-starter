@@ -70,7 +70,7 @@ $CX exec "Review the auth flow in src/worker/routes/ for security issues" -o /tm
 $CX exec "Deep analysis of this race condition" -m gpt-5.4
 
 # With working directory (Codex runs in that project)
-$CX exec "Run the tests and fix any failures" -C ~/AIVA-Frontend
+$CX exec "Run the tests and fix any failures" -C ~/your-app
 
 # Read the response (if using -o flag)
 cat /tmp/review.txt
@@ -105,7 +105,7 @@ CX="bash ~/.claude/skills/codex-chat/scripts/codex-tmux.sh"
 # Start a session
 $CX start
 $CX start --model gpt-5.4              # Specific model
-$CX start --cd ~/AIVA-Frontend          # Specific directory
+$CX start --cd ~/your-app          # Specific directory
 
 # Send a prompt and read the response
 $CX ask "Look at src/worker/routes/admin.ts — is the auth check correct?"
@@ -176,7 +176,7 @@ $CX exec "I'm fixing a bug where React fails to mount silently. The root cause i
 bash ~/.claude/skills/codex-chat/scripts/codex-tmux.sh exec \
   "Investigate all useEffect calls in src/react-app/ — which ones are anti-patterns that should be refactored? List file:line for each." \
   -o /tmp/codex-useeffect-audit.txt \
-  -C ~/AIVA-Frontend &
+  -C ~/your-app &
 
 # Claude continues working...
 # Later, read the result:
@@ -197,7 +197,7 @@ $(cat /tmp/changes.diff)"
 
 ```bash
 # Codex can write code in its sandbox
-$CX exec "Create a rate limiter middleware for Hono that uses Cloudflare KV for storage. It should support per-IP and per-user limits with sliding window. Write the complete implementation." -C ~/AIVA-Frontend -o /tmp/rate-limiter.txt
+$CX exec "Create a rate limiter middleware for Hono that uses Cloudflare KV for storage. It should support per-IP and per-user limits with sliding window. Write the complete implementation." -C ~/your-app -o /tmp/rate-limiter.txt
 ```
 
 ## Tips
@@ -221,7 +221,7 @@ bash ~/.claude/skills/codex-chat/scripts/sync-codex-auth.sh
 bash ~/.claude/skills/codex-chat/scripts/sync-codex-auth.sh /path/to/tokens.json
 ```
 
-**How it works**: cli-proxy-api on your VPS auto-refreshes Codex OAuth tokens. The sync script copies `access_token`, `refresh_token`, and `id_token` from `~/.cli-proxy-api/codex-barkleesanders@gmail.com.json` into Codex's `~/.codex/auth.json`.
+**How it works**: cli-proxy-api on your VPS auto-refreshes Codex OAuth tokens. The sync script copies `access_token`, `refresh_token`, and `id_token` from `~/.cli-proxy-api/codex-you.json` into Codex's `~/.codex/auth.json`.
 
 **When to run**: If you see `refresh_token_reused` or `401 Unauthorized` errors from Codex.
 

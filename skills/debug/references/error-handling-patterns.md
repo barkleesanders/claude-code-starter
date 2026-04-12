@@ -57,7 +57,7 @@ try {
 | Database error | 503 or 500 | Connection failed, query error |
 | Business logic validation | 400 or 422 | Bad input |
 
-### Real-World Case: AIVA Benefits Finder (2026-02-27)
+### Real-World Case: Production App Benefits Finder (2026-02-27)
 - **Symptom**: "Unauthorized: Token verification failed" on every benefits search
 - **Root cause**: Clerk API call in the same try-catch was failing, but the catch returned 401
 - **Fix**: Split into JWT try-catch (401) and service try-catch (503)
@@ -101,7 +101,7 @@ Custom `requireAdmin()` functions in route files that only check Clerk `publicMe
 
 ### Symptoms
 - Admin tabs (Referrals, Users, etc.) show "Could not load data" or "Failed to load" for the real admin
-- `/api/admin/*` routes return 403 for `help@aivaclaims.com`
+- `/api/admin/*` routes return 403 for `admin@example.com`
 - No error in logs because the `throw new Error("Admin access required")` is caught and returned as 403
 - Works fine in local dev if you set Clerk metadata there but not in production
 
@@ -110,7 +110,7 @@ Two separate admin authorization mechanisms exist:
 1. **`adminMiddleware`** in `src/worker/index.ts` -- checks Clerk metadata OR DB `is_admin=1` (correct)
 2. **Custom `requireAdmin()`** in individual route files -- may only check Clerk metadata (wrong)
 
-The production admin (`help@aivaclaims.com`) uses `is_admin = 1` in the DB. It does NOT have `publicMetadata.role === "admin"` in Clerk. Any route that uses a metadata-only check returns 403 for this user.
+The production admin (`admin@example.com`) uses `is_admin = 1` in the DB. It does NOT have `publicMetadata.role === "admin"` in Clerk. Any route that uses a metadata-only check returns 403 for this user.
 
 ### Quick Detection
 ```bash
@@ -150,8 +150,8 @@ async function requireAdmin(c: Context<{ Bindings: Env }>) {
 // All call sites must await: requireAdmin(c) -> await requireAdmin(c)
 ```
 
-### Real-World Case: AIVA adminClerk.ts (2026-03-13)
-- **Symptom**: Referrals tab, user lookup, referrers list all showed "Could not load data" for `help@aivaclaims.com`
+### Real-World Case: Production App adminClerk.ts (2026-03-13)
+- **Symptom**: Referrals tab, user lookup, referrers list all showed "Could not load data" for `admin@example.com`
 - **Root cause**: `requireAdmin()` was synchronous and metadata-only. Production admin has `is_admin=1` but no Clerk metadata role.
 - **Fix**: Made `requireAdmin` async with DB `is_admin` fallback; updated all 6 call sites from `requireAdmin(c)` to `await requireAdmin(c)`. Added `Context<{ Bindings: Env }>` type so `c.env.DB` was accessible.
 - **Files**: `src/worker/routes/adminClerk.ts`

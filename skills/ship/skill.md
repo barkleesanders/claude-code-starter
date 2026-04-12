@@ -321,6 +321,7 @@ After push: `gh pr checks <PR_NUMBER> --watch`
 - Phase 1: ALWAYS run `pkill -f vitest 2>/dev/null` after every test invocation
 - Phase -0: NEVER push or tag during merge conflict resolution
 - Phase 0: NEVER deploy with lint errors unless explicit override
+- Phase 0: After Biome auto-fix on inline-HTML projects (CF Workers, SSR), ALWAYS run embedded JS string safety check (Stage 1.7 in code-quality.md) — Biome's noUselessEscapeInString silently breaks JS inside HTML template strings
 - Phase 0.5: BLOCK on 20+ deployments unless --force-override
 - Phase 1: BLOCK on ANY test failure
 - Phase 1.1: BLOCK if frontend calls API endpoints with no backend handler
@@ -365,6 +366,14 @@ After push: `gh pr checks <PR_NUMBER> --watch`
 - Phase 1.5: BLOCK if terraform plan shows resources being destroyed
 
 ---
+
+## Output Discipline (from internal conciseness anchors)
+
+Between tool calls: **max 1-2 sentences** explaining the next action.
+Final deployment summary: concise bullet points, no preamble.
+When fixing issues inline: state what was wrong and what was done in one line each.
+Never repeat tool output back to the user — they already see it.
+Phase transitions: one-line banner only (e.g., `-- Phase 0 OK -> Phase 1: Build & Test --`).
 
 ## TONE
 

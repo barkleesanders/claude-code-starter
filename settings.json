@@ -25,12 +25,12 @@
       "Bash(unzip:*)",
       "Bash(for:*)",
       "Bash(do echo:*)",
-      "Bash(if [ -f \"/Users/barkleesanders/AIVA/components/$file\" ])",
+      "Bash(if [ -f \"~/your-app/components/$file\" ])",
       "Bash(then echo \"✅ EXISTS\")",
       "Bash(else echo \"❌ MISSING\")",
       "Bash(fi:*)",
       "Bash(done)",
-      "Bash(if [ -f \"/Users/barkleesanders/AIVA/contexts/$file\" ])",
+      "Bash(if [ -f \"~/your-app/contexts/$file\" ])",
       "Bash([:*)",
       "Bash(do:*)",
       "Bash(echo:*)",
@@ -83,13 +83,13 @@
       "Bash(git checkout:*)",
       "Bash(vercel --prod)",
       "Bash(vercel:*)",
-      "WebFetch(domain:aiva-2f3i2o7m8-barkleesanders-projects.vercel.app)",
+      "WebFetch(domain:your-app.vercel.app)",
       "Bash(ast-grep:*)",
       "Bash(git pull:*)",
       "Bash(git rm:*)",
       "Bash(git rev-parse:*)",
       "Bash(npx vitest run:*)",
-      "Bash(/Users/barkleesanders/tools/debug-sessions/va-report-path-traversal/final-verification.sh:*)",
+      "Bash(~/tools/debug-sessions/va-report-path-traversal/final-verification.sh:*)",
       "Bash(osgrep:*)",
       "Bash(npx biome check:*)",
       "Bash(gh pr view:*)",
@@ -286,7 +286,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "node /Users/barkleesanders/claude-hud/dist/index.js"
+    "command": "node ~/claude-hud/dist/index.js"
   },
   "enabledPlugins": {
     "browserbase@claude-code-plugin": false,
@@ -311,7 +311,7 @@
       "command": "/opt/homebrew/bin/uv",
       "args": [
         "--directory",
-        "/Users/barkleesanders/tools/financial-datasets-mcp",
+        "~/tools/financial-datasets-mcp",
         "run",
         "server.py"
       ]

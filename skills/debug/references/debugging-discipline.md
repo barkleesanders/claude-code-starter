@@ -208,4 +208,4 @@ await securePut(url, body);
 await fetchClientData(); // pull server-computed side effects
 ```
 
-**Real-world case (2026-03-30):** AIVA Claims dashboard showed "Step 1 of 7" with 71% progress. `activeStepIndex` was URL-persisted via `?step=1` and the useEffect only initialized when `null`. Admin marked 5 steps complete but user's pointer never advanced. Fixed by: auto-advance logic + silentFetch on all 6 user-facing data hooks.
+**Real-world case (2026-03-30):** your app dashboard showed "Step 1 of 7" with 71% progress. `activeStepIndex` was URL-persisted via `?step=1` and the useEffect only initialized when `null`. Admin marked 5 steps complete but user's pointer never advanced. Fixed by: auto-advance logic + silentFetch on all 6 user-facing data hooks.
