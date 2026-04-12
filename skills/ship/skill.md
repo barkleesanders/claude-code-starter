@@ -120,28 +120,32 @@ qmd query "deployment checklist"    # Search project docs
 qmd query "rollback procedure"      # Find rollback docs
 ```
 
-### bd — Task Tracking
+### bd — Task Tracking (MANDATORY)
 ```bash
-bd create --title="Deploy: run quality gates" --type=task   # Track deployment tasks
-bd close <id>                                                # Mark gate complete
+bd create --title="Deploy: run quality gates" --type=task --priority=1   # Track deployment
+bd update <id> --status=in_progress                                       # Claim
+bd close <id> --reason="Deployed to production"                           # Close
 ```
+
+**Before running /ship**: Create a beads issue for the deployment itself (`bd create --title="Deploy <feature>" --type=task`) if one doesn't already exist. Close it only after post-deploy verification passes.
+
+**If `.beads/` does not exist** and this is a git repo:
+```bash
+git config beads.role maintainer && bd init --quiet --skip-hooks
+```
+
+If `bd` is not installed, warn the user once and continue (don't block the deploy).
 
 ## CRITICAL: NO TASK MANAGEMENT TOOLS
 
-**DO NOT use TodoWrite, TaskCreate, or TaskUpdate tools.** Use `bd` (beads) for task tracking instead:
-
-```bash
-bd create --title="Deploy: <description>" --type=task  # Create at start
-bd update <id> --status=in_progress                     # Claim it
-bd close <id> --reason="Deployed to production"         # Close when done
-```
+**DO NOT use TodoWrite, TaskCreate, or TaskUpdate tools.** Use `bd` (beads) for task tracking instead. This is a project-wide rule — see CLAUDE.md "Beads Task Tracking Rule".
 
 Print a short status line when transitioning phases:
 ```
 -- Phase 0 OK -> Phase 1: Build & Test --
 ```
 
-Just execute the phases in order. Do the work, don't track the work.
+Just execute the phases in order. Do the work, don't track the work in TodoWrite.
 
 ## DEPLOYMENT TARGET (DEFAULT: PRODUCTION)
 

@@ -234,18 +234,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bd init --quiet --skip-hooks 2>/dev/null || true",
+            "command": "command -v bd >/dev/null 2>&1 && { git config beads.role maintainer 2>/dev/null; bd init --quiet --skip-hooks 2>/dev/null; } || true",
             "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "$HOME/claude-code-boilerplate/scripts/patch-claude-models.sh --check 2>/dev/null || true",
-            "timeout": 3
-          },
-          {
-            "type": "command",
-            "command": "$HOME/claude-code-boilerplate/scripts/backup-claude-config.sh 2>/dev/null || true",
-            "timeout": 30
           }
         ]
       },
@@ -254,7 +244,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bd prime"
+            "command": "command -v bd >/dev/null 2>&1 && [ -d .beads ] && bd prime 2>/dev/null || true"
           }
         ]
       }

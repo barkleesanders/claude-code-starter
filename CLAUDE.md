@@ -1,5 +1,22 @@
 # Global Claude Code Configuration
 
+## Beads Task Tracking Rule (MANDATORY)
+
+**ALWAYS use `bd` (beads) for ALL task tracking. NEVER use TodoWrite, TaskCreate, or markdown files for tracking work.**
+
+- **Before coding**: `bd create --title="What you're doing" --description="Why" --type=task|bug|feature --priority=2`
+- **Starting work**: `bd update <id> --claim`
+- **Done**: `bd close <id>` (close multiple: `bd close <id1> <id2> ...`)
+- **Find work**: `bd ready` (unblocked), `bd list --status=open` (all open)
+- **Dependencies**: `bd dep add <child> <parent>`
+- **Persistent notes**: `bd remember "insight"` (NOT MEMORY.md)
+
+If beads isn't initialized in a repo, run: `git config beads.role maintainer && bd init --quiet`
+
+Priority: 0-4 (0=critical, 4=backlog). NOT "high"/"medium"/"low".
+
+Install beads: `brew install steveyegge/tap/beads` (macOS) or see https://github.com/steveyegge/beads
+
 ## Git Pre-Flight Rule (MANDATORY)
 
 **ALWAYS run `git status` BEFORE any of these commands:**

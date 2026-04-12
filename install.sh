@@ -8,6 +8,27 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "Installing Claude Code Starter..."
 
+# Check for beads (bd) — task tracking is mandatory per CLAUDE.md
+if ! command -v bd >/dev/null 2>&1; then
+    echo ""
+    echo "WARNING: 'bd' (beads) not found."
+    echo "This config uses beads for ALL task tracking (replaces TodoWrite/TaskCreate)."
+    echo ""
+    echo "Install with:"
+    echo "  brew install steveyegge/tap/beads       # macOS"
+    echo "  cargo install --git https://github.com/steveyegge/beads  # cross-platform"
+    echo ""
+    echo "See https://github.com/steveyegge/beads for details."
+    echo ""
+    read -p "Continue without bd? [y/N] " cont
+    if [[ ! "$cont" =~ ^[Yy]$ ]]; then
+        echo "Aborting. Install bd and re-run this script."
+        exit 1
+    fi
+else
+    echo "Found bd $(bd --version 2>/dev/null | head -1)"
+fi
+
 # Create directories if they don't exist
 mkdir -p "$CLAUDE_DIR/agents"
 mkdir -p "$CLAUDE_DIR/skills"
@@ -109,14 +130,28 @@ echo "Installation complete!"
 echo ""
 echo "Installed:"
 echo "  - 35 agents (systematic-debugging, carmack-mode-engineer, ship-working-code, ...)"
-echo "  - 45+ skills (/debug, /carmack, /ship, /safety-audit, /token-usage, ...)"
+echo "  - 49 skills (/debug, /carmack, /ship, /safety-audit, /token-usage, ...)"
 echo "  - 21 commands"
 echo "  - CLAUDE.md quick reference"
 echo ""
+
+# Auto-initialize beads in the current working directory if it's a git repo
+if command -v bd >/dev/null 2>&1 && [ -d "$PWD/.git" ] && [ ! -d "$PWD/.beads" ]; then
+    echo "Initializing beads in current repo ($PWD)..."
+    (cd "$PWD" && git config beads.role maintainer 2>/dev/null; bd init --quiet --skip-hooks 2>/dev/null) || true
+    echo "  -> .beads/ created. Run 'bd ready' to find work, 'bd create' to add tasks."
+    echo ""
+fi
+
 echo "Usage:"
 echo "  /debug [issue]     - 5-phase bug investigation"
-echo "  /carmack [issue]   - Deep debugging with repro harnesses"
+echo "  /carmack [issue]   - Build features, fix bugs, deep debugging"
 echo "  /ship              - Safe production deployment"
 echo "  /safety-audit      - Production safety checks"
+echo ""
+echo "Task tracking (MANDATORY per CLAUDE.md):"
+echo "  bd create --title=\"...\" --type=task --priority=2   # Create before coding"
+echo "  bd ready                                              # Show unblocked work"
+echo "  bd close <id>                                         # Close when done"
 echo ""
 echo "Note: You may need to restart Claude Code for changes to take effect."

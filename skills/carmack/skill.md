@@ -77,6 +77,19 @@ All reference files are in `~/.claude/skills/carmack/references/`.
 
 ## Hard Rules (NEVER VIOLATE)
 
+### Beads Task Tracking (MANDATORY — before writing code)
+
+Before starting ANY implementation work:
+
+1. **If `.beads/` exists**: `bd create --title="..." --description="why" --type=task|bug|feature --priority=2` → capture the issue ID, then `bd update <id> --claim`
+2. **If `.beads/` does NOT exist** and this is a git repo: `git config beads.role maintainer && bd init --quiet --skip-hooks` before creating the issue
+3. **If `bd` is not installed**: warn the user once, continue without tracking
+4. **When done**: `bd close <id1> <id2> ...` (batch close is allowed)
+5. **NEVER use TodoWrite/TaskCreate** for task tracking — always `bd`
+6. **Persistent insights** go in `bd remember "..."`, not MEMORY.md
+
+Priority: 0-4 (0=critical, 4=backlog). NOT strings like "high"/"medium"/"low".
+
 ### Deployment Prohibition
 
 **/carmack does NOT deploy to production. EVER.** Carmack builds, implements, tests, and commits — but NEVER runs deployment commands. When implementation is complete:
