@@ -55,6 +55,37 @@ When writing code that calls GitHub APIs (Rust, Python, JS, shell scripts):
 3. **Fall back gracefully** if `gh` is not installed (skip or warn, don't error)
 4. **For tools with built-in updaters** (e.g., yt-dlp): use `gh api` to get the version tag, then pass it to the tool's `--update-to` flag to avoid the tool's own unauthenticated API calls
 
+## OpenClaw Native-First Rule (MANDATORY)
+
+**Before writing ANY custom script, cron, or systemd unit for OpenClaw, check what `openclaw` does natively.** Custom wrappers are the last resort, not the first move.
+
+```
+openclaw --help → openclaw <area> --help → openclaw <action> --dry-run → docs.openclaw.ai
+```
+
+Only after all four return "not supported" do you write custom code. Every OpenClaw outage in the last two months traced back to home-grown scripts that reimplemented — badly — functionality OpenClaw already ships.
+
+| Task | Use this, not a script |
+|---|---|
+| Update package | `openclaw update --yes --channel stable --timeout 1200` |
+| Fix config / migrate | `openclaw doctor --fix --non-interactive` (auto-run by `openclaw update`) |
+| Health check | `openclaw health` or `openclaw doctor` |
+| Restart gateway | `openclaw gateway restart` |
+| Clear stale sessions | `openclaw doctor --fix` + user-side `/new` in the chat |
+| Install / remove plugins | `openclaw plugins install` / `openclaw plugins remove` |
+| Rotate model auth | `openclaw models auth login --provider <p>` |
+| Manage cron jobs | `openclaw cron` (don't hand-edit `cron/jobs.json`) |
+| Manage channels | `openclaw channels` (don't edit `channels.*` in `openclaw.json`) |
+
+**Red flags — STOP and check native first if you're about to:**
+- Write a journal-tail watcher that parses error strings → there's almost certainly a native `doctor` subcommand
+- Recursively walk JSON under `/root/.openclaw/*.json` → native tooling reads/writes these; you will race with it
+- Hardcode paths under `/usr/lib/node_modules/openclaw/dist/` → chunk filenames change every release
+- Run `npm install` inside the openclaw package directory → always wrong; pulls dev dependencies production installs omit
+- Reimplement config migration "because doctor seems too aggressive" → pass `--non-interactive` instead
+
+If a custom wrapper is genuinely justified: document at the top WHY the native path didn't work, link the `docs.openclaw.ai` URL you checked, revisit quarterly. See [barkleesanders/OpenClawBS docs/12-openclaw-native-first.md](https://github.com/barkleesanders/OpenClawBS/blob/main/docs/12-openclaw-native-first.md) for the full incident history.
+
 ## Tool Integration Template
 
 <!-- Add your tool integrations here. Example format:
