@@ -20,8 +20,8 @@ shift || true
 
 case "$mode" in
   --clear)
-    for log in tool-errors feedback skill-usage agent-outcomes; do
-      f="$HOME_CLAUDE/${log}.jsonl"
+    for log in tool-errors.jsonl feedback-pending.jsonl skill-usage.jsonl agent-outcomes.jsonl; do
+      f="$HOME_CLAUDE/${log}"
       [ -f "$f" ] && mv "$f" "${f}.archived-$(date +%Y%m%d-%H%M%S)" && echo "archived $f"
     done
     rm -f "$HOME_CLAUDE/tool-errors-pending.md" "$HOME_CLAUDE/feedback-pending.md" "$HOME_CLAUDE/skill-drift.md" "$HOME_CLAUDE/skill-usage-report.md"
