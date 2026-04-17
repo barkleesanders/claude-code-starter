@@ -105,7 +105,38 @@ agentMeta.usage.input  # turn 1 input == approx system prompt size
 
 Plugins (browser, exa, active-memory, etc.) each add to system prompt. Disable unused ones before fighting compaction.
 
-## 10. JSON config backups before every patch
+## 10. Measurement-first rule (MANDATORY for any config/removal decision)
+
+**NEVER remove, disable, or resize something because you assume it's "unused" or "too big." Measure first.** Saying "disable unused plugins" without reading tool-use events is a guess, not a fix.
+
+### Pattern — measure BEFORE touching config
+
+| Decision | Measurement to run first |
+|---|---|
+| "Disable plugin X" | Grep session JSONL for `tool_use` / `toolCall` events naming X's tools over last 14 days |
+| "System prompt is too big" | `openclaw agent --message 'size check' --json \| grep '"input"'` — record before/after each config change |
+| "This skill isn't used" | Check `~/.claude/skill-usage.jsonl` or run `skill-usage-report.py` |
+| "This command rotted" | `skill-drift-check.sh` — don't delete a reference without evidence |
+| "This compaction knob turns left" | Read the plugin source: `grep -oE 'toKnobName[^}]+' /root/.openclaw/extensions/<plugin>/dist/*.js` to see the enum / direction |
+
+### Real incident (2026-04-17)
+
+Lowered `reserveTokensFloor` from 20000 → 12000 to "trigger compaction earlier." OpenClaw's own error message later said "set it to 20000 or higher." The knob turned the opposite direction of what I assumed. Fixed by measuring first next time.
+
+Then proposed "disable browser + exa plugins (unused)." Tool-usage scan showed browser had 8 calls + exa had 13 calls in 14 days — both used. Only `anthropic` plugin (0 calls) was safe to disable. Saved 440 tokens per turn.
+
+### Pre-decision checklist
+
+Before committing to a config change:
+1. What is the baseline number? (tokens, errors, latency — whatever the change claims to affect)
+2. How will I re-measure the SAME number after the change?
+3. If the number didn't improve, will I revert or double down?
+
+If step 3 is "double down," you're about to make a mistake. Revert.
+
+---
+
+## 11. JSON config backups before every patch
 
 ```bash
 cp <config>.json <config>.json.bak-$(date +%Y%m%d-%H%M%S)
