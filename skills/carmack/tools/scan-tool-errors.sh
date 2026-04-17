@@ -53,28 +53,52 @@ for line in Path(log_path).read_text(errors='ignore').splitlines():
         continue
     groups[d['sig']].append(d)
 
-# For each signature, decide novel-vs-known by keyword match against catalog
-# We look for distinctive substrings from first_line in the catalog
-def looks_known(first_line: str) -> bool:
-    # pull a few 4+-char word tokens
-    tokens = re.findall(r'[A-Za-z][A-Za-z0-9_]{3,}', first_line)
+# For each signature, decide novel-vs-known by keyword match against catalog.
+# Scan both first_line AND excerpt so aggregated/generic first_lines don't bypass the check.
+def looks_known(first_line: str, excerpt: str = '') -> bool:
+    text = (first_line + ' ' + excerpt).lower()
+    tokens = re.findall(r'[A-Za-z][A-Za-z0-9_]{3,}', text)
     if not tokens:
         return False
-    # require at least 2 distinct tokens present in catalog
-    hits = sum(1 for t in set(tokens[:8]) if t.lower() in catalog.lower())
+    hits = sum(1 for t in set(tokens[:10]) if t in catalog.lower())
     return hits >= 2
+
+# Native-guidance extraction — many tools embed the fix in their error text.
+# Surfacing these hints alongside the signature cuts re-diagnosis to zero.
+REMEDIATION_PATTERNS = [
+    r"(?:set|setting)\s+([`'\"]?[a-zA-Z][a-zA-Z0-9_.]*[`'\"]?)\s+(?:to|=)\s+([0-9a-zA-Z.\"_-]+|\"[^\"]+\")",
+    r"(?:try|run|use)\s+(?:running\s+)?[`']([^`']{3,80})[`']",
+    r"Fix:\s*(?:run\s+)?[`']?([^`'\n]{3,120})[`']?",
+    r"Run:\s*[`']?([^`'\n]{3,120})[`']?",
+    r"(?:increase|raise|lower)\s+(?:your\s+)?([`'\"]?[a-zA-Z][a-zA-Z0-9_.]*[`'\"]?)\s+(?:to|by)\s+([0-9a-zA-Z.]+)",
+    r"Did you mean\s+([`'\"]?[a-zA-Z][a-zA-Z0-9_.-]*[`'\"]?)",
+    r"See\s+(https?://[^\s]+)",
+    r"Read it first before",  # Edit tool's "File has not been read yet"
+]
+
+def extract_hints(text: str) -> list:
+    hints = []
+    for pat in REMEDIATION_PATTERNS:
+        for m in re.finditer(pat, text, re.IGNORECASE):
+            full = m.group(0)[:140]
+            g = ' '.join(x for x in m.groups() if x)
+            if full not in [h['full'] for h in hints]:
+                hints.append({'full': full, 'captured': g[:80] if g else full[:80]})
+    return hints[:5]
 
 novel = []
 for sig, entries in groups.items():
     first = entries[0]['first_line']
-    if looks_known(first):
+    excerpt = entries[0].get('excerpt', '')
+    if looks_known(first, excerpt):
         continue
     novel.append({
         'sig': sig,
         'count': len(entries),
         'tools': sorted(set(e['tool'] for e in entries)),
         'first_line': first,
-        'excerpt': entries[0]['excerpt'],
+        'excerpt': excerpt,
+        'hints': extract_hints(excerpt or first),
     })
 
 novel.sort(key=lambda e: -e['count'])
@@ -100,14 +124,17 @@ lines = [
     "",
 ]
 for i, e in enumerate(novel[:40], 1):
-    lines += [
-        f"## {i}. [{e['count']}x via {','.join(e['tools'])}] {e['first_line']}",
-        "",
-        "```",
-        e['excerpt'],
-        "```",
-        "",
-    ]
+    lines.append(f"## {i}. [{e['count']}x via {','.join(e['tools'])}] {e['first_line']}")
+    lines.append("")
+    if e.get('hints'):
+        lines.append("**🧭 Native remediation hints extracted from error text:**")
+        for h in e['hints']:
+            lines.append(f"- `{h['captured']}` (context: {h['full'][:100]})")
+        lines.append("")
+    lines.append("```")
+    lines.append(e['excerpt'])
+    lines.append("```")
+    lines.append("")
 Path(pending_path).write_text("\n".join(lines))
 print(f"wrote {len(novel)} novel pattern(s) to {pending_path}")
 PY
