@@ -42,6 +42,12 @@ SAFE_PROBES = {
 findings = []
 seen_bins = set()
 
+# Load allowlist early so both path and binary branches can consult it
+allow_path = Path.home() / ".claude" / "skill-drift-allowlist.txt"
+global_allowlist = set()
+if allow_path.exists():
+    global_allowlist = set(allow_path.read_text().splitlines())
+
 for skill_md in Path(skills_dir).rglob("*"):
     if skill_md.name.lower() not in ("skill.md",):
         continue
@@ -61,6 +67,9 @@ for skill_md in Path(skills_dir).rglob("*"):
             cand = snippet.split()[0]
         cand = cand.strip("'\"()[],.")
         if not cand or cand in seen_bins or len(cand) > 30:
+            continue
+        if cand in global_allowlist:
+            seen_bins.add(cand)
             continue
         if re.match(r"^[a-zA-Z][\w-]{1,29}$", cand) and cand in SAFE_PROBES:
             seen_bins.add(cand)
