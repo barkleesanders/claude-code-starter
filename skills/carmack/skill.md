@@ -250,3 +250,5 @@ Include the content from the relevant reference files you loaded in STEP 1.
 IMPORTANT: After EVERY git push, check if the repo has GitHub Actions workflows. If yes, watch all checks until they complete. If any check fails, read the failure logs, fix the issue, commit, push, and repeat — up to 3 retry cycles.
 CRITICAL: Do NOT deploy to production. Do NOT run wrangler deploy, npm run deploy, vercel deploy --prod, or any production deployment command. When implementation is complete, STOP and tell the user to run /ship for deployment.
 ```
+
+- **For ALL modes**: run `~/.claude/skills/carmack/tools/scan-tool-errors.sh` once when invoked. If it prints novel patterns, read `~/.claude/tool-errors-pending.md`, classify each, append entries to `shared/tool-error-recovery.md`, then run the scanner with `--clear` to archive the log.
