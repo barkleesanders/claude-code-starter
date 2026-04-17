@@ -181,6 +181,72 @@ Generates a report at `~/.claude/usage/token_report.md` with:
 
 All data stays local — nothing is sent anywhere.
 
+## Self-Improvement System
+
+Claude Code gets smarter every session through five feedback loops that capture mistakes and surface them as reviewable patterns on the next `/carmack` invocation.
+
+### What gets captured automatically
+
+| Hook | Captures | Log file |
+|------|----------|----------|
+| `PostToolUse` | Tool errors (any `is_error:true`) | `~/.claude/tool-errors.jsonl` |
+| `UserPromptSubmit` | Correction ("don't do X") and success ("perfect") phrases | `~/.claude/feedback-pending.jsonl` |
+| `PostToolUse Skill\|Agent` | Skill and subagent invocations + outcome | `~/.claude/skill-usage.jsonl` |
+
+### What gets surfaced
+
+On every `/carmack` invocation, a single scanner (`~/.claude/skills/carmack/tools/auto-improve.sh`) runs all five checks and prints a compact summary:
+
+- **Novel tool errors** → `tool-errors-pending.md` — Claude classifies each into `shared/tool-error-recovery.md`
+- **User behavioral feedback** → `feedback-pending.md` — Claude saves as memory entries (feedback type)
+- **Skill usage report** — flags skills with >30% error rate (weekly, needs 5+ invocations)
+- **Skill drift** — validates commands/paths in every `skill.md` still resolve (weekly, allowlist-backed)
+- **Memory search** — `memory-search.sh <topic>` greps both `MEMORY.md` and `bd memories` before starting work
+
+### Token & efficiency gains
+
+Measured against a real VPS long-session workload before/after today's changes:
+
+| Metric | Before | After | Gain |
+|--------|-------:|------:|------|
+| Context ceiling (featherless GLM-4.7) | 32,768 | 48,000 | +46% |
+| Tokens sent to model at turn 5 | ~44K (near ceiling, compaction deferred) | 46,752 with 231,863 of history compressed in | **5x effective context** |
+| LCM mode default | `deferred` (no-op boundary writes) | `inline` (real summarization before next prompt) | compaction actually shrinks |
+| Tool-error recovery catalog | 9 patterns | 20 patterns | +11 from scanning 1,141 transcripts (3,256 errors classified) |
+| Blind-spot reference | — | 10 patterns | covers schema-validate-before-restart, self-upgrade traps, adjacent-system breakage |
+| Stop-hook checks | 3 (tasks, errors, request coverage) | 5 (adds real-traffic verification, fix-all-issues rule) | catches silent infra "done" |
+
+**Per-session savings** on long debugging workloads: typical 50-turn session now stays under the 48K ceiling indefinitely; previously would crash at turn 2-3 with "context exceeded." For shorter sessions, the tool-error catalog saves roughly 2–5K tokens per known failure pattern (no re-diagnosis needed).
+
+### Safe JSON config mutation
+
+New helper replaces hand-rolled python-heredoc patches:
+
+```bash
+~/.claude/skills/carmack/tools/json-patch.sh <config> '<jq-expr>' \
+  --validate-cmd "<cmd>" --restart <systemd-service>
+```
+
+Auto-backup + jq patch + JSON validate + optional validate-cmd + optional systemd restart + **auto-rollback** on any failure.
+
+### Usage
+
+```bash
+# See what's accumulated since last review
+~/.claude/skills/carmack/tools/auto-improve.sh
+
+# After classifying pending items into the catalog, archive the logs
+~/.claude/skills/carmack/tools/auto-improve.sh --clear
+
+# Skill-specific
+~/.claude/skills/carmack/tools/skill-drift-check.sh
+~/.claude/skills/carmack/tools/memory-search.sh openclaw
+```
+
+The system is agent-native: every learning loop compounds into Claude's next session without manual curation.
+
+---
+
 ## Debug Session Persistence
 
 Investigations are saved to `tools/debug-sessions/{issue-name}/`:
