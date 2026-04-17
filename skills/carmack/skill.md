@@ -54,7 +54,7 @@ Determine mode from the user's request, then read ONLY the relevant reference fi
 | User Intent Pattern | Mode | Reference Files to Read |
 |---------------------|------|------------------------|
 | bug, error, crash, failing, 500, timeout, leak, hang | **debug** | `debug-patterns.md` |
-| review, PR, check code, audit code | **review** | `code-review-react.md`, `code-review-security.md`, `code-review-general.md` |
+| review, PR, check code, audit code | **review** | `code-review-react.md`, `code-review-security.md`, `code-review-general.md`, `production-readiness-checklist.md` |
 | build, add, implement, feature, create | **feature** | `feature-implementation.md` |
 | brainstorm, plan, PRD, spec, requirements | **plan** | `feature-implementation.md` |
 | research, find, investigate, last 30 days | **research** | `research.md` |
@@ -63,14 +63,20 @@ Determine mode from the user's request, then read ONLY the relevant reference fi
 | skill, create skill, edit skill | **skill** | `skill-creation.md` |
 | codex, second opinion, rescue | **codex** | `codex-integration.md` |
 | task, prd.json, stories, tracking | **task** | `task-tracking.md` |
-| deploy, CI, push, ship (read-only context) | **deploy** | `deploy-patterns.md` |
+| deploy, CI, push, ship (read-only context) | **deploy** | `deploy-patterns.md`, `production-readiness-checklist.md` |
+| production readiness, pre-launch, is this ready, prod checklist, launch audit | **prod-readiness** | `production-readiness-checklist.md`, `code-review-security.md`, `preflight-checks.md` |
 | UX, accessibility, responsive, mobile | **ux** | `ux-patterns.md`, `responsive-design.md` |
+| lighthouse, 100/100, perf audit, core web vitals, LCP, TBT, "slow site", SEO audit | **lighthouse** | `lighthouse-optimization.md`, `debug-patterns.md` |
 | audit docs, check for lies, verify against source, legal document, fabrication, hallucination | **legal-audit** | `legal-document-audit.md` |
-| infra, config, plugin, gateway, systemd, upgrade, restart, schema | **infra** | `blind-spots.md`, `debug-patterns.md` |
+| infra, config, plugin, gateway, systemd, openclaw, upgrade, restart, schema | **infra** | `blind-spots.md`, `debug-patterns.md` |
+| VPS, bsclaudebot, openclaw-gateway, remote agent, cron job on vps | **vps-openclaw** | `blind-spots.md` + **ALWAYS run `~/.claude/skills/carmack/tools/openclaw-remote-doctor.sh all` FIRST** before any config change — captures native `openclaw doctor` output, main-agent token usage, tool-usage data, and extracts remediation hints from error text. Apply 🧭 hints before inventing fixes. |
 
 **Additional context (load when applicable):**
+- If working in an AIVA project (cwd contains "aiva" or project references aivaclaims.com): also read `aiva-guidelines.md`
 - For all modes except research/browser: also read `preflight-checks.md`
 - **For ALL modes**: also read `~/.claude/skills/shared/ant-verification-protocol.md` (ant-level quality gates)
+- **For ALL modes**: also read `~/.claude/skills/shared/tool-error-recovery.md` (catalog of tool errors and recovery patterns — consult on any tool failure, and APPEND a new entry whenever you hit a novel one)
+- **For ALL modes**: run `~/.claude/skills/carmack/tools/scan-tool-errors.sh` once when invoked. If it prints novel patterns, read `~/.claude/tool-errors-pending.md`, classify each, append entries to `tool-error-recovery.md`, then run the scanner with `--clear` to archive the log. This keeps the error catalog self-updating.
 - **For ANY infra/config/plugin/service work**: always read `blind-spots.md` — covers schema-validation-before-restart, self-upgrade traps, "gateway started ≠ working", compaction telemetry, adjacent-system breakage, guardrail-alert-vs-enforcement patterns learned from real incidents
 
 All reference files are in `~/.claude/skills/carmack/references/`.
@@ -78,19 +84,6 @@ All reference files are in `~/.claude/skills/carmack/references/`.
 ---
 
 ## Hard Rules (NEVER VIOLATE)
-
-### Beads Task Tracking (MANDATORY — before writing code)
-
-Before starting ANY implementation work:
-
-1. **If `.beads/` exists**: `bd create --title="..." --description="why" --type=task|bug|feature --priority=2` → capture the issue ID, then `bd update <id> --claim`
-2. **If `.beads/` does NOT exist** and this is a git repo: `git config beads.role maintainer && bd init --quiet --skip-hooks` before creating the issue
-3. **If `bd` is not installed**: warn the user once, continue without tracking
-4. **When done**: `bd close <id1> <id2> ...` (batch close is allowed)
-5. **NEVER use TodoWrite/TaskCreate** for task tracking — always `bd`
-6. **Persistent insights** go in `bd remember "..."`, not MEMORY.md
-
-Priority: 0-4 (0=critical, 4=backlog). NOT strings like "high"/"medium"/"low".
 
 ### Deployment Prohibition
 
@@ -130,6 +123,55 @@ After implementing ANY code change:
 4. **If the change is a bug fix**, verify the original symptom no longer reproduces
 5. **Never report "done" based on the edit alone** — verify the outcome with evidence
 
+### Fix-All-Issues-Found Rule (MANDATORY — 2026-04-12)
+
+**When an audit/review/diagnostic step surfaces issues, FIX THEM — do not only report.** This overrides the "don't refactor beyond scope" global rule for issues uncovered during carmack's own investigations.
+
+Triggers (non-exhaustive):
+- `tsc --noEmit` reports errors → fix every error, even if unrelated to the task
+- `biome check` reports lint errors or warnings → auto-fix with `--fix`, then resolve remaining manually
+- `npm audit` reports vulnerabilities → apply overrides and verify
+- Code review uncovers bugs in adjacent code → fix them
+- Security sweep finds XSS/injection risks in files you didn't edit → fix them
+- Build warnings → resolve, don't ignore
+
+Behavior:
+1. Enumerate every finding (count them, don't truncate)
+2. Fix in batches, rebuilding / re-running the diagnostic after each batch
+3. Loop until count reaches 0 OR a finding is genuinely not fixable (documented with reason)
+4. Only then report "done" — and only after re-running the diagnostic one final time to confirm 0
+
+**Escape hatches** (narrow):
+- If fixing would require a breaking API change or major version upgrade → create a beads issue describing the blocker and continue with the rest
+- If fixing is >10x the cost of the original task → pause, report the finding, ask the user before continuing
+- "Pre-existing" is NOT a valid excuse. "Unrelated to my change" is NOT a valid excuse.
+
+**Why (2026-04-12):** Session ended with 93 pre-existing `tsconfig.worker.json` TypeScript errors merely reported, not fixed. User set this as a permanent rule: if carmack sees it, carmack fixes it.
+
+### No-Suppression Rule (MANDATORY — 2026-04-12)
+
+**NEVER use `@ts-expect-error`, `@ts-ignore`, `// eslint-disable`, `// biome-ignore`, `// @ts-nocheck`, or equivalent suppressions as a "fix".** Suppressions hide bugs — they don't resolve them.
+
+When a type-system complaint appears legitimate:
+1. **Investigate the root cause** — library version regression, missing generics, ambient type collision, wrong middleware signature, etc.
+2. **Refactor to make the types line up** — extract to a helper, use chain-style routing, replace a validator with inline `safeParse()`, upgrade a package, or rename a conflicting type
+3. **Only as a last resort**: if all of the above genuinely cannot resolve it and the code is demonstrably safe at runtime, use a **narrow** type assertion (`as unknown as T`) at the exact expression — NEVER a line-level suppression comment that hides all errors on that line
+
+When a lint rule complaint appears:
+1. **Fix the code** to satisfy the rule
+2. If the rule is wrong for the project, disable it in config (`biome.json`, `.eslintrc`) with a comment — not per-line suppressions
+
+**Acceptable suppressions (rare, must document why):**
+- Third-party type declarations that are definitively wrong — suppress with a comment citing the upstream issue URL
+- Intentional runtime behavior the type-system can't model (e.g., WASM boundary) — suppress with detailed explanation
+
+**Unacceptable:**
+- "Hono 4.12 regression" → refactor to chain-style, switch to inline parse, or upgrade
+- "Timing out on the fix" → stop and ask the user before suppressing
+- "Pre-existing" suppressions in the file → remove them as you refactor
+
+**Why (2026-04-12):** Carmack added 4 `@ts-expect-error` suppressions instead of refactoring 4 routes to drop the broken zValidator chain and use inline `safeParse()`. User flagged this immediately. Permanent rule.
+
 Word budget: **25 words max between tool calls, 100 words max final answer.** Lead with action, not explanation.
 
 ---
@@ -163,8 +205,10 @@ When using the Agent tool to delegate work:
 | `research.md` | Last30days web research, Reddit/X/web synthesis, prompt generation |
 | `skill-creation.md` | Creating & editing SKILL.md files, frontmatter, progressive disclosure |
 | `task-tracking.md` | PRD to prd.json conversion, agent-testable tasks, beads tracking |
+| `aiva-guidelines.md` | AIVA-specific: color ban, VA palette, OG/favicon standards, admin auth pattern |
 | `preflight-checks.md` | Pre-flight: CDP warmup, codebase audit, code coverage, lint/security auto-fix |
 | `legal-document-audit.md` | 5 hallucination patterns (fabricated citations, fake phones, invented people, name transposition, exhibit drift), audit procedure, sweep script |
+| `lighthouse-optimization.md` | Lighthouse 100/100 playbook: 3-run median audit loop, 10 high-leverage patterns (defer third-party, kill CF Bot Fight JS, SSR hero, async CSS, preload LCP, bundle analysis, bf-cache headers, SEO fallback, a11y quick wins, CSP fixes), 4-stage fix order, known ceilings |
 | `~/.claude/skills/shared/ant-verification-protocol.md` | **Ant-level quality gates**: OWASP Top 10 sweep, truthfulness protocol, closed-loop verification, enhanced review |
 
 ---
@@ -219,7 +263,8 @@ Before invoking the Task tool, print a brief status message:
 
 1. Parse the user's request against the Mode Detection table above
 2. Read the relevant reference files from `~/.claude/skills/carmack/references/`
-3. For implementation/debug modes, also read `preflight-checks.md`
+3. If working in an AIVA project directory, also read `aiva-guidelines.md`
+4. For implementation/debug modes, also read `preflight-checks.md`
 
 **STEP 1.5 — Apply Ant-Level Verification Protocol (MANDATORY):**
 
@@ -250,5 +295,3 @@ Include the content from the relevant reference files you loaded in STEP 1.
 IMPORTANT: After EVERY git push, check if the repo has GitHub Actions workflows. If yes, watch all checks until they complete. If any check fails, read the failure logs, fix the issue, commit, push, and repeat — up to 3 retry cycles.
 CRITICAL: Do NOT deploy to production. Do NOT run wrangler deploy, npm run deploy, vercel deploy --prod, or any production deployment command. When implementation is complete, STOP and tell the user to run /ship for deployment.
 ```
-
-- **For ALL modes**: run `~/.claude/skills/carmack/tools/scan-tool-errors.sh` once when invoked. If it prints novel patterns, read `~/.claude/tool-errors-pending.md`, classify each, append entries to `shared/tool-error-recovery.md`, then run the scanner with `--clear` to archive the log.
