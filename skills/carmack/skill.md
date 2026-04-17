@@ -66,10 +66,12 @@ Determine mode from the user's request, then read ONLY the relevant reference fi
 | deploy, CI, push, ship (read-only context) | **deploy** | `deploy-patterns.md` |
 | UX, accessibility, responsive, mobile | **ux** | `ux-patterns.md`, `responsive-design.md` |
 | audit docs, check for lies, verify against source, legal document, fabrication, hallucination | **legal-audit** | `legal-document-audit.md` |
+| infra, config, plugin, gateway, systemd, upgrade, restart, schema | **infra** | `blind-spots.md`, `debug-patterns.md` |
 
 **Additional context (load when applicable):**
 - For all modes except research/browser: also read `preflight-checks.md`
 - **For ALL modes**: also read `~/.claude/skills/shared/ant-verification-protocol.md` (ant-level quality gates)
+- **For ANY infra/config/plugin/service work**: always read `blind-spots.md` — covers schema-validation-before-restart, self-upgrade traps, "gateway started ≠ working", compaction telemetry, adjacent-system breakage, guardrail-alert-vs-enforcement patterns learned from real incidents
 
 All reference files are in `~/.claude/skills/carmack/references/`.
 

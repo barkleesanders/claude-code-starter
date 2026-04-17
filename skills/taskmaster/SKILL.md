@@ -19,7 +19,7 @@ to re-examine whether all work is truly done.
 ## How It Works
 
 1. **Agent tries to stop** — the stop hook fires.
-2. **The hook checks** for incomplete signals (pending tasks, recent errors).
+2. **The hook checks** for incomplete signals (pending tasks, recent errors, blind spots in infra/config work — see reason text in check-completion.sh).
 3. **Agent is prompted** to verify: original requests addressed, plan steps
    completed, tasks resolved, errors fixed, no loose ends.
 4. **If work remains**, the agent continues. If truly done, it confirms and
