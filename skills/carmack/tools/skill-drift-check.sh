@@ -80,11 +80,24 @@ for skill_md in Path(skills_dir).rglob("*"):
                 findings.append(f"- {cand} error: {e} (referenced in {skill_md.relative_to(Path.home())})")
 
     # Detect referenced local paths (starting with ~/ or /Users or ./skills)
+    on_mac = sys.platform == "darwin"
+    allowlist = set()
+    allow_path = Path.home() / ".claude" / "skill-drift-allowlist.txt"
+    if allow_path.exists():
+        allowlist = set(allow_path.read_text().splitlines())
     for m in re.finditer(r"`((?:~|/Users|/root|\./skills|\./references|\./tools)[^`\n]{2,200})`", text):
         p = os.path.expanduser(m.group(1).strip())
-        # strip trailing args/flags after first space
         p_only = p.split()[0]
-        if p_only and not Path(p_only).exists() and not any(ch in p_only for ch in "*?["):
+        # Skip template placeholders
+        if any(c in p_only for c in "<>{}") or any(ch in p_only for ch in "*?["):
+            continue
+        # Skip VPS-only paths when running on mac
+        if on_mac and p_only.startswith("/root/"):
+            continue
+        # Skip user-acknowledged paths
+        if p_only in allowlist:
+            continue
+        if p_only and not Path(p_only).exists():
             findings.append(f"- path missing: {p_only} (referenced in {skill_md.relative_to(Path.home())})")
 
 # Dedup findings
