@@ -6,7 +6,7 @@ set -e
 
 [ "$#" -lt 1 ] && { echo "usage: $0 <topic>" >&2; exit 1; }
 Q="$*"
-MEMORY="$HOME/.claude/projects/-Users-barkleesanders/memory"
+MEMORY="$HOME/.claude/projects/-Users-<user>/memory"
 
 echo "=== MEMORY.md index hits ==="
 [ -f "$MEMORY/MEMORY.md" ] && grep -i -n "$Q" "$MEMORY/MEMORY.md" | head -10 || echo "(no index)"

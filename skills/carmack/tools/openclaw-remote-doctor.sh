@@ -14,7 +14,7 @@
 
 set -euo pipefail
 
-VPS="root@100.96.42.67"
+VPS="root@<YOUR_VPS_IP>"
 SSH_OPTS="-p 2222 -o ConnectTimeout=10 -o ServerAliveInterval=30"
 
 mode="${1:-all}"
