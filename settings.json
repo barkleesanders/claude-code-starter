@@ -25,12 +25,12 @@
       "Bash(unzip:*)",
       "Bash(for:*)",
       "Bash(do echo:*)",
-      "Bash(if [ -f \"~/your-app/components/$file\" ])",
-      "Bash(then echo \"✅ EXISTS\")",
-      "Bash(else echo \"❌ MISSING\")",
+      "Bash(if [ -f \"/Users/<user>/AIVA/components/$file\" ])",
+      "Bash(then echo \"\u2705 EXISTS\")",
+      "Bash(else echo \"\u274c MISSING\")",
       "Bash(fi:*)",
       "Bash(done)",
-      "Bash(if [ -f \"~/your-app/contexts/$file\" ])",
+      "Bash(if [ -f \"/Users/<user>/AIVA/contexts/$file\" ])",
       "Bash([:*)",
       "Bash(do:*)",
       "Bash(echo:*)",
@@ -83,13 +83,13 @@
       "Bash(git checkout:*)",
       "Bash(vercel --prod)",
       "Bash(vercel:*)",
-      "WebFetch(domain:your-app.vercel.app)",
+      "WebFetch(domain:aiva-2f3i2o7m8-<user>-projects.vercel.app)",
       "Bash(ast-grep:*)",
       "Bash(git pull:*)",
       "Bash(git rm:*)",
       "Bash(git rev-parse:*)",
       "Bash(npx vitest run:*)",
-      "Bash(~/tools/debug-sessions/va-report-path-traversal/final-verification.sh:*)",
+      "Bash(/Users/<user>/tools/debug-sessions/va-report-path-traversal/final-verification.sh:*)",
       "Bash(osgrep:*)",
       "Bash(npx biome check:*)",
       "Bash(gh pr view:*)",
@@ -214,6 +214,16 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/skills/hooks/pre-edit-check.sh",
+            "timeout": 3
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -226,6 +236,36 @@
             "timeout": 3
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/skills/hooks/tool-error-logger.sh",
+            "timeout": 3
+          }
+        ]
+      },
+      {
+        "matcher": "Skill|Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/skills/hooks/skill-usage-logger.sh",
+            "timeout": 3
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Write|Edit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/skills/hooks/track-file-reads.sh",
+            "timeout": 3
+          }
+        ]
       }
     ],
     "SessionStart": [
@@ -234,8 +274,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v bd >/dev/null 2>&1 && { git config beads.role maintainer 2>/dev/null; bd init --quiet --skip-hooks 2>/dev/null; } || true",
+            "command": "git config beads.role maintainer 2>/dev/null; bd init --quiet --skip-hooks 2>/dev/null || true",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "$HOME/claude-code-boilerplate/scripts/patch-claude-models.sh --check 2>/dev/null || true",
+            "timeout": 3
+          },
+          {
+            "type": "command",
+            "command": "$HOME/claude-code-boilerplate/scripts/backup-claude-config.sh 2>/dev/null || true",
+            "timeout": 30
           }
         ]
       },
@@ -244,7 +294,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "command -v bd >/dev/null 2>&1 && [ -d .beads ] && bd prime 2>/dev/null || true"
+            "command": "bd prime"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/$bunfs$VPS_HOME/bin/unbrowse-update-hint.mjs\""
           }
         ]
       }
@@ -272,17 +330,32 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/skills/hooks/feedback-logger.sh",
+            "timeout": 3
+          }
+        ]
+      }
     ]
   },
   "statusLine": {
     "type": "command",
-    "command": "node ~/claude-hud/dist/index.js"
+    "command": "node /Users/<user>/claude-hud/dist/index.js"
   },
   "enabledPlugins": {
     "browserbase@claude-code-plugin": false,
     "typescript-lsp@claude-plugins-official": true,
     "rust-analyzer-lsp@claude-plugins-official": true,
-    "codex@openai-codex": true
+    "codex@openai-codex": true,
+    "code-review@claude-plugins-official": true,
+    "github@claude-plugins-official": true,
+    "evo@evo-hq-evo": true
   },
   "extraKnownMarketplaces": {
     "openai-codex": {
@@ -301,7 +374,7 @@
       "command": "/opt/homebrew/bin/uv",
       "args": [
         "--directory",
-        "~/tools/financial-datasets-mcp",
+        "/Users/<user>/tools/financial-datasets-mcp",
         "run",
         "server.py"
       ]

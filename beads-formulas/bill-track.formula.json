@@ -1,0 +1,61 @@
+{
+  "name": "bill-track",
+  "title": "Track legislative bill — {{bill_id}}",
+  "description": "Track a CA or federal bill through committees, votes, amendments, and final action.",
+  "phase": "liquid",
+  "variables": {
+    "bill_id": {
+      "description": "Bill number (e.g. AB 2624, SB 150, HR 1234)",
+      "required": true
+    },
+    "bill_title": {
+      "description": "Official bill title",
+      "required": true
+    },
+    "author": {
+      "description": "Bill author(s)",
+      "required": true
+    },
+    "jurisdiction": {
+      "description": "ca | federal",
+      "default": "ca"
+    },
+    "priority": {
+      "description": "0-4 (0=critical)",
+      "default": "2"
+    }
+  },
+  "steps": [
+    {
+      "id": "baseline",
+      "title": "Baseline — pull current {{bill_id}} text, history, sponsors",
+      "type": "task",
+      "labels": ["domain:legal", "workflow:bill-track"],
+      "description": "Initial documentation:\n- Pull bill text from leginfo.legislature.ca.gov or congress.gov\n- Pull committee analyses (PDF)\n- Pull registered support/opposition lists\n- Pull voting history\n- Save all to Drive: /Records/{{bill_id}}/baseline/"
+    },
+    {
+      "id": "monitor-committee",
+      "title": "Monitor committee progression — {{bill_id}}",
+      "type": "task",
+      "labels": ["domain:legal", "workflow:bill-track"],
+      "description": "Each committee vote: download new analysis, note amendments, note vote count.\nOptionally set up schedule skill to re-check weekly.",
+      "depends_on": ["baseline"]
+    },
+    {
+      "id": "public-analysis",
+      "title": "Publish public-facing analysis — {{bill_id}}",
+      "type": "task",
+      "labels": ["domain:legal", "workflow:bill-track", "domain:journalism"],
+      "description": "Produce a plain-English breakdown:\n- What it does (per section)\n- Who's for/against and why\n- What the intent appears to be\n- Where the gray zones are\n\nRender via /magazine skill if sharable externally.",
+      "depends_on": ["baseline"]
+    },
+    {
+      "id": "final-action",
+      "title": "Track final action — {{bill_id}}",
+      "type": "task",
+      "labels": ["domain:legal", "workflow:bill-track"],
+      "description": "Governor signature, veto, or hold. Document outcome and implications.",
+      "depends_on": ["monitor-committee"]
+    }
+  ]
+}

@@ -6,7 +6,6 @@ import sys
 import time
 from pathlib import Path
 
-
 def main() -> int:
     try:
         d = json.load(sys.stdin)
@@ -45,7 +44,6 @@ def main() -> int:
     with log.open("a") as f:
         f.write(json.dumps(entry) + "\n")
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

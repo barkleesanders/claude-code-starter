@@ -1,0 +1,65 @@
+{
+  "name": "va-claim",
+  "title": "VA Disability Claim — {{condition}}",
+  "description": "End-to-end VA disability claim: evidence gathering, nexus letter, submission, C&P exam, decision, appeal.",
+  "phase": "liquid",
+  "variables": {
+    "condition": {
+      "description": "Condition name (e.g. 'Tinnitus', 'PTSD', 'Sleep Apnea')",
+      "required": true
+    },
+    "claim_type": {
+      "description": "new | supplemental | hlr | bva",
+      "default": "new"
+    },
+    "vasrd_code": {
+      "description": "VASRD diagnostic code if known (e.g. '6260' for tinnitus)",
+      "default": ""
+    },
+    "priority": {
+      "description": "0-4 (0=critical)",
+      "default": "2"
+    }
+  },
+  "steps": [
+    {
+      "id": "evidence",
+      "title": "Gather evidence — {{condition}}",
+      "type": "task",
+      "labels": ["domain:va", "workflow:va-claim"],
+      "description": "Collect:\n- Service treatment records\n- VA Medical Center records\n- Private medical records\n- Buddy statements\n- Current symptoms documentation\n\nUpload to Drive /VA/{{condition}}/evidence/"
+    },
+    {
+      "id": "nexus",
+      "title": "Obtain nexus letter — {{condition}}",
+      "type": "task",
+      "labels": ["domain:va", "workflow:va-claim"],
+      "description": "Nexus letter must state 'at least as likely as not' the condition is service-connected. Options:\n- VA doctor (free)\n- Private doctor ($500-1500)\n- Telemedicine nexus services",
+      "depends_on": ["evidence"]
+    },
+    {
+      "id": "submit",
+      "title": "Submit {{claim_type}} claim — {{condition}}",
+      "type": "task",
+      "labels": ["domain:va", "workflow:va-claim"],
+      "description": "Use /va-claims skill to generate VA-526EZ (or appropriate form for claim_type) and /va-submit to file.\n\nForm routing:\n- new → VA Form 21-526EZ\n- supplemental → VA Form 20-0995\n- hlr → VA Form 20-0996\n- bva → VA Form 10182",
+      "depends_on": ["nexus"]
+    },
+    {
+      "id": "cp-exam",
+      "title": "Attend C&P exam — {{condition}}",
+      "type": "task",
+      "labels": ["domain:va", "workflow:va-claim"],
+      "description": "C&P exam preparation:\n- Review symptoms and frequency\n- Bring evidence binder\n- Get DBQ completed on-site if possible\n\nAfter exam: file travel reimbursement via /va-travel skill",
+      "depends_on": ["submit"]
+    },
+    {
+      "id": "decision",
+      "title": "Receive decision — {{condition}}",
+      "type": "task",
+      "labels": ["domain:va", "workflow:va-claim"],
+      "description": "Rating decision review:\n- Document rating percentage\n- Note effective date\n- Identify any secondary conditions mentioned\n- Determine if appeal is warranted",
+      "depends_on": ["cp-exam"]
+    }
+  ]
+}

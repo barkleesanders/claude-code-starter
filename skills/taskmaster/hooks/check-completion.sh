@@ -124,7 +124,7 @@ print(f"STALE_COUNT={stale_count}")
 
   if [ -n "$FRESH" ]; then
     HAS_INCOMPLETE_SIGNALS=true
-    BEADS_BLOCK=$'\n\nBeads issues still in_progress (touched in last '"$WINDOW_MIN"$' min):\n'"$FRESH"$'\n\nClose with: bd close <id>   (or `bd update <id> --status=pending` to unclaim)'
+    BEADS_BLOCK=$'\n\nBeads issues still in_progress (touched in last '"$WINDOW_MIN"$' min):\n'"$FRESH"$'\n\nResolve options:\n  bd close <id>                       — mark complete\n  bd update <id> --status=open        — unclaim (put back on ready queue)\n  bd defer <id>                       — park for later (restore with bd undefer)\n  bd update <id> --status=blocked     — mark blocked'
   fi
 
   if [ "$STALE_COUNT" -gt 0 ]; then

@@ -8,7 +8,6 @@ import sys
 import time
 from pathlib import Path
 
-
 CORRECTION = [
     r"\bdon'?t\s+(do|use|run|call|add|write|create|include|include)",
     r"\bstop\s+(doing|using|calling|running|adding|writing)",
@@ -37,7 +36,6 @@ SUCCESS = [
     r"\bwell\s+done\b",
     r"\bthanks?,?\s+(that|that'?s)\s+(was|perfect|great)",
 ]
-
 
 def read_last_assistant_snippet(transcript_path: str, chars: int = 600) -> str:
     """Return a short snippet of the last assistant turn from a JSONL transcript."""
@@ -68,7 +66,6 @@ def read_last_assistant_snippet(transcript_path: str, chars: int = 600) -> str:
         if text:
             return text[:chars]
     return ""
-
 
 def main() -> int:
     try:
@@ -128,7 +125,6 @@ def main() -> int:
     with log.open("a") as f:
         f.write(json.dumps(entry) + "\n")
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())

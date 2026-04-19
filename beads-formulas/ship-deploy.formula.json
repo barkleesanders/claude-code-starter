@@ -1,0 +1,61 @@
+{
+  "name": "ship-deploy",
+  "title": "Ship deployment — {{project}}",
+  "description": "Full /ship deployment workflow: quality gates, safety audit, deploy, verify.",
+  "phase": "vapor",
+  "variables": {
+    "project": {
+      "description": "Project being shipped (aiva-claims, sf311-doge, etc.)",
+      "required": true
+    },
+    "environment": {
+      "description": "production | preview | staging",
+      "default": "production"
+    },
+    "audit_tier": {
+      "description": "1 | 2 | 3 (higher = more thorough)",
+      "default": "1"
+    }
+  },
+  "steps": [
+    {
+      "id": "preflight",
+      "title": "Pre-flight — git status + branch state for {{project}}",
+      "type": "task",
+      "labels": ["workflow:deploy"],
+      "description": "Run git-preflight checks:\n- git status (no uncommitted secrets)\n- git log vs origin\n- Branch up to date\n- No stale worktrees\n- CHANGELOG.md updated if applicable"
+    },
+    {
+      "id": "gates",
+      "title": "Run /ship quality gates — {{project}}",
+      "type": "task",
+      "labels": ["workflow:deploy"],
+      "description": "/ship runs 12+ gates including:\n- Dependabot vulns (ALL must fix)\n- npm audit (ALL must fix)\n- Biome lint (auto-setup if missing)\n- Security review\n- Code scanning\n- React mount verification (Gate 7)\n- SEO FOUC check (Gate 7.5)\n\nPer feedback_ship_fix_all_issues.md — never skip gates.",
+      "depends_on": ["preflight"]
+    },
+    {
+      "id": "safety-audit",
+      "title": "Safety audit tier {{audit_tier}} — {{project}}",
+      "type": "task",
+      "labels": ["workflow:deploy"],
+      "description": "Audit checks based on tier:\n- Tier 1: silent failures, security, tests\n- Tier 2: blind spots, test quality, rate limits\n- Tier 3: code archaeology, critical paths",
+      "depends_on": ["gates"]
+    },
+    {
+      "id": "deploy",
+      "title": "Deploy to {{environment}} — {{project}}",
+      "type": "task",
+      "labels": ["workflow:deploy"],
+      "description": "For frontend projects: always clean build first (per feedback_verification_before_done.md)\n  rm -rf dist && tsc -b && vite build && wrangler deploy\n\nFor Rails projects: migrate then deploy.\nFor Workers: wrangler deploy.",
+      "depends_on": ["safety-audit"]
+    },
+    {
+      "id": "verify",
+      "title": "Verify deploy with real traffic — {{project}}",
+      "type": "task",
+      "labels": ["workflow:deploy"],
+      "description": "Per carmack-verification rule:\n- curl a canonical URL\n- Verify bundle hash\n- Test golden-path feature\n- Monitor logs for 2 min\n- Check adjacent services didn't break",
+      "depends_on": ["deploy"]
+    }
+  ]
+}

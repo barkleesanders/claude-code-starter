@@ -1,0 +1,77 @@
+{
+  "name": "records-request",
+  "title": "CPRA/FOIA Records Request — {{agency}}",
+  "description": "Full lifecycle of a public records request: draft → file → track → receive → archive → follow-up.",
+  "phase": "liquid",
+  "variables": {
+    "agency": {
+      "description": "Agency name (SFPUC, CPUC, Navy, etc.)",
+      "required": true
+    },
+    "subject": {
+      "description": "Short subject of the request (e.g. 'Treasure Island power outages')",
+      "required": true
+    },
+    "jurisdiction": {
+      "description": "sf | ca | federal",
+      "default": "sf"
+    },
+    "filer_entity": {
+      "description": "Entity filing the request (e.g. 'ESBE Inc dba Treasure Island Outage Reporter')",
+      "default": "<Your Name> (individual)"
+    },
+    "priority": {
+      "description": "0-4 (0=critical)",
+      "default": "2"
+    }
+  },
+  "steps": [
+    {
+      "id": "draft",
+      "title": "Draft CPRA/FOIA request — {{subject}} to {{agency}}",
+      "type": "task",
+      "labels": ["domain:records", "workflow:records-request", "area:{{jurisdiction}}"],
+      "description": "Draft the records request letter. Include:\n- Filer: {{filer_entity}} (claim news-media status if applicable)\n- Subject: {{subject}}\n- Agency: {{agency}}\n- Date range and specific record types\n- Statutory citations (CPRA Gov Code § 6250 et seq for CA, 5 USC § 552 for FOIA)\n- Fee waiver request (if news media)\n\nSave draft to Drive via records-sync.sh"
+    },
+    {
+      "id": "file",
+      "title": "File request — {{subject}} to {{agency}}",
+      "type": "task",
+      "labels": ["domain:records", "workflow:records-request"],
+      "description": "Submit via:\n- SF NextRequest (sanfrancisco.nextrequest.com) for SF agencies\n- Direct email/mail for state agencies\n- FOIA.gov for federal\n\nRecord tracking/reference number in issue notes.",
+      "depends_on": ["draft"]
+    },
+    {
+      "id": "track",
+      "title": "Track response — {{agency}} must respond in statutory window",
+      "type": "task",
+      "labels": ["domain:records", "workflow:records-request"],
+      "description": "Statutory deadlines:\n- CPRA: 10 calendar days to acknowledge, can extend 14 more days\n- FOIA: 20 business days\n- CA PUC: 10 business days\n\nIf deadline missed, file follow-up citing statute. Set a reminder.",
+      "depends_on": ["file"]
+    },
+    {
+      "id": "receive",
+      "title": "Receive and log response — {{subject}}",
+      "type": "task",
+      "labels": ["domain:records", "workflow:records-request", "area:drive"],
+      "description": "When response arrives:\n1. Download all produced records\n2. Run: ~/tools/records-sync.sh --folder-name '{{subject}} {{agency}} YYYY-MM-DD' <files>\n3. Parent: Drive /Records/\n4. Note any redactions and their statutory basis\n5. Flag any records withheld for follow-up appeal",
+      "depends_on": ["track"]
+    },
+    {
+      "id": "analyze",
+      "title": "Analyze records — {{subject}}",
+      "type": "task",
+      "labels": ["domain:records", "workflow:records-request"],
+      "description": "Review produced records for:\n- Newsworthy findings\n- Evidence supporting complaint/lawsuit\n- Gaps requiring follow-up request\n- Contradictions with public statements",
+      "depends_on": ["receive"]
+    },
+    {
+      "id": "followup",
+      "title": "Decide on follow-up — {{subject}}",
+      "type": "task",
+      "labels": ["domain:records", "workflow:records-request"],
+      "description": "Options:\n- File appeal if records wrongly withheld (CPRA § 6258, FOIA administrative appeal)\n- File new request for specific gaps\n- Publish findings on treasureislandsfpoweroutages.com or similar\n- Escalate to CPUC complaint / AG office / press",
+      "depends_on": ["analyze"]
+    }
+  ]
+}
