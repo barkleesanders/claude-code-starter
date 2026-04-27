@@ -10,14 +10,14 @@
 
 ## Code Search Tools
 
-### ogrep -- Semantic Code Search
-Use `ogrep` for AST-aware code search by meaning. Always index before first search in a project.
+### osgrep -- Semantic Code Search
+Use `osgrep` for AST-aware code search by meaning. Always index before first search in a project.
 ```bash
-ogrep index .                          # Build index (first time)
-ogrep query "where is auth handled"    # Semantic search
-ogrep query "error handling" --mode fulltext  # Keyword search (no embeddings needed)
-ogrep query "database connection" -n 10      # More results
-ogrep chunk <ref> --context 5          # Get chunk with surrounding context
+osgrep index .                          # Build index (first time)
+osgrep query "where is auth handled"    # Semantic search
+osgrep query "error handling" --mode fulltext  # Keyword search (no embeddings needed)
+osgrep query "database connection" -n 10      # More results
+osgrep chunk <ref> --context 5          # Get chunk with surrounding context
 ```
 
 ### qmd -- Knowledge & Documentation Search

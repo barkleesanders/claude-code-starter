@@ -36,7 +36,7 @@ Clone https://github.com/barkleesanders/claude-code-starter.git and run the inst
 Claude will clone the repo and run `./install.sh`. The script:
 - Copies all agents/skills/commands to `~/.claude/`
 - Bootstraps Homebrew if missing (prompts once for your password)
-- Installs every CLI tool the skills depend on (`gh`, `node`, `ogrep`, `agent-browser`, `wrangler`, etc.)
+- Installs every CLI tool the skills depend on (`gh`, `node`, `osgrep`, `agent-browser`, `wrangler`, etc.)
 - Asks once about merging `CLAUDE.md` and `settings.json` — choose option 1 or 3.
 
 Or run it directly in your terminal:
@@ -55,7 +55,7 @@ After installation, restart Claude Code and type:
 
 Carmack will scan your `~/.claude/` directory and confirm everything is installed. If anything is missing, it will fix it for you.
 
-That's it. You now have **35 agents, 51 skills, and 26 commands** ready to use, plus an idempotent CLI installer (`install-tools.sh`) that brings in `bd`, `gh`, `node`, `ogrep`, `agent-browser`, `wrangler`, `vercel`, `rclone`, `ffmpeg`, and more. See [Installation](#installation) below for details.
+That's it. You now have **35 agents, 51 skills, and 26 commands** ready to use, plus an idempotent CLI installer (`install-tools.sh`) that brings in `bd`, `gh`, `node`, `osgrep`, `agent-browser`, `wrangler`, `vercel`, `rclone`, `ffmpeg`, and more. See [Installation](#installation) below for details.
 
 ### Your First Real Command
 
@@ -284,7 +284,7 @@ That single command:
 1. **Copies** 35 agents, 51 skills, 26 commands to `~/.claude/`
 2. **Installs/merges** `CLAUDE.md` and `settings.json`
 3. **Bootstraps Homebrew** if missing (you'll be prompted for your macOS password once)
-4. **Installs all CLI tools** in dependency order: `bd`, `jq`, `node`, `gh`, `ripgrep`, `osgrep` (aliased as `ogrep`), `qmd`, `rclone`, `ffmpeg`, `agent-browser`, `wrangler`, `vercel`, `eas-cli`, plus **claude-hud** (cloned from https://github.com/barkleesanders/claude-hud and built — provides the rich statusLine HUD)
+4. **Installs all CLI tools** in dependency order: `bd`, `jq`, `node`, `gh`, `ripgrep`, `osgrep`, `qmd`, `rclone`, `ffmpeg`, `agent-browser`, `wrangler`, `vercel`, `eas-cli`, plus **claude-hud** (cloned from https://github.com/barkleesanders/claude-hud and built — provides the rich statusLine HUD)
 5. **Adds Homebrew to your shell rc** (zsh/bash) for future sessions
 6. **Auto-inits `.beads/`** in the current repo if it's a git repo
 
@@ -319,7 +319,7 @@ Idempotent — safe to re-run. Detects what's already installed via `command -v`
 | **core** | `jq` | `brew install jq` | JSON in many skill scripts |
 | **core** | `node` | `brew install node` | Provides `npm` for the rest |
 | **search** | `rg` (ripgrep) | `brew install ripgrep` | Fast code search |
-| **search** | `osgrep` (aliased as `ogrep`) | `npm i -g osgrep` | Open Source Semantic Search ([Ryandonofrio3/osgrep](https://github.com/Ryandonofrio3/osgrep)) — referenced as `ogrep` in CLAUDE.md |
+| **search** | `osgrep` | `npm i -g osgrep` | Open Source Semantic Search ([Ryandonofrio3/osgrep](https://github.com/Ryandonofrio3/osgrep)) — AST-aware code search |
 | **search** | `qmd` | `npm i -g @tobilu/qmd` | Local doc/notes semantic search ([tobi/qmd](https://github.com/tobi/qmd)) |
 | **hud** | `claude-hud` | `git clone barkleesanders/claude-hud && npm i && npm run build` | Rich statusLine HUD (used by `settings.json` `"statusLine"`) |
 | **browser** | `agent-browser` | `npm i -g agent-browser` | Headless browser skill |

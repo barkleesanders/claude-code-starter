@@ -24,19 +24,19 @@ Print a short status line when transitioning phases:
 
 Follow phases in order. Skip phases that don't apply. Focus on doing the work, not tracking the work.
 
-## SEMANTIC SEARCH (ogrep)
+## SEMANTIC SEARCH (osgrep)
 
 **Purpose**: Use AST-aware semantic search for efficient codebase reconnaissance.
 
 **Usage**:
-- **Index first**: `ogrep index .` (required before first search in a project)
-- **Semantic search**: `ogrep query "where is auth handled"`
-- **Keyword search**: `ogrep query "error handling" --mode fulltext`
-- **More results**: `ogrep query "database connection" -n 10`
+- **Index first**: `osgrep index .` (required before first search in a project)
+- **Semantic search**: `osgrep query "where is auth handled"`
+- **Keyword search**: `osgrep query "error handling" --mode fulltext`
+- **More results**: `osgrep query "database connection" -n 10`
 
 **Search-First Protocol**:
-1. ALWAYS attempt `ogrep query` before using `grep`/`rg` for code discovery
-2. If ogrep fails: Fall back to `rg`/`grep` and log the fallback
+1. ALWAYS attempt `osgrep query` before using `grep`/`rg` for code discovery
+2. If osgrep fails: Fall back to `rg`/`grep` and log the fallback
 
 ## PRIME DIRECTIVE - Read the Code FIRST
 

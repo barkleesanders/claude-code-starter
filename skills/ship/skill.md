@@ -108,10 +108,10 @@ fi
 
 ## Tools Available
 
-### ogrep — Code Search During Gates
+### osgrep — Code Search During Gates
 ```bash
-ogrep query "throw.*module scope" --mode fulltext   # Find risky patterns
-ogrep query "validateClientEnv" -n 20               # Find all validation calls
+osgrep query "throw.*module scope" --mode fulltext   # Find risky patterns
+osgrep query "validateClientEnv" -n 20               # Find all validation calls
 ```
 
 ### qmd — Documentation Search
@@ -169,7 +169,7 @@ Just execute the phases in order. Do the work, don't track the work in TodoWrite
 
 ### CODE SEARCH
 
-Use standard tools (Grep, Glob, Read) for code discovery. Use `ogrep` if available for AST-aware search, but never block on it — fall back to Grep/Glob immediately if unavailable.
+Use standard tools (Grep, Glob, Read) for code discovery. Use `osgrep` if available for AST-aware search, but never block on it — fall back to Grep/Glob immediately if unavailable.
 
 ---
 

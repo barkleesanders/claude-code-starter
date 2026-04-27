@@ -137,7 +137,7 @@ echo ""
 if [ -x "$SCRIPT_DIR/install-tools.sh" ] && [ "${1:-}" != "--no-tools" ]; then
     echo "─────────────────────────────────────────────────────────────"
     echo "Now installing CLI tools required by agents and skills..."
-    echo "(brew, node, gh, ripgrep, ogrep, agent-browser, wrangler, vercel, rclone, ffmpeg)"
+    echo "(brew, node, gh, ripgrep, osgrep, agent-browser, wrangler, vercel, rclone, ffmpeg)"
     echo "Skip with: ./install.sh --no-tools"
     echo "─────────────────────────────────────────────────────────────"
     "$SCRIPT_DIR/install-tools.sh"

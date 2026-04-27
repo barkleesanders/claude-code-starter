@@ -6,7 +6,7 @@
 #
 # Tiers:
 #   core      — required by CLAUDE.md mandatory rules (bd, gh, jq, node)
-#   search    — code/doc search tools (ogrep, ripgrep)
+#   search    — code/doc search tools (osgrep, ripgrep)
 #   browser   — browser automation (agent-browser via npm)
 #   deploy    — deploy/cloud clients (wrangler, vercel, rclone)
 #   media     — media tools used by avatar-video, nano-banana skills (ffmpeg)
@@ -169,17 +169,9 @@ install_core() {
 install_search() {
   info "Tier: search (code & doc search)"
   brew_install ripgrep rg
-  # osgrep — Open Source Semantic Search (Ryandonofrio3/osgrep) — referenced as `ogrep` in CLAUDE.md
+  # osgrep — Open Source Semantic Search (Ryandonofrio3/osgrep)
   npm_install osgrep osgrep
-  # Symlink ogrep -> osgrep so CLAUDE.md `ogrep` commands work
-  if have osgrep && ! have ogrep; then
-    local link_path
-    link_path="$(dirname "$(command -v osgrep)")/ogrep"
-    if [ ! -e "$link_path" ]; then
-      ln -sf "$(command -v osgrep)" "$link_path" && ok "linked ogrep -> osgrep"
-    fi
-  fi
-  # qmd — tobi/qmd — local doc/notes semantic search (referenced in CLAUDE.md)
+  # qmd — tobi/qmd — local doc/notes semantic search
   npm_install @tobilu/qmd qmd
 }
 

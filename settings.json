@@ -146,7 +146,7 @@
       "Bash(realpath:*)",
       "Bash(dirname:*)",
       "Bash(basename:*)",
-      "Bash(ogrep:*)",
+      "Bash(osgrep:*)",
       "Bash(qmd:*)",
       "Bash(cargo fmt:*)",
       "Bash(cargo clippy:*)",

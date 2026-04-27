@@ -152,11 +152,11 @@ When invoked, systematically challenge the problem:
 
 ## Code Search Tools
 
-### ogrep — Semantic Code Search
+### osgrep — Semantic Code Search
 ```bash
-ogrep index .                          # Build index (first time)
-ogrep query "where is auth handled"    # Semantic search
-ogrep query "dead code" --mode fulltext  # Keyword search
+osgrep index .                          # Build index (first time)
+osgrep query "where is auth handled"    # Semantic search
+osgrep query "dead code" --mode fulltext  # Keyword search
 ```
 
 ### bd — Task Tracking

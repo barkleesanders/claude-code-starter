@@ -62,7 +62,7 @@ The sequence matters more than any single tool choice.
 - **Git archaeology**: `git log -p`, `git blame`, `git diff A..B` — often the highest-signal context in a debug session. No native equivalent.
 - **Executing code for evidence**: `node`, `python -c`, `curl`, `timeout 120 npx vitest run specific-test`. Evidence beats speculation.
 - **Compound pipelines**: anything involving `sort`/`uniq`/`wc`/`awk`/`xargs`. Example: `grep -rn "TODO" --include="*.ts" | grep -v test | sort | uniq -c | sort -rn` for a ranked frequency table.
-- **Running CLI tools**: `ogrep`, `qmd`, `bd`, `gh`, `wrangler`, `git`, `npm`.
+- **Running CLI tools**: `osgrep`, `qmd`, `bd`, `gh`, `wrangler`, `git`, `npm`.
 
 **Don't use Bash as a `Read` substitute** (`cat`, `head`, `tail`, `sed -n '50,70p'`, `less`). You lose multimodal rendering, file-read tracking, and clean line-numbered output.
 
@@ -240,13 +240,13 @@ When using the Agent tool to delegate work:
 
 **Start with native `Grep` / `Glob`** — they return structured `file:line:content` output that feeds directly into `Read`. Escalate to the CLI tools below only when keyword matching can't express the question (semantic search, cross-doc synthesis, AST patterns).
 
-### ogrep — AST-Aware / Semantic Code Search (escalate from Grep)
+### osgrep — AST-Aware / Semantic Code Search (escalate from Grep)
 Use when the thing you're looking for isn't a literal keyword — e.g. "where is auth handled" across varied naming.
 
 ```bash
-ogrep index .                          # Build index (first time per project)
-ogrep query "where is auth handled"    # Semantic search
-ogrep query "error handling" --mode fulltext  # Keyword search
+osgrep index .                          # Build index (first time per project)
+osgrep query "where is auth handled"    # Semantic search
+osgrep query "error handling" --mode fulltext  # Keyword search
 ```
 
 ### qmd — Knowledge & Documentation Search
@@ -319,7 +319,7 @@ Load `~/.claude/skills/shared/ant-verification-protocol.md` and apply:
 ```
 Launch carmack-mode-engineer agent now with the user's issue description.
 Include the content from the relevant reference files you loaded in STEP 1.
-CRITICAL (context quality): Use the Grep → Read loop as the default investigation sequence. Never use Bash `cat`/`head`/`tail`/`sed -n` as a Read substitute — you lose multimodal rendering (images/PDFs/notebooks), safe-edit tracking, and clean line numbers. Reserve Bash for git archaeology (log/blame/diff), code execution (node/python/curl/test runs), compound pipelines (sort/uniq/wc/awk/xargs), and CLI tools (ogrep/qmd/bd/gh).
+CRITICAL (context quality): Use the Grep → Read loop as the default investigation sequence. Never use Bash `cat`/`head`/`tail`/`sed -n` as a Read substitute — you lose multimodal rendering (images/PDFs/notebooks), safe-edit tracking, and clean line numbers. Reserve Bash for git archaeology (log/blame/diff), code execution (node/python/curl/test runs), compound pipelines (sort/uniq/wc/awk/xargs), and CLI tools (osgrep/qmd/bd/gh).
 IMPORTANT: After EVERY git push, check if the repo has GitHub Actions workflows. If yes, watch all checks until they complete. If any check fails, read the failure logs, fix the issue, commit, push, and repeat — up to 3 retry cycles.
 CRITICAL: Do NOT deploy to production. Do NOT run wrangler deploy, npm run deploy, vercel deploy --prod, or any production deployment command. When implementation is complete, STOP and tell the user to run /ship for deployment.
 ```

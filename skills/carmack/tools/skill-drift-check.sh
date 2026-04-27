@@ -27,7 +27,7 @@ SAFE_PROBES = {
     "bd": ["bd", "--help"],
     "gh": ["gh", "--version"],
     "jq": ["jq", "--version"],
-    "ogrep": ["ogrep", "--version"],
+    "osgrep": ["osgrep", "--version"],
     "qmd": ["qmd", "--version"],
     "wrangler": ["wrangler", "--version"],
     "git": ["git", "--version"],
