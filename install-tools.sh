@@ -31,6 +31,7 @@ for arg in "$@"; do
     --browser)   TIER="browser" ;;
     --deploy)    TIER="deploy" ;;
     --media)     TIER="media" ;;
+    --hud)       TIER="hud" ;;
     --optional)  TIER="optional" ;;
     --check)     CHECK_ONLY=1 ;;
     --skip-brew) SKIP_BREW=1 ;;
@@ -168,9 +169,14 @@ install_core() {
 install_search() {
   info "Tier: search (code & doc search)"
   brew_install ripgrep rg
-  brew_install rust cargo    # needed for ogrep
-  cargo_install osgrep ogrep
-  # qmd — no public source identified; document for the user
+  # ogrep — AST-aware code search (CLAUDE.md). Source not in public crates.io;
+  # likely a private/internal tool. We provide rg which is the universal fallback.
+  if have ogrep; then
+    ok "ogrep"
+  else
+    warn "ogrep — not in public registries; install per your source of record"
+  fi
+  # qmd — no public install source identified; document for the user
   if have qmd; then
     ok "qmd"
   else
@@ -195,9 +201,33 @@ install_media() {
   brew_install ffmpeg ffmpeg
 }
 
+install_claude_hud() {
+  info "Tier: claude-hud (statusLine HUD)"
+  local hud_dir="$HOME/claude-hud"
+  if [ -f "$hud_dir/dist/index.js" ]; then
+    ok "claude-hud built at $hud_dir"
+    return
+  fi
+  miss "claude-hud not built"
+  if [ "$CHECK_ONLY" -eq 1 ]; then return; fi
+  if ! have node; then
+    warn "node required — install Node first (brew install node)"
+    return 1
+  fi
+  if [ ! -d "$hud_dir" ]; then
+    run_or_show "git clone https://github.com/barkleesanders/claude-hud.git $hud_dir"
+  fi
+  ( cd "$hud_dir" && run_or_show "npm install" && run_or_show "npm run build" )
+  if [ -f "$hud_dir/dist/index.js" ]; then
+    ok "claude-hud built"
+  else
+    miss "claude-hud build failed"
+  fi
+}
+
 install_optional() {
   info "Tier: optional"
-  npm_install eas-cli eas-cli
+  npm_install eas-cli eas
   # codex CLI — referenced by codex-chat skill
   if have codex; then
     ok "codex"
@@ -226,12 +256,14 @@ case "$TIER" in
   deploy)   install_deploy ;;
   media)    install_media ;;
   optional) install_optional ;;
+  hud)      install_claude_hud ;;
   all)
     install_core
     install_search
     install_browser
     install_deploy
     install_media
+    install_claude_hud
     install_optional
     ;;
 esac

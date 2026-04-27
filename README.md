@@ -284,7 +284,7 @@ That single command:
 1. **Copies** 35 agents, 51 skills, 26 commands to `~/.claude/`
 2. **Installs/merges** `CLAUDE.md` and `settings.json`
 3. **Bootstraps Homebrew** if missing (you'll be prompted for your macOS password once)
-4. **Installs all 13 CLI tools** in dependency order: `bd`, `jq`, `node`, `gh`, `ripgrep`, `rust`, `ogrep`, `agent-browser`, `wrangler`, `vercel`, `rclone`, `ffmpeg`, `eas-cli`
+4. **Installs all CLI tools** in dependency order: `bd`, `jq`, `node`, `gh`, `ripgrep`, `rclone`, `ffmpeg`, `agent-browser`, `wrangler`, `vercel`, `eas-cli`, plus **claude-hud** (cloned from https://github.com/barkleesanders/claude-hud and built — provides the rich statusLine HUD)
 5. **Adds Homebrew to your shell rc** (zsh/bash) for future sessions
 6. **Auto-inits `.beads/`** in the current repo if it's a git repo
 
@@ -300,10 +300,11 @@ The agents and skills reference ~14 external CLIs. `install-tools.sh` installs t
 ./install-tools.sh              # Install everything (default)
 ./install-tools.sh --check      # Report what's missing, install nothing
 ./install-tools.sh --core       # Just the mandatory ones (bd, gh, jq, node)
-./install-tools.sh --search     # Code/doc search (ripgrep, ogrep)
+./install-tools.sh --search     # Code/doc search (ripgrep)
 ./install-tools.sh --browser    # Browser automation (agent-browser)
 ./install-tools.sh --deploy     # Cloud clients (wrangler, vercel, rclone)
 ./install-tools.sh --media      # Media tools (ffmpeg)
+./install-tools.sh --hud        # claude-hud (statusLine HUD)
 ./install-tools.sh --optional   # eas-cli, codex, asc
 ```
 
@@ -318,8 +319,9 @@ Idempotent — safe to re-run. Detects what's already installed via `command -v`
 | **core** | `jq` | `brew install jq` | JSON in many skill scripts |
 | **core** | `node` | `brew install node` | Provides `npm` for the rest |
 | **search** | `rg` (ripgrep) | `brew install ripgrep` | Fast code search |
-| **search** | `ogrep` | `cargo install osgrep` | AST-aware code search (CLAUDE.md) |
+| **search** | `ogrep` | (private/external) | AST-aware code search — not in public registries; install per your source of record |
 | **search** | `qmd` | manual — see upstream | Local semantic doc search (no public install identified) |
+| **hud** | `claude-hud` | `git clone barkleesanders/claude-hud && npm i && npm run build` | Rich statusLine HUD (used by `settings.json` `"statusLine"`) |
 | **browser** | `agent-browser` | `npm i -g agent-browser` | Headless browser skill |
 | **deploy** | `wrangler` | `npm i -g wrangler` | Cloudflare Workers deploys |
 | **deploy** | `vercel` | `npm i -g vercel` | Vercel deploys |
