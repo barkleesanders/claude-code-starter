@@ -169,19 +169,18 @@ install_core() {
 install_search() {
   info "Tier: search (code & doc search)"
   brew_install ripgrep rg
-  # ogrep — AST-aware code search (CLAUDE.md). Source not in public crates.io;
-  # likely a private/internal tool. We provide rg which is the universal fallback.
-  if have ogrep; then
-    ok "ogrep"
-  else
-    warn "ogrep — not in public registries; install per your source of record"
+  # osgrep — Open Source Semantic Search (Ryandonofrio3/osgrep) — referenced as `ogrep` in CLAUDE.md
+  npm_install osgrep osgrep
+  # Symlink ogrep -> osgrep so CLAUDE.md `ogrep` commands work
+  if have osgrep && ! have ogrep; then
+    local link_path
+    link_path="$(dirname "$(command -v osgrep)")/ogrep"
+    if [ ! -e "$link_path" ]; then
+      ln -sf "$(command -v osgrep)" "$link_path" && ok "linked ogrep -> osgrep"
+    fi
   fi
-  # qmd — no public install source identified; document for the user
-  if have qmd; then
-    ok "qmd"
-  else
-    warn "qmd — no public install source identified; check upstream"
-  fi
+  # qmd — tobi/qmd — local doc/notes semantic search (referenced in CLAUDE.md)
+  npm_install @tobilu/qmd qmd
 }
 
 install_browser() {

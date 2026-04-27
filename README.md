@@ -284,7 +284,7 @@ That single command:
 1. **Copies** 35 agents, 51 skills, 26 commands to `~/.claude/`
 2. **Installs/merges** `CLAUDE.md` and `settings.json`
 3. **Bootstraps Homebrew** if missing (you'll be prompted for your macOS password once)
-4. **Installs all CLI tools** in dependency order: `bd`, `jq`, `node`, `gh`, `ripgrep`, `rclone`, `ffmpeg`, `agent-browser`, `wrangler`, `vercel`, `eas-cli`, plus **claude-hud** (cloned from https://github.com/barkleesanders/claude-hud and built — provides the rich statusLine HUD)
+4. **Installs all CLI tools** in dependency order: `bd`, `jq`, `node`, `gh`, `ripgrep`, `osgrep` (aliased as `ogrep`), `qmd`, `rclone`, `ffmpeg`, `agent-browser`, `wrangler`, `vercel`, `eas-cli`, plus **claude-hud** (cloned from https://github.com/barkleesanders/claude-hud and built — provides the rich statusLine HUD)
 5. **Adds Homebrew to your shell rc** (zsh/bash) for future sessions
 6. **Auto-inits `.beads/`** in the current repo if it's a git repo
 
@@ -319,8 +319,8 @@ Idempotent — safe to re-run. Detects what's already installed via `command -v`
 | **core** | `jq` | `brew install jq` | JSON in many skill scripts |
 | **core** | `node` | `brew install node` | Provides `npm` for the rest |
 | **search** | `rg` (ripgrep) | `brew install ripgrep` | Fast code search |
-| **search** | `ogrep` | (private/external) | AST-aware code search — not in public registries; install per your source of record |
-| **search** | `qmd` | manual — see upstream | Local semantic doc search (no public install identified) |
+| **search** | `osgrep` (aliased as `ogrep`) | `npm i -g osgrep` | Open Source Semantic Search ([Ryandonofrio3/osgrep](https://github.com/Ryandonofrio3/osgrep)) — referenced as `ogrep` in CLAUDE.md |
+| **search** | `qmd` | `npm i -g @tobilu/qmd` | Local doc/notes semantic search ([tobi/qmd](https://github.com/tobi/qmd)) |
 | **hud** | `claude-hud` | `git clone barkleesanders/claude-hud && npm i && npm run build` | Rich statusLine HUD (used by `settings.json` `"statusLine"`) |
 | **browser** | `agent-browser` | `npm i -g agent-browser` | Headless browser skill |
 | **deploy** | `wrangler` | `npm i -g wrangler` | Cloudflare Workers deploys |
