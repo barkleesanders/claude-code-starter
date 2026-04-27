@@ -30,10 +30,20 @@ Open **Claude Code** in your terminal, VS Code, or the desktop app. If you don't
 Paste this into Claude Code:
 
 ```
-Clone https://github.com/barkleesanders/claude-code-starter.git and run the install script to set up all the agents, skills, and commands
+Clone https://github.com/barkleesanders/claude-code-starter.git and run the install script to set up all the agents, skills, commands, and CLI tools
 ```
 
-Claude will clone the repo, run `./install.sh`, and walk you through the setup. When it asks about CLAUDE.md and settings.json, choose to install them (option 1 or 3).
+Claude will clone the repo and run `./install.sh`. The script:
+- Copies all agents/skills/commands to `~/.claude/`
+- Bootstraps Homebrew if missing (prompts once for your password)
+- Installs every CLI tool the skills depend on (`gh`, `node`, `ogrep`, `agent-browser`, `wrangler`, etc.)
+- Asks once about merging `CLAUDE.md` and `settings.json` — choose option 1 or 3.
+
+Or run it directly in your terminal:
+
+```bash
+git clone https://github.com/barkleesanders/claude-code-starter.git && cd claude-code-starter && ./install.sh
+```
 
 ### Step 3: Verify It Works
 
@@ -45,7 +55,7 @@ After installation, restart Claude Code and type:
 
 Carmack will scan your `~/.claude/` directory and confirm everything is installed. If anything is missing, it will fix it for you.
 
-That's it. You now have 35 agents, 48 skills, and 21 commands ready to use.
+That's it. You now have **35 agents, 51 skills, and 26 commands** ready to use, plus an idempotent CLI installer (`install-tools.sh`) that brings in `bd`, `gh`, `node`, `ogrep`, `agent-browser`, `wrangler`, `vercel`, `rclone`, `ffmpeg`, and more. See [Installation](#installation) below for details.
 
 ### Your First Real Command
 
@@ -263,11 +273,63 @@ Resume any investigation: "Resume the auth-timeout investigation"
 
 ## Installation
 
-### Automatic
+### One-line install (recommended)
 
 ```bash
-./install.sh
+git clone https://github.com/barkleesanders/claude-code-starter.git && cd claude-code-starter && ./install.sh
 ```
+
+That single command:
+
+1. **Copies** 35 agents, 51 skills, 26 commands to `~/.claude/`
+2. **Installs/merges** `CLAUDE.md` and `settings.json`
+3. **Bootstraps Homebrew** if missing (you'll be prompted for your macOS password once)
+4. **Installs all 13 CLI tools** in dependency order: `bd`, `jq`, `node`, `gh`, `ripgrep`, `rust`, `ogrep`, `agent-browser`, `wrangler`, `vercel`, `rclone`, `ffmpeg`, `eas-cli`
+5. **Adds Homebrew to your shell rc** (zsh/bash) for future sessions
+6. **Auto-inits `.beads/`** in the current repo if it's a git repo
+
+Skip the CLI tool install with `./install.sh --no-tools`.
+
+The script is idempotent — safe to re-run. It detects what's already installed and only runs the missing pieces.
+
+### CLI Tools Installer
+
+The agents and skills reference ~14 external CLIs. `install-tools.sh` installs them all by tier:
+
+```bash
+./install-tools.sh              # Install everything (default)
+./install-tools.sh --check      # Report what's missing, install nothing
+./install-tools.sh --core       # Just the mandatory ones (bd, gh, jq, node)
+./install-tools.sh --search     # Code/doc search (ripgrep, ogrep)
+./install-tools.sh --browser    # Browser automation (agent-browser)
+./install-tools.sh --deploy     # Cloud clients (wrangler, vercel, rclone)
+./install-tools.sh --media      # Media tools (ffmpeg)
+./install-tools.sh --optional   # eas-cli, codex, asc
+```
+
+Idempotent — safe to re-run. Detects what's already installed via `command -v` and only runs the missing installs.
+
+#### What gets installed
+
+| Tier | Tool | Source | Used by |
+|------|------|--------|---------|
+| **core** | `bd` (beads) | `brew install steveyegge/tap/beads` | Mandatory task tracking (CLAUDE.md rule) |
+| **core** | `gh` | `brew install gh` | GitHub API rate-limit rule |
+| **core** | `jq` | `brew install jq` | JSON in many skill scripts |
+| **core** | `node` | `brew install node` | Provides `npm` for the rest |
+| **search** | `rg` (ripgrep) | `brew install ripgrep` | Fast code search |
+| **search** | `ogrep` | `cargo install osgrep` | AST-aware code search (CLAUDE.md) |
+| **search** | `qmd` | manual — see upstream | Local semantic doc search (no public install identified) |
+| **browser** | `agent-browser` | `npm i -g agent-browser` | Headless browser skill |
+| **deploy** | `wrangler` | `npm i -g wrangler` | Cloudflare Workers deploys |
+| **deploy** | `vercel` | `npm i -g vercel` | Vercel deploys |
+| **deploy** | `rclone` | `brew install rclone` | Cloud storage skill |
+| **media** | `ffmpeg` | `brew install ffmpeg` | avatar-video, video skills |
+| **optional** | `eas-cli` | `npm i -g eas-cli` | Expo builds |
+| **optional** | `codex` | per `skills/codex/SKILL.md` | codex-chat / codex-rescue skills |
+| **optional** | `asc` | per `skills/ios-ship/SKILL.md` | App Store Connect (iOS shipping) |
+
+> **Homebrew bootstrap**: macOS users without `brew` will see one-liner instructions on first run. Install Homebrew once interactively, then re-run `./install-tools.sh`.
 
 ### Manual
 
@@ -280,15 +342,19 @@ cp agents/*.md ~/.claude/agents/
 # Skills
 cp -r skills/* ~/.claude/skills/
 
-# Commands
+# Commands (top-level + workflows subdirectory)
 mkdir -p ~/.claude/commands
 cp commands/*.md ~/.claude/commands/
+cp -r commands/workflows ~/.claude/commands/
 
 # CLAUDE.md (merge with existing or replace)
 cp CLAUDE.md ~/.claude/CLAUDE.md
 
 # Settings (review and merge hooks/permissions into your settings.json)
 cat settings.json
+
+# CLI tools (do this last)
+./install-tools.sh
 ```
 
 ## File Structure
@@ -296,7 +362,8 @@ cat settings.json
 ```
 claude-code-starter/
 ├── README.md
-├── install.sh
+├── install.sh                       # Installs agents/skills/commands + offers CLI tools
+├── install-tools.sh                 # Installs the ~14 external CLIs (idempotent, tiered)
 ├── settings.json                    # Claude Code settings (permissions, hooks, plugins)
 ├── CLAUDE.md                        # Quick reference config
 ├── agents/                          # 35 specialized agent definitions
@@ -304,15 +371,16 @@ claude-code-starter/
 │   ├── carmack-mode-engineer.md
 │   ├── ship-working-code.md
 │   └── ...
-├── skills/                          # 45+ skill definitions
+├── skills/                          # 51 skill definitions
 │   ├── debug/skill.md
 │   ├── carmack/skill.md
 │   ├── ship/skill.md
 │   └── ...
-├── commands/                        # 21 slash commands
+├── commands/                        # 26 slash commands (incl. workflows/)
 │   ├── browser.md
 │   ├── changelog.md
-│   └── ...
+│   └── workflows/                   # work, plan, review, brainstorm, compound
+├── beads-formulas/                  # Workflow templates (records-request, ship-deploy, …)
 ├── scripts/
 │   └── backup-claude-config.sh      # Auto-backup script
 └── hooks-examples/

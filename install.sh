@@ -126,14 +126,23 @@ else
 fi
 
 echo ""
-echo "Installation complete!"
-echo ""
-echo "Installed:"
+echo "Files installed:"
 echo "  - 35 agents (systematic-debugging, carmack-mode-engineer, ship-working-code, ...)"
-echo "  - 49 skills (/debug, /carmack, /ship, /safety-audit, /token-usage, ...)"
-echo "  - 21 commands"
+echo "  - 51 skills (/debug, /carmack, /ship, /safety-audit, /token-usage, ...)"
+echo "  - 26 commands (incl. workflows/)"
 echo "  - CLAUDE.md quick reference"
 echo ""
+
+# CLI tools — install everything the agents/skills reference (skip with --no-tools)
+if [ -x "$SCRIPT_DIR/install-tools.sh" ] && [ "${1:-}" != "--no-tools" ]; then
+    echo "─────────────────────────────────────────────────────────────"
+    echo "Now installing CLI tools required by agents and skills..."
+    echo "(brew, node, gh, ripgrep, ogrep, agent-browser, wrangler, vercel, rclone, ffmpeg)"
+    echo "Skip with: ./install.sh --no-tools"
+    echo "─────────────────────────────────────────────────────────────"
+    "$SCRIPT_DIR/install-tools.sh"
+    echo ""
+fi
 
 # Auto-initialize beads in the current working directory if it's a git repo
 if command -v bd >/dev/null 2>&1 && [ -d "$PWD/.git" ] && [ ! -d "$PWD/.beads" ]; then
