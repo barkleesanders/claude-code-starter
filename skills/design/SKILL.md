@@ -1,186 +1,86 @@
 ---
 name: design
-description: Design UI screens with Google Stitch AI. Generates high-fidelity HTML/CSS designs from text prompts, edits existing screens, and manages design systems. Uses the Stitch MCP server for AI-powered design generation.
+description: Design and build frontend interfaces with high design quality. Picks a bold aesthetic direction, then either generates screens via Google Stitch MCP or writes production-grade code directly in the repo. Use for UI design, screen mockups, design systems, building components / pages / apps, or any "design" / "build a [component/page/UI]" request.
 user-invocable: true
 ---
 
-# /design — AI-Powered UI Design with Google Stitch
+# /design — Direction-First Frontend Design & Build
 
-You are a Design Systems Lead and Prompt Engineer specializing in the **Stitch MCP server**. You create high-fidelity, consistent, and professional UI designs by transforming user ideas into precise design specifications.
+You are a Design Systems Lead. Every `/design` invocation runs in **two phases**:
 
-## Prerequisites
+1. **Phase 0 — Lock the aesthetic direction.** No exceptions, no skipping.
+2. **Phase 1 — Route to the right transport** (Stitch cloud generation OR in-repo code writing) and load the matching reference file.
 
-The `stitch` MCP server must be running (configured in `~/.claude/settings.json`). If Stitch tools are unavailable, tell the user to run:
-```bash
-! npx @_davideast/stitch-mcp init
-```
-
-## Routing
-
-Based on the user's request, choose the right workflow:
-
-| User Intent | Action | Primary Tool |
-|:---|:---|:---|
-| "Design a [page]..." | Generate new screen | `mcp__stitch__generate_screen_from_text` |
-| "Edit this [screen]..." | Edit existing screen | `mcp__stitch__edit_screens` |
-| "Show my projects" | List projects | `mcp__stitch__list_projects` |
-| "Show screens" | List screens | `mcp__stitch__list_screens` |
-| "Create design system" | Analyze & write DESIGN.md | `mcp__stitch__get_screen` + Write |
+The direction picked in Phase 0 is the single source of truth for whatever runs in Phase 1.
 
 ---
 
-## Prompt Enhancement Pipeline (ALWAYS run before generation/editing)
+## Phase 0 — Aesthetic Direction (ALWAYS run first)
 
-### Step 1: Context
-- Check for `.stitch/DESIGN.md` in the current project — if it exists, incorporate its tokens
-- Identify platform (Web/Mobile) and page type
-- Use `mcp__stitch__list_projects` if projectId is unknown
+Load `references/aesthetic-core.md` and follow it to lock four things:
 
-### Step 2: Refine terminology
-Replace vague terms with professional UI/UX language:
+1. **Purpose** — what problem this interface solves; who uses it
+2. **Tone** — pick ONE direction from the menu (brutalist / luxury / retro-futuristic / organic / playful / editorial / etc.). **Never "modern."**
+3. **Constraints** — framework, performance, accessibility
+4. **Differentiation** — the ONE memorable thing
 
-| Vague | Professional |
-|:---|:---|
-| "menu at the top" | "sticky navigation bar with logo and list items" |
-| "big photo" | "high-impact hero section with full-width imagery" |
-| "list of things" | "responsive card grid with hover states and subtle elevations" |
-| "button" | "primary call-to-action button with micro-interactions" |
-| "form" | "clean form with labeled input fields, validation states, and submit button" |
-| "sidebar" | "collapsible side navigation with icon-label pairings" |
-| "popup" | "modal dialog with overlay and smooth entry animation" |
+The aesthetic-core also carries:
+- The five aesthetic areas (typography, color, motion, spatial, backgrounds)
+- The anti-slop banlist (no Inter/Roboto/Arial defaults, no purple-on-white, no shadcn defaults shipped raw, etc.)
+- The vague → professional vocabulary table
 
-### Step 3: Set atmosphere
-Add vibe descriptors:
-
-| Vibe | Description |
-|:---|:---|
-| Modern | Clean, minimal, generous whitespace, high-contrast typography |
-| Professional | Sophisticated, trustworthy, subtle shadows, premium palette |
-| Playful | Vibrant, rounded corners, bold accent colors, bouncy micro-animations |
-| Dark Mode | Electric, high-contrast accents on deep slate backgrounds |
-| Luxury | Elegant, spacious, fine lines, serif headers, high-fidelity photography |
-| Tech/Cyber | Futuristic, neon accents, glassmorphism, monospaced typography |
-
-### Step 4: Structure the final prompt
-
-```
-[Overall vibe, mood, and purpose of the page]
-
-**DESIGN SYSTEM (REQUIRED):**
-- Platform: [Web/Mobile], [Desktop/Mobile]-first
-- Palette: [Primary Name] (#hex), [Secondary Name] (#hex)
-- Styles: [Roundness], [Shadow/Elevation style]
-
-**PAGE STRUCTURE:**
-1. **Header:** [Navigation and branding]
-2. **Hero Section:** [Headline, subtext, primary CTA]
-3. **Primary Content Area:** [Component breakdown]
-4. **Footer:** [Links and copyright]
-```
+If the user gave you a fuzzy brief, **stop and ask them to pick a direction** from the menu before continuing. Don't guess.
 
 ---
 
-## Workflow: Text-to-Design (New Screen)
+## Phase 1 — Route to Transport
 
-1. **Enhance prompt** using pipeline above
-2. **Find project**: `mcp__stitch__list_projects` (or use known projectId)
-3. **Generate**:
-   ```
-   mcp__stitch__generate_screen_from_text({
-     projectId: "...",
-     prompt: "[Enhanced Prompt]",
-     deviceType: "DESKTOP"  // or MOBILE, TABLET
-   })
-   ```
-4. **Show AI feedback**: Surface `outputComponents` text description and suggestions
-5. **Download assets**: Save HTML and screenshots to `.stitch/designs/`
-6. **Refine**: Use edit workflow for tweaks — don't regenerate from scratch
+Pick the mode from the user's intent:
 
-## Workflow: Edit Existing Screen
+| User intent signals | Mode | Reference file to load |
+|---|---|---|
+| "Design a [page/screen]", "mock this up", "edit screen X", "list Stitch projects", a Stitch project URL pasted, anything implying screen-level generation in Stitch | **Stitch** | `references/stitch-workflows.md` |
+| "Build a [component / page / app]", "implement this in React/Next/Vue/Svelte/Astro", "write the code for...", in-repo code work | **Code** | `references/code-implementation.md` |
+| "Create a design system", "extract design tokens", "give me a `DESIGN.md`" | **Hybrid** | both reference files |
 
-1. **Find screen**: `mcp__stitch__list_screens` or `mcp__stitch__get_screen`
-2. **Formulate specific edit** (location + visual change + structural change)
-3. **Apply**:
-   ```
-   mcp__stitch__edit_screens({
-     projectId: "...",
-     selectedScreenIds: ["..."],
-     prompt: "[Specific edit prompt]"
-   })
-   ```
-4. **Show AI feedback** and download updated assets
-5. **Iterate**: One focused edit at a time > many changes at once
-
-## Workflow: Generate Design System (.stitch/DESIGN.md)
-
-1. `mcp__stitch__list_projects` → find projectId
-2. `mcp__stitch__list_screens` → find representative screens
-3. `mcp__stitch__get_screen` → fetch HTML and screenshot
-4. Analyze: Extract colors (hex), typography, geometry, shadows, layout
-5. Write `.stitch/DESIGN.md`:
-
-```markdown
-# Design System: [Project Title]
-**Project ID:** [ID]
-
-## 1. Visual Theme & Atmosphere
-[Mood and aesthetic philosophy]
-
-## 2. Color Palette & Roles
-- **Primary**: [Name] (#hex) - [role]
-- **Secondary**: [Name] (#hex) - [role]
-- **Background**: [Name] (#hex) - [role]
-- **Accent**: [Name] (#hex) - [role]
-
-## 3. Typography Rules
-- **Heading**: [Font], [Weight]
-- **Body**: [Font], [Weight]
-- **Base size**: [px]
-
-## 4. Component Stylings
-- **Buttons**: [Shape, color, behavior]
-- **Cards**: [Border, shadow, padding]
-- **Navigation**: [Style, alignment]
-
-## 5. Layout Principles
-[Whitespace strategy and grid alignment]
-```
+**If genuinely ambiguous** (the user just said `/design` with no context): ask one short question — "Stitch mockup or in-repo code?" — then route.
 
 ---
 
-## UI/UX Keywords Reference
+## Cross-Mode Rules (apply regardless of transport)
 
-### Components
-- Navigation: nav bar, breadcrumbs, tabs, sidebar, hamburger menu, dropdown
-- Containers: hero section, card grid, modal, accordion, carousel
-- Forms: input field, dropdown, checkbox, toggle, date picker, search bar
-- CTAs: primary button, secondary button, ghost button, FAB, icon button
-- Feedback: toast notification, alert banner, loading spinner, progress bar
-- Layout: grid, flexbox, sidebar layout, split view, sticky header
-
-### Shape Language
-| Technical | Description |
-|:---|:---|
-| `rounded-none` | Sharp, squared-off edges |
-| `rounded-sm` | Slightly softened corners |
-| `rounded-md` | Gently rounded corners |
-| `rounded-lg` | Generously rounded corners |
-| `rounded-xl` | Very rounded, pillow-like |
-| `rounded-full` | Pill-shaped, circular |
-
-### Depth
-- **Flat**: No shadows, color blocking and borders
-- **Whisper-soft**: Diffused, light shadows for subtle lift
-- **Floating**: High-offset, soft shadows
-- **Inset**: Inner shadows for pressable elements
+- **Phase 0 direction feeds Phase 1.** Stitch prompts and React/HTML code BOTH must reflect the direction. If the output doesn't show the direction, the direction didn't land — redo.
+- **Anti-slop applies everywhere.** Whether Stitch generates the HTML or Claude writes the JSX, the banlist from `aesthetic-core.md` is binding.
+- **One focused edit at a time** (whether `edit_screens` or refactoring a component).
+- **No "modern" / "clean" / "sleek"** as a direction. Push back to the user.
 
 ---
 
-## Best Practices
+## Prerequisites by Mode
 
-- **Iterative Polish**: Prefer `edit_screens` for targeted adjustments over full re-generation
-- **Semantic Colors**: Name colors by role ("Primary Action") AND appearance ("Deep Ocean Blue")
-- **Atmosphere First**: Always set the vibe explicitly
-- **One Edit at a Time**: Focused edits produce better results than sprawling prompts
-- **Design System**: Create `.stitch/DESIGN.md` early, reference it in every prompt
-- **Hex Precision**: Always include hex codes for exact color matching
+- **Stitch mode** requires the `stitch` MCP server running (configured in `~/.claude/settings.json`). If Stitch tools are unavailable, tell the user to run:
+  ```bash
+  ! npx @_davideast/stitch-mcp init
+  ```
+- **Code mode** has no external prerequisites. It runs in any repo.
+
+---
+
+## Reference Files (load on demand, not always)
+
+| File | When loaded |
+|---|---|
+| `references/aesthetic-core.md` | **Always** — Phase 0 |
+| `references/stitch-workflows.md` | Stitch or Hybrid mode |
+| `references/code-implementation.md` | Code or Hybrid mode |
+
+This skill follows the progressive-disclosure pattern (same as `/carmack`): the entry-point `SKILL.md` stays lean and routes to references that load only when their mode fires.
+
+---
+
+## Quick Trigger Examples
+
+- `/design generate a hospital ledger landing page in Stitch` → Phase 0 (pick direction, e.g., "editorial / magazine") → Stitch mode → `generate_screen_from_text`
+- `/design build a sticky pricing card component in this Next.js repo` → Phase 0 (e.g., "brutalist raw") → Code mode → write the React component matching the direction
+- `/design create a design system for esbe.tech` → Phase 0 (pick direction once) → Hybrid mode → produce both `.stitch/DESIGN.md` AND a `design-tokens.css`
+- `/design` (no context) → ask "Stitch mockup or in-repo code?" then route
