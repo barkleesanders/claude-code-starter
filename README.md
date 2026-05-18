@@ -438,6 +438,8 @@ Before writing custom scripts/crons/systemd units that wrap OpenClaw, check `ope
 
 That's it — you now have a Claude agent that wakes up every weekday at 9am, runs `/carmack` on a project, and posts the result to Telegram.
 
+> **Reference implementation**: see [hermes-setup](https://github.com/barkleesanders/hermes-setup) — my Mac mini deployment of [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent), running this exact pattern. launchd for deterministic shell, OpenClaw for scheduled Claude agents, claude-code-starter for the shared `~/.claude/` skills.
+
 ---
 
 ## Privacy & PII Boundaries
