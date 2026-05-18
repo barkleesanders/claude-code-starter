@@ -9,9 +9,11 @@ Out of the box, Claude Code is a single AI that responds to what you type. With 
 - **`/carmack`** — A debugging agent modeled after John Carmack. It doesn't ask you for logs — it builds reproduction harnesses, attaches debuggers, instruments code, and finds root causes autonomously. It writes the fix AND the regression test.
 - **`/ship`** — A deployment agent that runs 12+ quality gates before your code hits production: lint, tests, security audit, bundle verification, health checks, and rollback preparation. It catches the bugs you'd find at 2am.
 - **`/debug`** — A 5-phase systematic debugging agent that refuses to guess. It gathers evidence, forms hypotheses, tests them, and only implements fixes after proving the root cause.
+- **`/ghidra`** — A reverse-engineering skill for compiled binaries (`.exe`, `.dylib`, `.so`, `.ipa`, `.apk`, firmware). Wraps NSA's Ghidra headless mode with ready-to-run Jython scripts (`decompile_all.py`, `dump_strings_imports.py`) and a built-in router that sends you to the right tool when "the thing" is actually a browser extension, source map, or pyc file instead of a binary.
 - **35 agents total** — Code reviewers (Rails, Python, TypeScript), security auditors, architecture strategists, performance oracles, design iterators, and more. Each one is a specialist that knows its domain deeply.
 - **Safety hooks** — Pre-commit checks that prevent you from pushing secrets, destructive bash commands that require confirmation, and automatic task tracking across sessions.
 - **Session persistence** — Debug investigations survive across conversations. Start debugging today, resume tomorrow with full context.
+- **OpenClaw pairing** — The starter kit is designed to pair with [OpenClaw](#openclaw--unattended-agent-jobs), an unattended-agent runtime. Same skills, same agents, same `carmack` / `ship` / `debug` workflows — but firing on a cron with results delivered to Telegram, Slack, or your inbox. See the [OpenClaw section](#openclaw--unattended-agent-jobs) below.
 
 This isn't a collection of prompts. It's a battle-tested engineering workflow that catches real production bugs, prevents real security issues, and ships real code safely.
 
@@ -55,7 +57,7 @@ After installation, restart Claude Code and type:
 
 Carmack will scan your `~/.claude/` directory and confirm everything is installed. If anything is missing, it will fix it for you.
 
-That's it. You now have **35 agents, 51 skills, and 26 commands** ready to use, plus an idempotent CLI installer (`install-tools.sh`) that brings in `bd`, `gh`, `node`, `osgrep`, `agent-browser`, `wrangler`, `vercel`, `rclone`, `ffmpeg`, and more. See [Installation](#installation) below for details.
+That's it. You now have **35 agents, 52 skills, and 26 commands** ready to use, plus an idempotent CLI installer (`install-tools.sh`) that brings in `bd`, `gh`, `node`, `osgrep`, `agent-browser`, `wrangler`, `vercel`, `rclone`, `ffmpeg`, and more. See [Installation](#installation) below for details.
 
 ### Your First Real Command
 
@@ -388,6 +390,75 @@ claude-code-starter/
 └── hooks-examples/
     └── settings-hooks.json          # Example hook configurations
 ```
+
+## OpenClaw — Unattended Agent Jobs
+
+The starter kit makes Claude Code **interactive** powerful. [OpenClaw](https://docs.openclaw.ai) makes it **unattended** powerful. Together they cover both halves of the agent-work problem: in-session work at your keyboard, and out-of-session work running on a schedule.
+
+### What OpenClaw is
+
+OpenClaw is a runtime for scheduled Claude agents. You install it on any always-on host (a Mac mini, a small Linux box, a NUC, a VPS) and it lets you create cron jobs that *invoke Claude with a prompt* — same `carmack`, `ship`, `debug` skills you use interactively, but firing on a schedule and delivering results to Telegram, Slack, Discord, or email.
+
+Think of it as the difference between `bash -c "..."` and a `crontab` line: OpenClaw is `crontab` for Claude.
+
+### Why pair OpenClaw with this starter kit
+
+Both layers share the same `~/.claude/` directory. Skills you write once work in both contexts:
+
+- **You write `/carmack` once** — it runs both when you type `/carmack` interactively and when an OpenClaw cron fires `openclaw cron add --message "/carmack check the build" --cron '0 9 * * *'`.
+- **Hooks fire in both contexts** — the same `pre-bash-block-deploy` hook that protects your interactive session also protects unattended runs.
+- **Memory and beads are shared** — what OpenClaw learns at 3am is in your context when you sit down at 9am.
+
+This is why the starter kit's `carmack` skill ships with `tools/openclaw-remote-doctor.sh` — when something breaks on the unattended side, Claude on your laptop can SSH into the OpenClaw host, run `openclaw doctor`, scan recent tool-usage, and surface the failures locally without you needing to leave your editor.
+
+### Two-rule operating model
+
+The starter kit's `CLAUDE.md` codifies two rules for picking the right scheduler:
+
+1. **`openclaw cron` is ONLY for LLM work.** Anything that needs a model — agent turns, browsing, summarization, code review on a PR queue — goes in OpenClaw.
+2. **Pure shell work goes in systemd timers (or launchd on macOS).** `git pull`, `rsync`, `curl`, `systemctl restart` — burning agent tokens on deterministic shell is pure waste.
+
+This split is what makes the combined setup sustainable cost-wise: agent tokens for things only an agent can do, shell timers for everything else.
+
+### Native-first rule (also codified in `CLAUDE.md`)
+
+Before writing custom scripts/crons/systemd units that wrap OpenClaw, check `openclaw --help`, `openclaw <area> --help`, and `--dry-run`. The native CLI covers more than people assume — adding `--best-effort-deliver` to a cron with a Telegram channel beats writing a shell wrapper to swallow delivery errors. The full rule is in `feedback_openclaw_native_first.md` when you run with the starter kit's auto-memory enabled.
+
+### Getting started
+
+1. Install OpenClaw on your always-on host: see [docs.openclaw.ai](https://docs.openclaw.ai).
+2. Make sure `~/.claude/` on that host has the starter kit installed (run the same `install.sh` there).
+3. Override the host in `skills/carmack/tools/openclaw-remote-doctor.sh` — replace `<YOUR_VPS_IP>` with your host, or set `OPENCLAW_HOST=user@your-host:port` in the environment.
+4. Create your first scheduled agent:
+   ```bash
+   openclaw cron add --agent main --cron '0 9 * * 1-5' \
+     --message "/carmack scan ~/code/myproject for the top 3 bugs and post a summary" \
+     --channel telegram --best-effort-deliver
+   ```
+
+That's it — you now have a Claude agent that wakes up every weekday at 9am, runs `/carmack` on a project, and posts the result to Telegram.
+
+---
+
+## Privacy & PII Boundaries
+
+This is a **public** repo. The author's working `~/.claude/` directory is private and contains personal data (real names, case files, medical records, financial data, project specifics). The two are kept separate by an explicit firewall:
+
+| Stays private (never pushed here) | Lives in this repo |
+|---|---|
+| `~/.claude/projects/<id>/memory/*.md` — auto-memory with names, cases, addresses, phones | The CLAUDE.md *rules* about how memory works, but never memory content itself |
+| Skill files that reference specific people, properties, court cases, medical providers | Skill files that document a *workflow* with placeholders (`<YOUR_VPS_IP>`, `<YOUR_PROJECT>`, etc.) |
+| Real OpenClaw cron jobs, hostnames, Tailscale IPs, Telegram chat IDs | The patterns for how to *create* such jobs |
+| `~/.beads/` issue databases with case identifiers | The `bd` CLI and the `beads-formulas/` templates |
+| Anything matching `barklee`, real email addresses, `@aivaclaims`, real phone numbers, real addresses, real case numbers | Scrubbed equivalents and `<PLACEHOLDER>` strings |
+
+**How sync works in practice**: before pushing any change to this repo, the author runs a PII grep (`grep -rniE "barklee|sanders|@gmail|@aivaclaims|/Users/[a-z]+|<actual-phone>|<actual-address>"`) over the staged files. Anything that matches gets sanitized (replaced with `<PLACEHOLDER>`) or extracted into a separate private skill that stays in `~/.claude/skills/` but is never committed here.
+
+The Ghidra skill in this repo is an example: it ships with two ready-to-run Jython scripts and a complete workflow guide — but the *binaries* the author actually reverse-engineers, the project paths they use, and the findings they produce never leave their laptop. The skill is reusable; the work product is private.
+
+**If you fork this repo and add your own skills**: do the same. Any skill that names a real person, property, case, or proprietary system should live in a separate **private** repo or a non-tracked subdirectory — never here. The starter kit is the *scaffolding*, not the *content*.
+
+---
 
 ## Customization
 
