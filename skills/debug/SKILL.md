@@ -14,6 +14,30 @@ model: inherit
 
 Fast reference for known production failure patterns. For deep debugging, use `/carmack`.
 
+## Mandatory upstream-protocol check (third-party integrations)
+
+When the symptom involves a third-party integration falling back to a worse path (handoff, redirect, "manual step required") — Verint dform, Clerk, Stripe, SeeClickFix, OAuth, any SaaS — load `~/.claude/skills/shared/upstream-protocol-investigation.md` BEFORE proposing a fix. Read the upstream's primary client source, capture real network traffic, inspect rendered `data-*` attributes. Treat any "Verified YYYY-MM-DD" comment in our codebase as a hypothesis to re-verify, not a fact. Token cost is unlimited for this; user explicitly authorized it (2026-05-09 SF311 graffiti incident: bandaid `0b746a4` → real fix `f27d1e3` after reading dform's `api.js` lines 462–520).
+
+## Mutating symptom across fixes = wrong premise (MANDATORY — 2026-05-19)
+
+When each fix makes the symptom *change* instead of *disappear* — `fetch_error` → `handshake_rejected` → `publicid_timeout`, every "fix" peeling back to reveal a new failure one layer deeper — STOP. That staircase is the tell that the whole feature premise is wrong, not that you are three fixes from done. Before fixing layer N+1, verify the premise itself: does the real client even use this code path? Capture live traffic and confirm. Reference incident: the SF311 cable chain — four green-tested fixes (`wss://`→`https://`, missing `Origin` header, subscription identifier, publicId timeout) each surfaced the next layer; a live mitm capture then proved the real app never opens the WebSocket at all — the whole path was dead code. Many round-trips of "fix the next layer" should have been one round-trip of "verify the premise."
+
+**PREMISE-CHECK GATE — run BEFORE the first fix (not just on the staircase). Full rule: `~/.claude/skills/shared/premise-check.md`.** Two questions, answered against LIVE upstream docs (not a cached `/skill` note): (1) **Is this approach even valid for THIS runtime/SDK/platform?** The browser SDK ≠ native SDK ≠ server SDK — a strategy/option/API documented under one is routinely absent or *forbidden* in another. If every doc/example for the thing you want sits under a *different* platform than yours, that's your answer — stop. (2) **What's the cheapest probe** (curl the API / grep the installed bundle / read the doc's "supported platforms" line) that proves it's possible here? Run it before coding. **Docs-before-note (always):** a `/skill` recipe, comment, memory, or prior conclusion is a HYPOTHESIS — re-verify any load-bearing "API/SDK can/can't do X" claim against the upstream's own *current* docs/source before building on it; live source wins, fix the stale note in the same pass. **2026-06-13 reference incident:** hours spent debugging Clerk native `oauth_token_apple` from a Capacitor webview — clerk-js (browser SDK) can never send it (browser-forced `Origin` vs Clerk Native-API `Authorization` conflict), a fact Clerk's docs state plainly under "Expo only." A wrong `/ios` trap-#4 note was trusted as fact; the working web-OAuth fix was a 5-minute live-doc read away. Now also enforced session-wide by the `premise-check-session-start.sh` SessionStart hook.
+
+## No-Lie Post-Fix Gate (MANDATORY — 2026-05-18)
+
+A "fixed" symptom is one that fails to reproduce on the *deployed/built artifact*, not in the source. After EVERY fix, before declaring root cause resolved, run the **No-Lie Verification Protocol** from `~/.claude/skills/shared/no-lie-verification.md` Checks 3 + 4:
+
+1. **Symptom re-test on the artifact**, not the source. Examples:
+   - "Stale copy" bug → cache-busted `curl https://prod-url/path` for the OLD string. Expected: 0 matches.
+   - "API 500 on category X" bug → `curl -X POST` reproducing the original request with a fresh cache-buster. Expected: 200 or the deliberate fallback, never a regression.
+   - "Race condition in worker" bug → run the original repro harness (`tools/repro/*.sh`) under load and confirm the failure no longer reproduces over N runs (N≥10).
+2. **Whole-repo symptom re-grep**, not just touched files. Proves "fixed all instances", not "fixed the ones I noticed". The whole-repo grep must return 0 matches OR only matches that are demonstrably unrelated (JSON values, log files, third-party node_modules).
+3. **If the fix is in TRIGGERED behavior** (failover, retry, fallback, circuit-breaker, rate-limit cooldown, error/`catch` branch, conditional cron) — **induce the trigger and watch the path fire** (Check 6 in `no-lie-verification.md`). Don't infer it from "the parts work": force the 429 / fail the dependency N times / feed the exact bad input on an isolated copy, confirm the fallback/retry/error-path actually executed, then confirm the live instance is untouched. "Configured" ≠ "fires."
+4. **Every claim in the final report cites the command that proves it.** Forbidden without proof: "fixed", "verified", "root cause confirmed", any specific count.
+
+**Reference incident (2026-05-18):** /carmack agent reported "no stale '10,000' strings — `rg` clean" but never curl'd the live URL. Old build was still serving until /ship deployed. The fix wasn't a fix until the deployed artifact was re-tested.
+
 ## Usage
 
 ```
@@ -30,6 +54,9 @@ Fast reference for known production failure patterns. For deep debugging, use `/
 - `/debug text overflow` -- Text escaping card boundaries on mobile
 - `/debug stale data` -- Admin changes not visible to users
 - `/debug deploy logout` -- Users logged out after every deploy
+- `/debug cloudflare security alert` -- Cloudflare flagged site for missing security.txt / HSTS / CAA / DNSSEC
+- `/debug slow page` -- Page/route slow: full-table scan on the hot path, cron warming the wrong cache, or a lagged-source window returning empty
+- `/debug cookies` -- Need cookies for curl/yt-dlp/scrape from a logged-in browser session (see "Cookie extraction" below)
 
 ---
 
@@ -39,7 +66,12 @@ Match the user's symptom to the right reference file, then load ONLY that file.
 
 | Symptom / Keyword | Pattern | Reference File |
 |--------------------|---------|----------------|
+| iOS app, simulator, Xcode, Swift crash, .ips crash log, Capacitor shell misbehaving, WKWebView rendering wrong (e.g. border-radius not clipping a composited img), in-app sign-in bounced to Safari, app stuck on splash / OTA rollback, webview UA flagged as in-app browser, **Clerk/Apple/Google social sign-in failing in a Capacitor app — `authorization_invalid` / `native_api_disabled` / `origin_authorization_headers_conflict` / `oauth_token_apple` / "native social login won't work in the app", OR a passkey/WebAuthn ceremony failing in the webview — "passkey registration was cancelled or timed out", `webcredentials`, associated domains, AASA 404** | iOS App Symptoms — route to the `/ios` skill (dev/debug loop, axiom crash/build/perf agents, webview driving via axe, AIVA Capacitor traps incl. clerk-js `allowedRedirectProtocols`, notifyAppReady rollback, WKWebView clip bug). **Any in-webview auth/credential ceremony fails with a GENERIC error until the app↔domain binding exists — read /ios trap #12's binding matrix and PROBE FIRST: social-OAuth Apple → trap #4 (`allowNavigation`); Google → policy-blocked, hide it; clerk-js scheme → `allowedRedirectProtocols`; passkey "cancelled or timed out" → `curl <domain>/.well-known/apple-app-site-association` + grep entitlements for `webcredentials` (improvebayarea `dadfdf3`). Don't debug the JS ceremony before the 30-sec probe.** | `/ios` skill (`~/.claude/skills/ios/SKILL.md`) |
 | catch-all, generic error, wrong status code, misleading error | Catch-All Error Masking (#1) | `error-handling-patterns.md` |
+| SF311 save 500, Verint save 500, Improve AI resubmit, category changed 500, request_type_id 500 | External Municipal Form Category Hard-500 (#15) | `error-handling-patterns.md` |
+| ticket description truncated, navFooter dropped, map links missing, address missing on filed ticket, description ends abruptly, external form truncation, Verint dform Request_description, bracket truncation, square bracket strip | External Form Description Truncation by Character (#19) | `error-handling-patterns.md` |
+| 311 ticket missing Location box, Open311 address null, mobile311 viewer shows description but no Location dt/dd, "one ticket has location another doesn't", sf_full_address dropped, Location_description ignored, structured location empty, lat/long null in Open311, address only in description body not the actual location field, scf location_details, address forwarding broken, coord-string in structured slot, "hardening 311 address forwarding", multi-city address never break | 311 Structured-Location Dropped by Long-Form / Coord-String Address (#21, backend-agnostic) | `error-handling-patterns.md` |
+| DBI complaint reported as validation but city has it, "DBI re-rendered the form (validation rejected the submission)" but DataSF shows the case, third-party form rejected but actually recorded, form echoed back on success, parser says failure but the agency received it, external form 200 OK we classified as failure, complaintNumber undefined but submission worked, dform/Verint/aspx false-negative on success, success-detection heuristic matches both success AND failure pages, lblError success vs failure span, signal-extraction tests use synthetic HTML, every IBA-submitted DBI complaint fails | Third-party signal-extractor false-negative due to synthetic fixtures (#23) | `error-handling-patterns.md` + `~/.claude/skills/shared/third-party-signal-fixtures.md` |
 | CI false positive, grep wrong, CI still fails | CI False Positives (#11) | `error-handling-patterns.md` |
 | admin 403, requireAdmin, metadata-only | Admin Auth Missing DB Fallback (#14) | `error-handling-patterns.md` |
 | admin 500 instead of 403 | Admin Route Wrong Status | `error-handling-patterns.md` |
@@ -48,27 +80,43 @@ Match the user's symptom to the right reference file, then load ONLY that file.
 | useEffect, renders twice, state lags, derived state | useEffect Abuse (#15) | `react-patterns.md` |
 | localStorage, preference lost, resets on refresh | Preference Lost on Reload (#13) | `react-patterns.md` |
 | double click, duplicate API call, async button | Async Button Double-Click | `react-patterns.md` |
+| chat/support widget gone after SSR, cookie banner missing on SSR page, `?support=open`/deep-link does nothing, global widget vanished after Hono/Astro/RSC conversion, "worked on every page before SSR", floating launcher dead, analytics/exit-intent dropped on SSR route | Global App.tsx Component Vanishes After SPA→SSR Conversion (#24) | `react-patterns.md` |
+| invisible text after SSR, white headings on light/gray bg, page background wrong color after conversion, "colors got messed up on conversion", body background overridden, SSR design clobbered by Tailwind/island CSS, text disappeared but HTML is there, computed bg ≠ design token, low contrast only on SSR pages, island/global CSS leaks `body` styles | Bundled Island/Global CSS Clobbers SSR Inline Design — Invisible Text (#25) | `react-patterns.md` |
 | auth guard, unauthenticated error, no redirect | Missing Frontend Auth Guard | `react-patterns.md` |
+| renders undefined, shows NaN, "Invalid Date", "[object Object]", toggle/section/control disappeared or silently vanished, "make sure nothing is undefined", Cannot read properties of undefined, is not iterable, null-gate hides UI, `useState<T\|null>` gates a render, `.map`/property access on possibly-undefined API data, admin/dashboard renders garbage, optional chaining missing | Undefined / Null-Render Safety (9-pattern catalog + live DOM grep for `undefined`/`NaN`/`[object Object]`) — also re-sweeps the adjacent admin blind-spot class (default-LIMIT truncation, NULL-aggregate sort burial, count-source mismatch, inner-JOIN row drop, admin-auth DB fallback) | `~/.claude/skills/shared/undefined-null-render-safety.md` |
+| generic `isRecord`/`isObject` guard, `as unknown as T`, `(x as any).field`, repetitive type-guard boilerplate, "vibe coding" / AI-slop TypeScript, loose `unknown`-everywhere, no schema validation at boundary, `Record<string, unknown>` everywhere | Anti-Slop TypeScript — replace generic guards/casts with named types, discriminated unions, or Zod (`z.infer`); detector: `~/.claude/skills/carmack/tools/detect-ts-slop.sh` | `~/.claude/skills/shared/anti-slop-typescript.md` |
 | text overflow, min-w-0, flex escape, card boundary | Text Overflow Flex+Grid (#12) | `css-layout-patterns.md` |
 | grid mobile, grid-cols, responsive breakpoint | Fixed Grid Breaks Mobile | `css-layout-patterns.md` |
 | iOS Safari, blank iPhone, PDF iframe, vh units | iOS Safari Rendering | `css-layout-patterns.md` |
 | og image, twitter card, social cache, stale card | Social Card Cache (#5) | `csp-cache-patterns.md` |
 | CSP, embed blank, frame-src, img-src, broken icons | CSP Blocking (#9) | `csp-cache-patterns.md` |
+| Cloudflare security alert, **Security Insights CSV**, security.txt missing, /.well-known/security.txt 404, securityheaders.com low score, observatory grade D, missing HSTS/CSP/COOP/CORP, CAA records, DNSSEC, RFC 9116, sitemap.xml 404, robots.txt advertises sitemap that doesn't exist | Site Security Baseline (#16) | `~/.claude/skills/shared/site-security-defaults.md` |
+| **CF Security Insights flags: "Dangling A/AAAA", "Unproxied CNAME", "DMARC Record Error", "Bot Fight Mode not enabled"** — DO NOT blindly apply CF's recommended fix; ~16% are false positives that break Clerk/SaaS CNAMEs, delete live Google-forwarding DNS, or duplicate valid DMARC. `dig`/`curl`-verify the OFTEN-FALSE classes first. Apply only the 3 safe fixes (security.txt + block AI bots + AI Labyrinth). | CF Security Insights triage map | `~/.claude/skills/shared/site-security-defaults.md` (triage section) + `~/.claude/skills/carmack/tools/cf-security-insights.sh` |
+| **DMARC failing from a sender IP, custom-domain mail bouncing / landing in spam, "send-as alias DMARC fail", Gmail "Send mail as", `p=reject` rejecting my OWN mail, "SPF passes but DMARC fails", "can't send from my domain", forwarded mail failing DMARC, a DMARC aggregate (RUA) report flags a source** — this is OUTBOUND auth alignment, NOT broken records. Records are usually fine; the *sending path* is wrong (Gmail send-as / a relay signs as the wrong domain → no aligned identifier → DMARC fail). `dig` the real SPF/DMARC/DKIM/MX FIRST; adding the relay's IP to SPF usually does NOTHING (SPF aligns on the envelope domain). **Check the platform's CURRENT native send capability before recommending a 3rd-party — verify live, not from memory**: a Cloudflare domain can now SEND via Email Sending (`wrangler email sending list/settings`; `smtp.mx.cloudflare.net:465`, user `api_token`, pwd = CF token w/ `Email Sending Write`). Fix = route the From-domain's sending through a DKIM-aligned sender; verify with a REAL send (`gog send --from <alias>` → grep `dmarc=pass`). | Email Deliverability / DMARC Alignment | `~/.claude/skills/shared/email-deliverability-dmarc.md` |
+| dependabot alert, npm audit, CVE, GHSA-xxxx, "vulnerable dependency", transitive vuln, "fix the security/dependabot page", overrides, esbuild/tar/minimatch/ws/vite/uuid vuln, `npm install` fails on override version | Dependency Vulnerability Audit & Fix (7-step: BOTH dependabot-api + per-manifest npm-audit, scan EVERY lockfile, scoped overrides for multi-major packages, verify patched version is published, never blind `npm audit fix --force`, verify build with project's real build) | `~/.claude/skills/shared/dependency-audit.md` |
 | www redirect, cookies lost, auth break | WWW Redirect Auth Break (#4) | `csp-cache-patterns.md` |
 | deploy logout, chunk hash, preloadError | Deploy Logs Users Out | `csp-cache-patterns.md` |
 | stale version, failed deploy, CF Pages | CF Pages Stale Deploy | `csp-cache-patterns.md` |
 | terraform destroy, infra deleted, catastrophic | AI Agent Destroys Infra (#6) | `infrastructure-patterns.md` |
+| prod auth, pk_test, accounts.dev, Clerk production, Wrangler binding, wrong auth instance | Production Auth Instance Drift (#12) | `infrastructure-patterns.md` |
+| prime-rhino, clerk.example.com missing, live HTML/CSP differs from dist, prod integration fails | AIVA Live Artifact/Auth Drift (#12a) | `infrastructure-patterns.md` |
+| wrangler secret put binding already in use, plaintext Worker var, secret_text missing, BREVO_API_KEY in vars | Worker Secret Binding Drift (#12b) | `infrastructure-patterns.md` |
+| **D1 route 500s with generic "Internal Server Error", `no such column`/`no such table`, `D1_ERROR`, intake/any-write save fails for everyone, migration file exists but column missing in prod, `wrangler tail` shows outcome Ok + empty exceptions, schema drift, migration not applied to remote** | **D1 Schema Drift — migration-file-exists-but-not-applied-to-prod** (#26). Detect: `wrangler tail --format json` → grep logs for `D1_ERROR`/`no such column` (it's in `logs[]`, not `exceptions[]`); confirm with `PRAGMA table_info(<t>)` on `--remote` (the file/local-D1 are NOT proof). Fix: additive `ALTER … ADD COLUMN`/`CREATE … IF NOT EXISTS` on remote, then `INSERT OR IGNORE` the filename into `d1_migrations` — NEVER bulk `migrations apply` (re-runs non-idempotent data migrations → corruption). Gate: `~/.claude/skills/shared/tools/d1-schema-drift-check.sh <repo>`. | `~/.claude/skills/shared/d1-schema-drift.md` |
 | rust clippy, cross-platform, cfg, unused_mut | Rust Cross-Platform Lint (#7) | `infrastructure-patterns.md` |
 | homebrew, keg-only, launchd, cron PATH | Homebrew Keg-Only PATH (#8) | `infrastructure-patterns.md` |
+| launchd/cron watchdog false alerts, "job-not-loaded" but service is up, gateway DOWN alert spam, bootstrap rc=5, `launchctl list` empty in launchd context, health-check passes interactively but fails on schedule, watchdog restarting a healthy service | launchd-Context Health-Check False Positive (#19) | `infrastructure-patterns.md` |
 | serde, deny_unknown_fields, config crash | Serde Config Crash (#10) | `infrastructure-patterns.md` |
 | innerHTML, XSS, dangerouslySetInnerHTML | XSS via innerHTML | `infrastructure-patterns.md` |
 | JSON-LD, script breakout | JSON-LD Breakout | `infrastructure-patterns.md` |
+| **Python SIGABRT / "Abort trap: 6" at finalization, parent `sshd-session`, `_enter_buffered_busy`, `Py_Finalize`/`_io_TextIOWrapper_close` in the stack, a Thread blocked in `read()`, recurring `Python-*.ips`, "crash over SSH", MCP bridge/server crashes on disconnect, cross-device `ssh host python …`, crash survives swapping the python interpreter** | Python finalization SIGABRT over SSH — daemon-thread-blocked-in-read SCRIPT bug, usually a cross-device MCP stdio server (NOT the interpreter; NOT scheduled — on-demand). Forensic capture via `~/.zshenv` SSH-cmd logger + WatchPaths crash-watcher correlated by **parentPid**. Fix: run the MCP server locally where the resource lives + `os._exit(0)` after the work loop (#22) | `infrastructure-patterns.md` |
 | cannot find module, postinstall, npm install broke, every update breaks | File Extension Mismatch / Broken Postinstall (#17/#18) | `infrastructure-patterns.md` |
 | npm-cli.js, shell script, SyntaxError unexpected string | npm-cli.js Shell Script Corruption (#17) | `infrastructure-patterns.md` |
 | installing deps one by one, each reveals another missing | Non-Fatal Postinstall Cascade (#18) | `infrastructure-patterns.md` |
 | stale data, admin user sync, visibilitychange | Data Stale Admin/User (#16) | `debugging-discipline.md` |
+| slow page, slow route, slow dashboard, 8M rows, COUNT(*) on every request, full table scan, why is X so slow, route reads wrong cache, cron warms wrong KV key, prewarm warms wrong thing, 24h/last-N window empty, lagged data source, requested_datetime lag | Hot-Path Data-Volume & Cache-Topology (#20) | `debugging-discipline.md` |
 | systematic, 4-phase, root cause, discipline | Debugging Discipline | `debugging-discipline.md` |
 | lint, biome, npm audit, security cleanup | Lint & Security Cleanup | `debugging-discipline.md` |
+| error too vague to act on, ambiguous error message, "can't tell what failed", same error fires 100s of times, log noise / superfluous log entries, no log at the failure point, silent failure, "why are these errors so unclear", add debug attributes, clean up the logs, assess the logs, improve log output | Observability / Log Hygiene — make ambiguous errors actionable (what was attempted + actual values + likely cause/branch + disambiguation: a vague error is usually two root causes sharing one string — split them), reduce noise by *downgrading* level (never delete), add the one attribute that names the failure. For a **proactive scheduled** pass over a window of logs, use the `/log-hygiene` skill instead. | `~/.claude/skills/shared/observability-instrumentation.md` (+ `/log-hygiene` skill) |
 
 All reference files are in `~/.claude/skills/debug/references/`.
 
@@ -78,13 +126,45 @@ All reference files are in `~/.claude/skills/debug/references/`.
 
 | File | Content |
 |------|---------|
-| `error-handling-patterns.md` | Catch-all masking (#1), CI false positives (#11), admin auth DB fallback (#14), admin 500 vs 403 |
+| `error-handling-patterns.md` | Catch-all masking (#1), external municipal form hard-500 (#15), CI false positives (#11), admin auth DB fallback (#14), admin 500 vs 403 |
 | `react-patterns.md` | Scope bug (#2), silent startup (#3), useEffect abuse (#15), localStorage persistence (#13), async double-click, missing auth guard |
+| `~/.claude/skills/shared/undefined-null-render-safety.md` | **Undefined/null-render bug class** — 9 patterns (null-gate hides UI, unguarded property access, `.map`/string/`Date` on possibly-undefined, JSON.parse, raw-undefined render, missing loading/empty states, backend omits a field) + live DOM grep for rendered `undefined`/`NaN`/`[object Object]`. Cross-refs the admin blind-spot class (truncation, NULL-aggregate sort, count mismatch, inner-JOIN drop, admin-auth DB fallback). Reference incident: AIVA admin "Test account" toggle hidden by an `isTest !== null` gate (2026-06-01) |
+| `~/.claude/skills/shared/anti-slop-typescript.md` | **Anti-slop TypeScript** — ban generic `isRecord`/`isObject` guards, `as unknown as T` launder-casts, `(x as any).field` reach-casts; require named types / discriminated unions / Zod schemas (`z.infer`) at trust boundaries; targeted predicate only as last resort. Detector: `~/.claude/skills/carmack/tools/detect-ts-slop.sh`. |
 | `css-layout-patterns.md` | Text overflow flex+grid (#12), fixed grid mobile, iOS Safari rendering (PDF, vh, fixed) |
 | `csp-cache-patterns.md` | Social card cache (#5), CSP multi-layer blocking (#9), www redirect (#4), deploy chunk invalidation, CF Pages stale deploy |
 | `infrastructure-patterns.md` | Infra destruction (#6), Rust cross-platform lint (#7), Homebrew keg-only (#8), serde config crash (#10), XSS innerHTML, JSON-LD breakout |
-| `debugging-discipline.md` | 4-phase workflow, diagnostic checklist (20 items), lint/security cleanup, data stale admin/user (#16) |
+| `debugging-discipline.md` | 4-phase workflow, diagnostic checklist (23 items), lint/security cleanup, data stale admin/user (#16), hot-path data-volume & cache-topology (#20) |
+| `~/.claude/skills/shared/observability-instrumentation.md` | **Observability / log hygiene**: 4-part actionable error-message design, boundary/decision-point logging, downgrade-noise-never-delete, instrument-on-fix attribute heuristic, stack log sources. Proactive scheduled counterpart: `/log-hygiene` skill. |
 | `~/.claude/skills/shared/ant-verification-protocol.md` | **Ant-level quality gates**: OWASP sweep, truthfulness protocol, closed-loop verification |
+
+---
+
+## Cookie extraction (curl / yt-dlp / scrape with logged-in session)
+
+When you need browser cookies for a non-browser tool (curl `--cookie`, yt-dlp `--cookies`, requests `cookies={}`, scrapers, n8n nodes), pick by where the live session is:
+
+| Where the session is | Best tool | Why |
+|---|---|---|
+| Live agent Chrome at `:9222` (`~/.kuri/chrome-profile`) | **chrome-devtools MCP** → CDP `Network.getCookies` for the URL | Includes session-only cookies not yet flushed to SQLite; no Keychain prompt; aligned with `/feedback_browser_default_chrome_profile`. |
+| Regular Chrome profile (`~/Library/Application Support/Google/Chrome/Default`) | **`~/tools/cookies-txt <url>`** | Reads SQLite + macOS Keychain. Works headless / from cron / without :9222 attached. Outputs Netscape, JSON, or `Cookie:` header. |
+| Brave / Edge / Chromium | `~/tools/cookies-txt --browser brave \| edge \| chromium <url>` | Same code, different Keychain entry. |
+| One-shot, don't care about reuse | `yt-dlp --cookies-from-browser chrome:Default <url>` | Already installed; bypasses the question entirely if all you need is yt-dlp. |
+
+**`~/tools/cookies-txt` reference** (ported from the "Get cookies.txt LOCALLY" Chrome extension, source at `~/re/cookies-txt-locally/`):
+
+```bash
+cookies-txt github.com                            # Netscape → stdout
+cookies-txt github.com -o /tmp/cookies.txt        # → file
+cookies-txt --all -f json                         # every cookie, JSON
+cookies-txt example.com -f header                 # "name=value; name=value;"
+cookies-txt --browser brave --profile "Profile 1" foo.com
+```
+
+Exit codes: `0` ok, `3` no DB at expected path, `4` Keychain entry missing/denied, `5` decrypt failure.
+
+**chrome-devtools MCP path** for the `:9222` Chrome — request CDP `Network.getCookies` with `{urls: ["https://github.com"]}`; format the returned cookie array with the same Netscape mapper the extension uses (`<domain>\t<TRUE/FALSE includeSubDomain>\t<path>\t<TRUE/FALSE secure>\t<expiry>\t<name>\t<value>`).
+
+**Don't use `unbrowse` / `agent-browser`** for cookie extraction — those launch separate browser instances with no logged-in state.
 
 ---
 
@@ -104,8 +184,18 @@ When debugging any production error, check in order:
 10. Preference not persisting? (localStorage writer without App.tsx reader)
 11. "Cannot find module" after every update? Run `file <path>.js` — may be a shell script (#17)
 12. Installing missing deps one-by-one, each reveals another? STOP — postinstall is broken (#18)
+13. External city form 500 after category change? Probe the failing category and a known-good category through the same first-party save path before blaming auth/photo.
+14. Production auth configured? Verify Worker dry-run bindings and live HTML do not expose `pk_test`, `sk_test`, or `.accounts.dev`.
+15. Live artifact matches production? Fetch cache-busted HTML and CSP headers; compare live response, not only local `dist`.
+16. Worker secrets correct? Sensitive bindings must appear as `secret_text` from `wrangler secret list`; no key/token/password literal should remain in `wrangler.json` `vars`.
+17. `wrangler secret put` says binding already exists? Remove the plaintext var from config, deploy without `--keep-vars`, put the secret, and re-list secrets before trusting it.
+18. AIVA deployed? Verify `clerk.example.com` is present, `prime-rhino-99`/`.clerk.accounts.dev`/`pk_test`/`sk_test` are absent, and `npm run test:integration:prod` passes if available.
+19. **Page/route slow?** (a) Enumerate every query that runs *before the response* — measure each `COUNT(*)`/`SUM(CASE...)`/whole-partition aggregate with `wrangler d1 execute --json` → `meta.rows_read`; >~100k rows on a per-request path = the bug. (b) Does it read a cache? Then `grep` for who *writes* that exact key — if nothing does (or only a manual script, no cron), it's a permanent MISS. (c) Cron warming a cache? `grep` for who *reads* those keys — a warmer that warms keys nothing reads (or a different key-shape than the route reads) is the bug. (d) `WHERE ts >= now() - N` against a lagged source returns empty — anchor on `MAX(ts)`. See Pattern #20.
+20. **Third-party submit reported as failed but the agency received it?** (DBI complaint flow, Verint dform save, OAuth callback, any webhook receiver, any reverse-engineered API replay.) Run `ls src/__fixtures__/<integration>/ 2>/dev/null`. If there is no `*-success.*` AND `*-failure.*` pair captured from the LIVE system, you cannot trust the detector — the test suite is asserting against fiction. Write `tools/repro/<integration>-probe.{sh,mjs}`, run it once for a known-good and a known-bad request, save both responses, then diff them to find the actual distinguishing feature (anchored DOM id / JSON field, NOT a substring that appears in both). Don't ship detector code without real fixtures. See Pattern #23 + `~/.claude/skills/shared/third-party-signal-fixtures.md`. Reference incident (2026-05-27): every IBA-submitted DBI complaint was reported as `validation` error for ~10 days while the city actually recorded every one of them — synthetic test fixture (`<html><body><h1>Thank you</h1>...`) didn't contain the form layout strings (`Sub_Button0`, `CheckBox1`) that the real DBI success page does contain, so the detector's `looksLikeEchoedForm` heuristic was never exercised against reality.
 
-For the full 22-item checklist, load `debugging-discipline.md`.
+21. **Error too vague to act on, firing repeatedly, or no log at the failure point?** Don't just patch this one instance — make the message actionable (what was attempted + actual values + likely cause/branch + disambiguation; a vague error is usually two root causes sharing one string), add the one attribute that would have named the failure, and *downgrade* noisy lines rather than deleting them. Standard: `~/.claude/skills/shared/observability-instrumentation.md`. For a scheduled sweep over a window of logs, use the `/log-hygiene` skill.
+
+For the full checklist, load `debugging-discipline.md`.
 
 ---
 
@@ -113,7 +203,17 @@ For the full 22-item checklist, load `debugging-discipline.md`.
 
 ### Deployment Prohibition (MANDATORY)
 
-NEVER deploy to production. NEVER run `wrangler deploy`, `npm run deploy`, `vercel deploy --prod`, or any production deployment command. If a fix is implemented and committed, STOP and tell the user: "Fix is committed and ready. Run `/ship` to deploy to production." Wait for explicit user approval. Do NOT invoke `/ship` autonomously.
+`/debug` is for investigation, local reproduction, local/reviewable fixes, and verification only. Production release authority belongs to `/ship`, not this skill.
+
+NEVER deploy, promote, release, or mutate production traffic while operating under `/debug`, even if the user also mentions "ship", "prod", "deploy", "push live", or "fix and deploy" in the same request. Do not run production deployment commands and do not invoke `/ship` autonomously.
+
+Forbidden examples include `wrangler deploy`, `wrangler versions deploy`, `wrangler pages deploy`, `npm run deploy`, `pnpm deploy`, `vercel deploy --prod`, `netlify deploy --prod`, `firebase deploy`, `fly deploy`, `railway up`, `render deploy`, Docker image push/promote commands, production migration/apply commands, and any Cloudflare/Vercel/GitHub release promotion that changes live traffic.
+
+Allowed under `/debug`: inspect logs, reproduce failures, patch locally, run bounded tests, and commit changes if the user asked for code changes and git safety checks pass. After implementing a fix, STOP and tell the user: "Fix is committed and ready. Run `/ship` to deploy to production." If the user wants production deployment, they must invoke `/ship` explicitly in a separate step.
+
+### Installed-Source Ground-Truth Guard (MANDATORY — 2026-06-12)
+
+Before proposing any fix that touches a dependency/plugin/framework/third-party widget, load `~/.claude/skills/shared/installed-source-ground-truth.md` and follow it: read the installed package's types+JSDoc in `node_modules/` for real option semantics, read the native platform implementation when platform support matters, and probe the live DOM/traffic for third-party widgets. Cite file+symbol in the fix. (2026-06-12: three CSS workarounds failed against the Brevo widget; the real fix — StatusBar `overlaysWebView:false` on iOS — was found by reading the installed plugin's Swift source.)
 
 ### Test Safety (CRITICAL)
 
@@ -150,5 +250,27 @@ When this skill is invoked:
 ```
 Load the matching reference file and show the relevant pattern.
 If the issue needs deep investigation beyond known patterns, recommend /carmack.
-CRITICAL: Do NOT deploy to production. Do NOT run wrangler deploy, npm run deploy, vercel deploy --prod, or any production deployment command.
+CRITICAL: Do NOT deploy, promote, release, or invoke /ship from /debug. Production shipping belongs only to /ship, invoked separately by the user.
 ```
+
+
+## Non-interactive / remote PATH false-negatives (ssh · launchd · cron · Hermes) — MANDATORY (2026-06-19)
+
+`ssh host 'cmd'` (BatchMode), launchd agents, and cron run with a **bare PATH** that excludes
+Homebrew (`/opt/homebrew/bin`) and `~/.local/bin`. The failures below are NOT real — they are PATH:
+
+- `ssh host 'which node'` / `which hermes` / `which brew` → "not found" even when installed
+  (`/opt/homebrew/bin/node`, `~/.local/bin/hermes`). **Probe explicit absolute paths**; never
+  conclude "not installed" from `which` in a non-interactive shell.
+- A tool invoked by launchd/cron dies with "command not found" → **pin the absolute interpreter
+  path** in the shim/plist (`/opt/homebrew/bin/node script.mjs`) and set `PATH` in the plist
+  `EnvironmentVariables`. A `#!/usr/bin/env node` shebang fails under launchd.
+- Verifying a remote agent job: `ssh host 'PATH=$HOME/.local/bin:/opt/homebrew/bin:$PATH <tool> ...'`
+  — a plain `ssh host '<tool> ...'` false-negatives ("NO-JOB" when the job exists).
+- Remote **zsh aborts the whole `ssh 'script'`** on an unmatched glob (`/path/*/bin`) — quote globs
+  or wrap in `bash -lc`.
+
+Reference incident (caltrans-pra → mac-mini): `ssh mac-mini 'which node'` said "not found" (node was
+`/opt/homebrew/bin/node v26`); `hermes cron list | grep caltrans` said NO-JOB (hermes at
+`~/.local/bin`, off the BatchMode PATH) — the job WAS registered. Both were PATH false-negatives,
+not missing artifacts. Verify on the runner via the **real invocation path**, with an explicit PATH.

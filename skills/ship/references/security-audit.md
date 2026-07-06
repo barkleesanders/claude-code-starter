@@ -39,6 +39,20 @@ npm run build 2>&1
 
 **The goal is 0 vulnerabilities, not "acceptable risk".** Every vulnerability with an available fix MUST be patched before shipping. This includes LOW severity — they accumulate and signal neglect to security scanners.
 
+### Full playbook + the traps that bite (load `~/.claude/skills/shared/dependency-audit.md`)
+
+The steps above are the happy path. Apply the shared **Dependency Audit Playbook** for the failure modes a naive `npm audit fix` misses (all observed 2026-06-15, improvebayarea):
+
+- **Scan EVERY manifest, not just root.** `find . -name package-lock.json -not -path '*/node_modules/*'` — sub-apps (`mobile/`, `functions/`, `apps/*`) carry their own lockfile AND their own alerts. Run `npm audit` in each directory.
+- **`npm audit` ≠ Dependabot.** Different advisory DBs surface different vulns. improvebayarea's Dependabot page listed 12 (esbuild/tar/minimatch/uuid); `npm audit` ALSO flagged ws + vite. Fix the **union** of `gh api .../dependabot/alerts` + per-manifest `npm audit`.
+- **Scope overrides when a package coexists at multiple majors.** A blanket `"minimatch":"3.1.4"` forces glob's `minimatch@8/@10` (NOT vulnerable, different API) down to v3 and breaks them. Use `"<parent>": { "minimatch": "^3.1.4" }`; afterward confirm with `npm ls <pkg>` that the safe majors are untouched.
+- **An existing override floor can itself be vulnerable.** `"ws":"^8.20.1"` still resolved `8.20.1`, which was `<8.21.0` (the patched version). An override is not a fix unless its floor ≥ patched.
+- **Verify the patched version is PUBLISHED before writing it:** `npm view <pkg>@<patched> version`. An unpublished version makes `npm install` fail.
+- **Cross-major bump (e.g. tar 6→7, uuid 7→11)?** Check the consumer survives: `require('pkg')`+named-method survives, `require('pkg/v4')` deep-import breaks; and CJS-consumer + ESM-only-major breaks. `grep -rn "require('<pkg>" node_modules/<consumer>/`.
+- **NEVER blind `npm audit fix --force`.** It proposed downgrading `wrangler 4→3` (major runtime regression). Read its plan; prefer scoped `overrides`.
+- **Build verification per project** (Step 6 below): `npm run build` often doesn't exist — Workers projects use `npx wrangler deploy --dry-run`, libraries use `npx tsc --noEmit`. Use the project's REAL build + one `vitest run` to confirm the runner boots.
+- **If `npm` is a wrapper shim** (`npm is an alias for socket npm`), call the real binary (`/opt/homebrew/bin/npm`) so non-interactive installs don't hang on a prompt.
+
 ### Dependabot Auto-Fix (MANDATORY — BLOCKING)
 
 **ALWAYS check and fix Dependabot alerts before deploying.** This is not optional. If `git push` output shows "GitHub found N vulnerabilities", this gate MUST resolve them before proceeding.
@@ -82,7 +96,12 @@ gh api "repos/${REPO}/dependabot/alerts/<N>" --jq '.state'
 ### Decision Logic
 - **If 0 open alerts**: Continue
 - **If alerts exist with available fix**: **AUTO-FIX** (add override, install, verify, commit)
-- **If alert has no fix available**: WARN, document in commit, continue
+- **If alert has no fix available on npm**: INVESTIGATE before accepting:
+    1. Check if maintainer publishes to a CDN/tarball (e.g. SheetJS publishes to cdn.sheetjs.com)
+    2. Check for maintained forks or alternative packages (e.g. exceljs replaces xlsx)
+    3. If tarball exists: `"pkg": "https://cdn.example.com/pkg-X.Y.Z/pkg-X.Y.Z.tgz"` in package.json
+    4. Force-commit lockfile so Dependabot can verify the resolution
+    5. Only WARN and continue if genuinely no fix exists anywhere
 - **If fix breaks build**: Revert override, WARN, document as known issue
 - **NEVER skip or ignore HIGH/CRITICAL alerts with available fixes**
 

@@ -97,10 +97,95 @@ fi
 **Post-deploy production tests** (run in Phase 4.1 after wrangler deploy):
 ```bash
 # 5. Production integration tests — verifies live endpoints
-timeout 60 TEST_BASE_URL=https://your-app.com npx vitest run tests/worker-integration.test.ts 2>&1
+timeout 60 TEST_BASE_URL=https://example.com npx vitest run tests/worker-integration.test.ts 2>&1
 pkill -f vitest 2>/dev/null
 # WARN if fails (don't block — already deployed, but flag for investigation)
 ```
+
+---
+
+## Phase 1.05: BUNDLE COMPOSITION GATE (WARN)
+
+**Purpose**: Catch heavy auth/SDK packages leaking into the main (landing-page) chunk BEFORE they ship. Prevents the Lighthouse perf ceiling drop caused by bundle bloat.
+
+**Trigger**: After `vite build` produces source maps. Skips if no `.map` file exists or `dist/` not found.
+
+**Execution** — analyze the largest `index-*.js.map` and flag known heavy packages that shouldn't be in a landing-page bundle:
+
+```bash
+# Only run if source maps exist
+if ! ls dist/client/assets/index-*.js.map 2>/dev/null | head -1 >/dev/null; then
+  echo "-- Phase 1.05 skipped (no source maps) --"
+else
+  python3 <<'PY'
+import json, sys
+from collections import defaultdict
+from pathlib import Path
+
+maps = sorted(Path('dist/client/assets').glob('index-*.js.map'), key=lambda p: p.stat().st_size, reverse=True)
+if not maps:
+    sys.exit(0)
+map_file = maps[0]
+js_file = map_file.with_suffix('')  # strips .map
+total_kb = js_file.stat().st_size // 1024
+
+d = json.load(open(map_file))
+sources = d.get('sources', [])
+contents = d.get('sourcesContent') or []
+pkgs = defaultdict(int)
+for i, s in enumerate(sources):
+    size = len(contents[i] or '') if i < len(contents) else 0
+    if 'node_modules/' in s:
+        parts = s.split('node_modules/')[-1].split('/')
+        pkg = '/'.join(parts[:2]) if parts[0].startswith('@') else parts[0]
+        pkgs[pkg] += size
+
+# Heavy packages that MUST NOT be in the main bundle of a public landing page.
+# Each entry: (package, reason, fix-playbook).
+AUTH_LEAKS = {
+    '@clerk/clerk-react': 'Clerk auth SDK — should only load after sign-in',
+    '@clerk/shared':      'Clerk auth internals — chained from @clerk/clerk-react',
+    '@auth0/auth0-react': 'Auth0 SDK — should only load after sign-in',
+    'firebase':           'Firebase SDK — should only load when needed',
+    '@supabase/supabase-js': 'Supabase SDK — should only load after sign-in',
+    '@stripe/stripe-js':  'Stripe SDK — should only load on checkout pages',
+}
+
+warnings = []
+for pkg, reason in AUTH_LEAKS.items():
+    if pkgs.get(pkg, 0) > 5 * 1024:  # >5KB of source bytes
+        warnings.append(f'  🚨 {pkg} in main bundle ({pkgs[pkg]//1024}KB source): {reason}')
+
+# Bundle-size ceiling warning
+BUNDLE_GZIPPED_KB_WARN = 200  # gzipped estimate = ~1/3.5 of uncompressed
+if total_kb > 700:
+    warnings.append(f'  ⚠️  Main bundle {total_kb}KB uncompressed (~{total_kb//3}KB gzipped) — trim via route-level lazy loading')
+
+print(f'-- Phase 1.05: Bundle composition --')
+print(f'Main bundle: {js_file.name} ({total_kb}KB uncompressed)')
+print(f'Top packages:')
+for p, sz in sorted(pkgs.items(), key=lambda x: -x[1])[:8]:
+    print(f'  {sz//1024:>5}KB  {p}')
+
+if warnings:
+    print(f'\nWARNINGS:')
+    for w in warnings:
+        print(w)
+    print(f'\nFix playbook: ~/.claude/skills/carmack/references/lighthouse-optimization.md #6')
+    print(f'Pattern: lazy-load components that chain in the heavy dep.')
+    print(f'Example: const AdminRoute = lazy(() => import("@/components/AdminRoute"))')
+else:
+    print('✓ No heavy SDK leaks detected')
+PY
+fi
+```
+
+**Decision logic**:
+- Any auth/payment SDK > 5KB in main bundle: **WARN** — surface fix pattern
+- Main bundle > 700KB uncompressed: **WARN** — suggest route-level splitting
+- Never BLOCK — bundle bloat ships but surfaces for next iteration
+
+**Note**: This check only fires when source maps are present. If the project disables source maps in production, skip silently.
 
 ---
 

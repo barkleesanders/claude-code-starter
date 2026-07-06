@@ -44,10 +44,48 @@ The treatments library is the value. Don't reinvent — pick from the catalog.
 
 ## Style commitments (non-negotiable)
 
+- **Document order: `<body>` → `<script>` → `<style>`** (NOT the traditional `<head>` with style/script before body). Write the body content first, then any `<script>`, then `<style>` last. Browsers reparent these correctly. This order ships dramatically better magazines than the traditional layout — it forces content-first generation and prevents running out of attention on scaffolding before the spreads exist. See "Document skeleton" below.
 - **Fonts**: Fraunces (serif display) + Inter (sans body) loaded via Google Fonts. Optional: JetBrains Mono for terminal/code spreads, Space Grotesk for scientific spreads.
 - **No small text anywhere.** Body minimum 22px. Spread display sizes use `clamp()` ranging from 48px → 200px+.
 - **Each spread is its own world.** No two spreads share the same background color, type treatment, AND numeral treatment. Variety is the whole point.
 - **Self-contained.** All CSS inline in `<style>`. No external JS required (except Google Fonts link). User opens one file, it works forever.
+
+## Document skeleton (MANDATORY)
+
+Every magazine file uses this exact order — body content first, scripts second, styles last:
+
+```html
+<!doctype html>
+<html lang="en">
+<title>The Morning Edition — 2026-05-18</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:...&family=Inter:...&display=swap" rel="stylesheet">
+
+<body>
+  <header class="masthead">...</header>
+  <section class="spread s01">...</section>
+  <section class="spread s02">...</section>
+  <!-- ... more spreads ... -->
+  <footer class="colophon">...</footer>
+</body>
+
+<script>
+  // Optional: print mode toggle, ?pdf= flag handling, anchor smooth-scroll, etc.
+</script>
+
+<style>
+  /* All CSS lives here, last. See references/design-system.md and references/spreads.md. */
+</style>
+</html>
+```
+
+Notes:
+- No `<head>` wrapper. `<title>`, `<meta>`, and `<link rel="stylesheet">` for Google Fonts go at the top of the document before `<body>` — browsers parse them into the implicit head.
+- `<style>` at the end of the document still applies to all preceding content (CSS is order-agnostic for selector matching). The trailing position is the whole point — body comes first.
+- This is non-traditional but valid HTML5. Do not "fix" it back to the standard `<head><style><script></head><body>` order.
 - **Numerals matter.** Every spread has a giant numeral (01, 02, 03…) with its own treatment per the spreads catalog.
 - **Source line on every spread.** Small (but not tiny — 18px+) attribution line at the bottom: source name + URL + any metadata.
 

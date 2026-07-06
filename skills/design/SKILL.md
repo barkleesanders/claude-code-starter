@@ -42,15 +42,33 @@ Pick the mode from the user's intent:
 | "Design a [page/screen]", "mock this up", "edit screen X", "list Stitch projects", a Stitch project URL pasted, anything implying screen-level generation in Stitch | **Stitch** | `references/stitch-workflows.md` |
 | "Build a [component / page / app]", "implement this in React/Next/Vue/Svelte/Astro", "write the code for...", in-repo code work | **Code** | `references/code-implementation.md` |
 | "Create a design system", "extract design tokens", "give me a `DESIGN.md`" | **Hybrid** | both reference files |
+| "Redesign / restyle / improve the look of an EXISTING app or screen", "make it look like [Apple Home / …]", "match this design" | **Preview-then-Apply** (Stitch → Code) — see Phase 1b | both (Stitch mockup first, then code) |
 
 **If genuinely ambiguous** (the user just said `/design` with no context): ask one short question — "Stitch mockup or in-repo code?" — then route.
+
+---
+
+## Phase 1b — Preview-then-Apply (Stitch → Code)
+
+When the user wants to **redesign or restyle an EXISTING app/UI** (there's already working code to change) — "make it look like Apple Home", "match this design", "improve the layout" — do NOT jump straight into writing CSS. **Generate a Stitch mockup first, show it, and get a yes before porting it to code.** This catches layout problems (dead space, unbalanced grids) on the canvas instead of in production.
+
+1. **Lock the direction** (Phase 0) as always.
+2. **Generate the design in Stitch** — `create_project` (or reuse one) → `generate_screen_from_text` with a prompt encoding the direction + the real screen's content/data. Use `MOBILE` for app-like UIs (`DESKTOP` is often rejected by the API — on `invalid argument`, fall back to `MOBILE`).
+3. **Render it for the user** — `get_project` → parse `.thumbnailScreenshot.downloadUrl` (`list_screens` is often empty right after generation; these calls exceed the tool token cap and get saved to a file — that's success, `jq` the saved JSON). `curl` the PNG and send it with `SendUserFile` so the user SEES the design.
+4. **ASK before applying** — `AskUserQuestion`: "Apply this design to the live code, or iterate on the mockup first?" Do NOT port to code without a yes.
+5. **On yes → implement in Code mode** — port the Stitch design faithfully (hero treatment, bento grid, color-wash, spacing), honoring the project's CSP / a11y / framework constraints. **Deploy stays with `/ship` — never auto-deploy.**
+
+The Stitch mockup is the shared reference you and the user agree on before code changes. Reference (2026-07-02, thermostat dashboard): restyling in Code mode directly produced a layout with a dead void; only after generating the Stitch version (balanced 2×2 bento + gradient hero) did the right layout become obvious. This mode makes that the default path.
 
 ---
 
 ## Cross-Mode Rules (apply regardless of transport)
 
 - **Phase 0 direction feeds Phase 1.** Stitch prompts and React/HTML code BOTH must reflect the direction. If the output doesn't show the direction, the direction didn't land — redo.
-- **Anti-slop applies everywhere.** Whether Stitch generates the HTML or Claude writes the JSX, the banlist from `aesthetic-core.md` is binding.
+- **Anti-slop applies everywhere.** Whether Stitch generates the HTML or Claude writes the JSX, the banlist from `aesthetic-core.md` is binding. This includes the **Absolute Bans** (side-stripe borders, gradient text, decorative glassmorphism, hero-metric template, identical card grids, modal-first) and the **two-altitude AI slop test** (first-order category reflex + second-order category-plus-anti-reference reflex).
+- **Color uses OKLCH, neutrals tinted.** No raw `#000`/`#fff`. Pick a color strategy (Restrained / Committed / Full palette / Drenched) before picking colors. See `aesthetic-core.md` → Color & Theme.
+- **Theme by scene, not category.** Write a one-sentence physical scene before choosing dark vs light. See `aesthetic-core.md` → Color & Theme.
+- **Code mode runs `npx impeccable detect`** before declaring done. 27 deterministic anti-pattern checks, no API key. See `code-implementation.md` → Deterministic Anti-Pattern Scan.
 - **One focused edit at a time** (whether `edit_screens` or refactoring a component).
 - **No "modern" / "clean" / "sleek"** as a direction. Push back to the user.
 

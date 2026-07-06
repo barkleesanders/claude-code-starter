@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+#
+# Stop hook: keep the agent working until the plan and user requests are 100% done.
+#
+# LOGIC:
+#   1. First stop attempt with real incomplete signals → block (ask agent to finish)
+#   2. Second stop attempt (stop_hook_active=true) → always allow (agent reviewed and confirmed)
+#   3. First stop attempt with NO signals → allow (nothing to check)
+#   4. Max counter reached → always allow (safety valve)
+#
+# Set TASKMASTER_MAX to change the max continuation count (default: 3, 0 = infinite).
+#
+set -euo pipefail
+
+INPUT=$(cat)
+SESSION_ID=$(echo "$INPUT" | jq -r '.session_id')
+TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path')
+STOP_HOOK_ACTIVE=$(echo "$INPUT" | jq -r '.stop_hook_active // false')
+
+# --- If the hook already fired and the agent still wants to stop, let it. ---
+# This is the critical fix: once the agent has been asked to review and
+# confirms completion, trust it. Don't loop.
+if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
+  # Clean up counter and allow stop
+  COUNTER_DIR="${TMPDIR:-/tmp}/taskmaster"
+  COUNTER_FILE="${COUNTER_DIR}/${SESSION_ID}"
+  rm -f "$COUNTER_FILE"
+  exit 0
+fi
+
+# --- loop guard ---
+COUNTER_DIR="${TMPDIR:-/tmp}/taskmaster"
+mkdir -p "$COUNTER_DIR"
+COUNTER_FILE="${COUNTER_DIR}/${SESSION_ID}"
+MAX=${TASKMASTER_MAX:-3}
+
+COUNT=0
+if [ -f "$COUNTER_FILE" ]; then
+  COUNT=$(cat "$COUNTER_FILE")
+fi
+
+# After max continuations, allow stop and clean up (0 = infinite, never cap)
+if [ "$MAX" -gt 0 ] && [ "$COUNT" -ge "$MAX" ]; then
+  rm -f "$COUNTER_FILE"
+  exit 0
+fi
+
+# --- transcript analysis ---
+# Only look for REAL incomplete signals: actual TaskCreate/TaskUpdate tool calls
+# with pending/in_progress status, not echoed text or system messages.
+HAS_INCOMPLETE_SIGNALS=false
+
+if [ -f "$TRANSCRIPT" ]; then
+  # Get the last 30 lines — enough to see recent tool results, not so much
+  # that we match old/irrelevant content
+  TAIL=$(tail -30 "$TRANSCRIPT" 2>/dev/null || true)
+
+  # Check for task-list items still pending/in-progress
+  # Use stricter patterns to avoid matching echoed hook text or conversation
+  if echo "$TAIL" | grep -q '"tool_name".*[Tt]ask' 2>/dev/null && \
+     echo "$TAIL" | grep -q '"status".*"in_progress"\|"status".*"pending"' 2>/dev/null; then
+    HAS_INCOMPLETE_SIGNALS=true
+  fi
+
+  # Check for recent errors in tool results (real tool errors, not discussion of errors)
+  if echo "$TAIL" | grep -q '"is_error".*true' 2>/dev/null; then
+    HAS_INCOMPLETE_SIGNALS=true
+  fi
+fi
+
+# --- decide ---
+# If no incomplete signals found, allow the stop — don't nag
+if [ "$HAS_INCOMPLETE_SIGNALS" = false ]; then
+  rm -f "$COUNTER_FILE"
+  exit 0
+fi
+
+# We have real signals — block once and ask the agent to review
+NEXT=$((COUNT + 1))
+echo "$NEXT" > "$COUNTER_FILE"
+
+if [ "$MAX" -gt 0 ]; then
+  LABEL="TASKMASTER (${NEXT}/${MAX})"
+else
+  LABEL="TASKMASTER (${NEXT})"
+fi
+
+REASON="${LABEL}: Incomplete tasks or recent errors detected.
+
+Before stopping, quickly check:
+1. Any tasks still pending/in_progress? Finish or close them.
+2. Any tool errors in the last few actions? Fix them.
+3. Did the user's request get fully addressed?
+
+If everything is done, confirm completion briefly."
+
+jq -n --arg reason "$REASON" '{ decision: "block", reason: $reason }'

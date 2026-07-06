@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# Remote OpenClaw diagnostic — runs from Mac, queries VPS bsclaudebot.
-# Triggers: any task that touches VPS, openclaw, bsclaudebot.
+# Remote OpenClaw diagnostic — runs from Mac, queries the openclaw host.
+# Triggers: any task that touches openclaw on Mac mini (or another remote host).
 # Captures native diagnostic output + extracts remediation hints locally,
-# so the agent on Mac sees the same "native-guidance-first" signals the
-# VPS scanner sees.
+# so the agent sees the same "native-guidance-first" signals the host scanner sees.
+#
+# 2026-05-14: migrated from deleted Hetzner VPS (100.96.42.67:2222) to Mac mini
+# (Tailscale alias `mac-mini`, configured in ~/.ssh/config). Path moved from
+# `openclaw` (root PATH on VPS) to `/opt/homebrew/bin/openclaw` (Mac mini).
 #
 # Usage:
 #   openclaw-remote-doctor.sh                 # full scan (doctor + tool-usage + errors)
@@ -14,24 +17,28 @@
 
 set -euo pipefail
 
-VPS="root@<YOUR_VPS_IP>"
-SSH_OPTS="-p 2222 -o ConnectTimeout=10 -o ServerAliveInterval=30"
+# Override with OPENCLAW_HOST=user@host:port for non-Mac-mini deployments.
+HOST="${OPENCLAW_HOST:-mac-mini}"
+SSH_OPTS="-o ConnectTimeout=10 -o ServerAliveInterval=30"
+OPENCLAW="${OPENCLAW_BIN:-/opt/homebrew/bin/openclaw}"
 
 mode="${1:-all}"
 shift || true
 
 run_remote() {
-  ssh $SSH_OPTS "$VPS" "$@" 2>&1 | grep -v 'Config was' || true
+  # Non-interactive SSH doesn't load ~/.zshrc, so /opt/homebrew/bin (node, openclaw)
+  # isn't on PATH by default. Inject it explicitly so node-based commands work.
+  ssh $SSH_OPTS "$HOST" "PATH=/opt/homebrew/bin:/opt/homebrew/sbin:\$PATH; $*" 2>&1 | grep -v 'Config was' || true
 }
 
 case "$mode" in
   doctor)
-    echo "=== openclaw doctor (VPS) ==="
-    run_remote "openclaw doctor"
+    echo "=== openclaw doctor (host) ==="
+    run_remote "$OPENCLAW doctor"
     ;;
   tokens)
-    echo "=== main-agent turn-1 tokens (VPS) ==="
-    run_remote "openclaw agent --agent main --message 'size check' --json --timeout 60" | \
+    echo "=== main-agent turn-1 tokens (host) ==="
+    run_remote "$OPENCLAW agent --agent main --message 'size check' --json --timeout 60" | \
       python3 -c "
 import json, sys, re
 raw = sys.stdin.read()
@@ -51,25 +58,25 @@ walk(j)
     ;;
   tools)
     days="${1:-14}"
-    echo "=== VPS tool-usage scan (last $days days) ==="
-    run_remote "/root/.openclaw/scripts/tool-usage-scan.sh $days"
+    echo "=== host tool-usage scan (last $days days) ==="
+    run_remote "~/.openclaw/scripts/tool-usage-scan.sh $days"
     ;;
   errors)
     days="${1:-1}"
-    echo "=== VPS cron errors (last $days day[s]) ==="
-    run_remote "openclaw cron list | grep -v 'Config was' | grep error"
+    echo "=== cron errors (last $days day[s]) ==="
+    run_remote "$OPENCLAW cron list | grep -v 'Config was' | grep error"
     ;;
   all|*)
-    echo "################## VPS OpenClaw snapshot ##################"
+    echo "################## OpenClaw snapshot ##################"
     echo
     echo "--- gateway status ---"
-    run_remote "systemctl is-active openclaw-gateway"
+    run_remote 'launchctl list 2>/dev/null | grep -i openclaw || pgrep -fl openclaw || echo "openclaw process not running"'
     echo
     echo "--- openclaw doctor (native diagnostic) ---"
-    run_remote "openclaw doctor" | head -80
+    run_remote "$OPENCLAW doctor" | head -80
     echo
     echo "--- main-agent turn-1 tokens ---"
-    run_remote "openclaw agent --agent main --message 'snapshot' --json --timeout 60" | \
+    run_remote "$OPENCLAW agent --agent main --message 'snapshot' --json --timeout 60" | \
       python3 -c "
 import json, sys
 raw = sys.stdin.read()
@@ -88,17 +95,17 @@ if i >= 0:
 " 2>/dev/null || echo "(agent call failed)"
     echo
     echo "--- tool usage (14d) ---"
-    run_remote "/root/.openclaw/scripts/tool-usage-scan.sh 14"
+    run_remote "~/.openclaw/scripts/tool-usage-scan.sh 14"
     echo
     echo "--- latest self-improve log ---"
-    run_remote "tail -15 /root/.openclaw/logs/self-improve.log"
+    run_remote "tail -15 ~/.openclaw/logs/self-improve.log"
     echo
-    echo "--- pending-review file on VPS ---"
-    run_remote "[ -f /root/.openclaw/improvement-pending.md ] && cat /root/.openclaw/improvement-pending.md || echo '(no pending review)'"
+    echo "--- pending-review file on host ---"
+    run_remote "[ -f ~/.openclaw/improvement-pending.md ] && cat ~/.openclaw/improvement-pending.md || echo '(no pending review)'"
     echo
     echo "################## extracted remediation hints ##################"
     # Extract hints from doctor output locally so the agent sees them inline
-    run_remote "cat /root/.openclaw/logs/doctor-latest.txt 2>/dev/null" | \
+    run_remote "cat ~/.openclaw/logs/doctor-latest.txt 2>/dev/null" | \
       python3 -c "
 import re, sys
 text = sys.stdin.read()

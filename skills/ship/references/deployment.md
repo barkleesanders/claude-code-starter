@@ -67,6 +67,57 @@ git log --format="%h %ad %s" --date=short ${LAST_HASH}..HEAD
 
 ---
 
+## Phase 3.55: README CONFIG-SYNC AUTO-REGEN (MANDATORY — added 2026-05-10)
+
+**Run after Phase 3.5, BEFORE any production deploy.** Catches drift between
+the deployed code and the README's "how the site works" section. The user's
+explicit ask: README must stay current with reality after every `/ship`.
+
+### Trigger
+Always run when the repo contains BOTH:
+- `scripts/regen-readme-status.sh` (or any `regen-readme*.sh` / `update-readme*.sh`)
+- A `README.md` with `<!-- auto-status:start -->` / `<!-- auto-status:end -->` markers
+  (or any equivalent managed-block convention the project documents)
+
+### Procedure
+```bash
+# 1. Run the project's README regeneration script
+if [ -x scripts/regen-readme-status.sh ]; then
+  bash scripts/regen-readme-status.sh
+elif [ -x scripts/update-readme.sh ]; then
+  bash scripts/update-readme.sh
+fi
+
+# 2. If the script produced a README diff, commit + push it BEFORE deploying
+if ! git diff --quiet README.md; then
+  git add README.md
+  git commit -m "docs: regen README current-setup [skip auto-readme]"
+  git push origin "$(git rev-parse --abbrev-ref HEAD)"
+fi
+```
+
+### Rules
+- The commit message MUST include `[skip auto-readme]` if a GitHub Action
+  re-runs the same regen on push (prevents infinite loops with workflows
+  like `auto-readme.yml`)
+- The README block must reflect the deployed state — if a deploy ships
+  new routes, new backends, new architecture, the README block updates BEFORE
+  prod gets the code, not after
+- The Stop hook checks this — if `README.md` is out of sync with the regen
+  script's output at session-end, it prompts to push before allowing exit
+- **If README config-sync fails: BLOCK Phase 4 deployments** (same as 3.5)
+
+### Why
+2026-05-10: User shipped multi-city `/case` route, Socrata-primary lookup,
+"View ticket →" button redesign, and visual map filters across 3 separate
+`/ship` runs without the public README mentioning any of them. The
+GitHub Action `auto-readme.yml` only triggers on a fixed file allowlist, and
+the architectural changes touched files outside that list. Adding this
+phase to /ship guarantees the README config-sync runs every deploy
+regardless of which files changed.
+
+---
+
 ## Phase 4: DOWNSTREAM DEPLOYMENTS
 
 **Deployment Target Logic**:
@@ -92,7 +143,59 @@ git log --format="%h %ad %s" --date=short ${LAST_HASH}..HEAD
 
 ### CLOUDFLARE DEPLOYMENT (if wrangler.toml/json exists)
 
-**Step 0: Detect Deployment Type** — CF Workers vs CF Pages:
+**🚨 Step 0: MANDATORY Wrangler Version Pre-Flight** — RUN THIS BEFORE ANY OTHER WRANGLER COMMAND, EVERY TIME.
+
+Wrangler ships breaking deploy bugs frequently and posts security/CVE patches on minor versions. An outdated wrangler can silently corrupt deploys, fail auth in subtle ways, or upload mis-bundled assets. The version check is non-negotiable — do not skip it because "the deploy worked last time".
+
+```bash
+# Detect both LOCAL (devDep) and GLOBAL wrangler versions
+LOCAL_WRANGLER=""
+GLOBAL_WRANGLER=""
+[ -f node_modules/wrangler/package.json ] && LOCAL_WRANGLER=$(node -p "require('./node_modules/wrangler/package.json').version" 2>/dev/null)
+GLOBAL_WRANGLER=$(command -v wrangler >/dev/null && wrangler --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+LATEST_WRANGLER=$(npm view wrangler version 2>/dev/null)
+
+echo "Wrangler versions — local: ${LOCAL_WRANGLER:-none}, global: ${GLOBAL_WRANGLER:-none}, latest: ${LATEST_WRANGLER:-unknown}"
+
+# `npm run deploy:prod` (and most npm scripts) use the LOCAL wrangler from node_modules,
+# NOT the global one. Both must be current.
+NEEDS_LOCAL_UPDATE=0
+NEEDS_GLOBAL_UPDATE=0
+[ -n "$LOCAL_WRANGLER" ] && [ "$LOCAL_WRANGLER" != "$LATEST_WRANGLER" ] && NEEDS_LOCAL_UPDATE=1
+[ -n "$GLOBAL_WRANGLER" ] && [ "$GLOBAL_WRANGLER" != "$LATEST_WRANGLER" ] && NEEDS_GLOBAL_UPDATE=1
+# If wrangler is in package.json devDeps but node_modules/wrangler is missing, that's also a needs-install
+grep -q '"wrangler"' package.json 2>/dev/null && [ -z "$LOCAL_WRANGLER" ] && NEEDS_LOCAL_UPDATE=1
+
+if [ "$NEEDS_LOCAL_UPDATE" = "1" ]; then
+  echo "Updating LOCAL wrangler to ${LATEST_WRANGLER}..."
+  # Detect package manager from lockfile — npm install can EOVERRIDE on bun/pnpm projects
+  if [ -f bun.lock ] || [ -f bun.lockb ]; then
+    bun add -d wrangler@latest 2>&1 | tail -3
+  elif [ -f pnpm-lock.yaml ]; then
+    pnpm add -D wrangler@latest 2>&1 | tail -3
+  elif [ -f yarn.lock ]; then
+    yarn add -D wrangler@latest 2>&1 | tail -3
+  else
+    npm install wrangler@latest --save-dev 2>&1 | tail -3
+  fi
+fi
+if [ "$NEEDS_GLOBAL_UPDATE" = "1" ]; then
+  echo "Updating GLOBAL wrangler to ${LATEST_WRANGLER}..."
+  npm install -g wrangler@latest 2>&1 | tail -3
+fi
+
+# Verify post-update
+[ "$NEEDS_LOCAL_UPDATE" = "1" ] && node -p "require('./node_modules/wrangler/package.json').version"
+[ "$NEEDS_GLOBAL_UPDATE" = "1" ] && wrangler --version
+```
+
+**Why both local and global**: `npm run deploy:prod` resolves wrangler from `./node_modules/.bin/`. Updating only the global binary leaves the project pinned to an outdated version that npm scripts will use. ALWAYS update both if either is stale.
+
+**If `npm view wrangler version` fails** (no network, npm registry down): log a warning and continue with the current version — do not block deployment over a metadata fetch failure. But if a known-needed update is suggested by inline wrangler output ("update available X.Y.Z"), retry the npm install.
+
+**After update, commit the package.json/lockfile changes** if `npm install --save-dev` modified them — these go in the same deploy commit so the deployed bundle's lockfile matches the wrangler that built it.
+
+**Step 0.1: Detect Deployment Type** — CF Workers vs CF Pages:
 ```bash
 # CF Pages: has pages_build_output_dir in wrangler.toml
 grep -q "pages_build_output_dir" wrangler.toml 2>/dev/null && echo "CF_PAGES" || echo "CF_WORKERS"
@@ -112,13 +215,28 @@ cat ~/.wrangler/config/default.toml 2>/dev/null | grep "scopes"
 npx wrangler whoami 2>&1 | head -5
 ```
 
-**CRITICAL: `.env.local` Token Override Bug**
-Wrangler auto-loads `.env.local` via dotenv. If `.env.local` has `CLOUDFLARE_API_TOKEN` with limited permissions, it OVERRIDES the wrangler OAuth token (which may have full permissions including `pages:write`). Symptoms:
-- `wrangler pages deploy` fails with "Authentication error [code: 10000]"
-- `wrangler whoami` says "authenticating via custom API token"
-- But `~/.wrangler/config/default.toml` has `pages:write` in scopes
+**🔑 PRIMARY AUTH METHOD (this account): Global API Key**
 
-**Fix**: Remove or comment out `CLOUDFLARE_API_TOKEN` from `.env.local` if the OAuth token has the right permissions. The OAuth token in `~/.wrangler/config/default.toml` is the preferred auth method.
+For you@example.com (account `370916317cb5ba9f1162c8e420fa86b4`), the persistent auth is the **Cloudflare Global API Key** stored at `~/.cloudflared/cf-global-api-key.json`. It is exported automatically by `~/.zshrc` as `CLOUDFLARE_API_KEY` + `CLOUDFLARE_EMAIL` and has FULL account permissions (Workers, Pages, DNS, KV, D1, R2, Zone — everything). This bypasses per-token permission gaps.
+
+This is the source of truth — DO NOT prompt the user for `wrangler login` if `wrangler whoami` already shows "Global API Key, associated with the email you@example.com". Just deploy.
+
+```bash
+# If wrangler whoami fails in a non-interactive shell, source zshrc env vars manually:
+export CLOUDFLARE_API_KEY="$(python3 -c 'import json;print(json.load(open("/Users/youruser/.cloudflared/cf-global-api-key.json"))["global_api_key"])')"
+export CLOUDFLARE_EMAIL="you@example.com"
+unset CLOUDFLARE_API_TOKEN  # narrower-scope tokens override the global key — unset them
+```
+
+Why Global API Key, not OAuth: the OAuth token in `~/.wrangler/config/default.toml` expires every ~90 days. The Hetzner VPS that previously kept it refreshed was deleted 2026-04-29. Until/unless `wrangler login` is re-run interactively, the Global API Key is the working auth path.
+
+**CRITICAL: `.env.local` Token Override Bug**
+Wrangler auto-loads `.env.local` via dotenv. If `.env.local` has `CLOUDFLARE_API_TOKEN` with limited permissions, it OVERRIDES the global API key + OAuth token. Symptoms:
+- `wrangler deploy` fails with "Authentication error [code: 10000]"
+- `wrangler whoami` says "authenticating via custom API token"
+- But the global key in env has full permissions
+
+**Fix**: Remove or comment out `CLOUDFLARE_API_TOKEN` from `.env.local`, or `unset CLOUDFLARE_API_TOKEN` in the deploy shell.
 
 **Step 2: Deploy** (CF Pages):
 ```bash
@@ -137,6 +255,18 @@ npm run build && npx wrangler pages deploy dist --project-name=$(grep '^name' wr
 ```bash
 npm run deploy 2>&1  # OR: npx wrangler deploy
 ```
+
+**Step 2.5: Record the deploy (durable, repo-native tracking)** — right after a
+successful `wrangler deploy`, if the repo has a deploy-record hook, run it so
+"when did commit `<sha>` go to prod" is answerable forever (Cloudflare only
+retains recent deployment history):
+```bash
+[ -f scripts/record-deploy.sh ] && bash scripts/record-deploy.sh   # appends deploy-log.jsonl + registers a GitHub Deployment
+```
+If you deployed via `npm run deploy`/`deploy:prod`/`deploy:skip-tests`, this is
+already chained in — skip. Reference: AIVA-Frontend `DEPLOYS.md` (born from the
+2026-07-05 intake outage whose start date was unrecoverable). A repo without the
+hook should add one (git-tracked `deploy-log.jsonl` line: sha, ts, worker version, actor).
 
 **Step 3: Verify Deployment Success**:
 ```bash

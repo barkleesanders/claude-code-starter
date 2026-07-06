@@ -93,6 +93,53 @@ npx eslint "src/react-app/**/*.{ts,tsx}" 2>&1 | grep "error"
 
 **Decision rule:** BOTH `biome check .` AND `npx eslint "src/react-app/**/*.{ts,tsx}"` MUST return `0 errors` before proceeding. NOT "0 errors in changed files" — 0 errors TOTAL. Pre-existing issues are bugs that must be fixed NOW, not deferred.
 
+### Stage 1.7: Embedded JS/CSS String Safety Check (MANDATORY)
+
+**Biome operates on file-level syntax and does NOT understand strings-within-strings.** When a project uses inline HTML templates (Cloudflare Workers, server-rendered HTML, template literals containing `<script>` blocks), Biome auto-fix can silently break embedded JavaScript.
+
+**The #1 pattern:** `noUselessEscapeInString` removes backslash escapes that are *syntactically necessary* inside embedded JS strings. Example: Biome converts `Didn\'t` → `Didn't` inside a single-quoted JS string embedded in a TypeScript template literal — this unescaped apostrophe terminates the JS string and kills the entire client-side script.
+
+**After every `biome check --fix` or `biome check --write --unsafe`, run this check:**
+
+```bash
+# Detect inline HTML projects (Workers, SSR, template-literal HTML)
+if grep -q "text/html\|innerHTML\|<script>" src/*.ts src/*.tsx 2>/dev/null; then
+  echo "INLINE HTML DETECTED — checking for Biome string-escape damage..."
+
+  # Check for unescaped apostrophes inside single-quoted JS strings in HTML templates
+  # Pattern: single-quote string containing an unescaped apostrophe
+  grep -nP ":'[^']*'[^']*'" src/*.ts 2>/dev/null | grep -v "^.*//.*$" | head -20
+
+  # Check for JS syntax errors in the rendered HTML output
+  # Build/deploy and verify JS actually runs:
+  # - curl the page, extract <script> content, check for syntax errors
+  # - OR: node -c on the extracted JS
+fi
+```
+
+**Fix patterns:**
+- Change single-quoted strings containing apostrophes to double-quoted: `'Didn't'` → `"Didn't"`
+- Add biome.json override to disable `noUselessEscapeInString` for files with inline HTML templates
+- After fix, always verify: `curl -s <URL> | grep -o 'KEY_JS_FUNCTION_NAME'` to confirm JS executes
+
+**Prevention — biome.json override for inline HTML files:**
+```json
+{
+  "overrides": [{
+    "include": ["src/index.ts"],
+    "linter": {
+      "rules": {
+        "suspicious": {
+          "noUselessEscapeInString": "off"
+        }
+      }
+    }
+  }]
+}
+```
+
+**Why (2026-04-11):** Biome auto-fix removed `\'` escape from `Didn\'t` in a single-quoted JS string inside an HTML template literal in a Cloudflare Worker. The unescaped apostrophe terminated the string, causing a JS syntax error that killed the entire page — no map, no data, no judges loaded. The TypeScript compiler (`tsc`) did not catch this because the JS is inside a template string, not parsed as JS by TypeScript.
+
 ### Stage 2: AI-Powered Manual Fix (INTELLIGENT — NO LIMIT)
 **Trigger**: If errors remain after Stage 1
 
@@ -148,3 +195,80 @@ npm audit 2>&1  # MUST show "found 0 vulnerabilities"
 ```
 
 **Decision rule:** `npm audit` MUST return `found 0 vulnerabilities` before proceeding. If a vulnerability has a fix version available, it MUST be applied. No exceptions for LOW/MEDIUM — fix them ALL.
+
+---
+
+## Stage 1.6: Hardcoded auth/key fallback scan (MANDATORY)
+
+**Why**: Vite (and similar build tools) inline `import.meta.env.*` at build time. CI builds run without `.env` (gitignored), so any hardcoded fallback in source becomes the SHIPPED value — even if `.env` is correct locally and dashboard secrets are correct in production. If the fallback is a *dev*-instance value (`pk_test_*`, `sk_test_*`, `*.accounts.dev`, etc.), production silently runs against the dev auth provider with all its rate limits and broken email deliverability.
+
+**Real incident (2026-04-30):** `App.tsx` had `const CLERK_KEY_FALLBACK = "pk_test_..."` used as `import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || CLERK_KEY_FALLBACK`. Production bundle shipped `pk_test_*` for months despite `.env` being updated and Cloudflare secrets being correct. Email verification emails never delivered because dev Clerk instance has hard send-rate caps. Fix: replace fallback with the prod value (or with a hard error so CI fails loudly).
+
+```bash
+# Scan source for production-toxic auth fallbacks. Fail the gate if any hit.
+PATTERNS='pk_test_|sk_test_|prime-rhino-99|\.clerk\.accounts\.dev|pk_(test|live)_[A-Za-z0-9_-]{20,}|sk_(test|live)_[A-Za-z0-9_-]{20,}'
+
+# Allowlist: env files (intentional), test files, type-prefix detection constants in vendored SDKs (e.g. "pk_test_" as a string constant).
+HITS=$(grep -rEn "$PATTERNS" src/ 2>/dev/null \
+  | grep -vE '\.test\.|__tests__|/node_modules/|\.d\.ts:' \
+  | grep -vE '"(pk|sk)_(test|live)_"\s*[,;)]' )  # bare prefix constants are SDK-internal
+
+if [ -n "$HITS" ]; then
+  echo "BLOCK: hardcoded auth-key patterns in source — these will ship even when env is correct:"
+  echo "$HITS"
+  exit 1
+fi
+
+# Same for the BUILT bundle — catch cases where the source is clean but a dependency baked it in.
+if [ -d dist ]; then
+  BUNDLE_HITS=$(grep -rE "pk_test_|sk_test_|prime-rhino-99|\.clerk\.accounts\.dev" dist/ 2>/dev/null \
+    | grep -v '\.map:' )
+  if [ -n "$BUNDLE_HITS" ]; then
+    echo "BLOCK: built bundle contains dev-instance auth references:"
+    echo "$BUNDLE_HITS"
+    exit 1
+  fi
+fi
+```
+
+**Generalize to other auth providers:**
+
+| Provider | Dev fingerprint | Prod fingerprint |
+|---|---|---|
+| Clerk | `pk_test_*`, `*.clerk.accounts.dev`, `*.clerk.dev`, instance slug like `prime-rhino-99` | `pk_live_*`, `clerk.<your-domain>` |
+| Supabase | project ref ending in `-dev` or local URLs `localhost:54321` | live project ref + `<ref>.supabase.co` |
+| Auth0 | `<tenant>-dev.<region>.auth0.com` | `<tenant>.<region>.auth0.com` or custom domain |
+| Firebase | demo-* projectId, `localhost:9099` (auth emulator) | real projectId, `<project>.firebaseapp.com` |
+| Stripe | `pk_test_*`, `sk_test_*` | `pk_live_*`, `sk_live_*` |
+
+**Fix pattern:**
+```ts
+// ❌ Silently ships dev value to prod when .env is gitignored from CI
+const FALLBACK = "pk_test_...";
+const KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || FALLBACK;
+
+// ✅ Hard-fail at build/runtime if env is missing — surfaces the bug immediately
+const KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+if (!KEY) throw new Error("VITE_CLERK_PUBLISHABLE_KEY is required at build time");
+
+// ✅ Or fallback to PROD value (publishable keys are public-by-design)
+const FALLBACK = "pk_live_..."; // prod custom domain
+```
+
+---
+
+## Stage 1.8: TypeScript Anti-Slop Scan (WARN — surface generic guards & laundered casts)
+
+**Why**: Generic `isRecord`/`isObject` guards, `as unknown as T` launder-casts, and `(x as any).field` reach-casts let code compile and run on data of unknown shape without ever stating the shape — pushing type errors to a production `TypeError`. It's the runtime-guard sibling of the hardcoded-fallback and No-Suppression problems, and the upstream cause of the undefined/null-render bug class. Full rule + Zod refactor patterns: `~/.claude/skills/shared/anti-slop-typescript.md`.
+
+```bash
+# Scan source (TS/TSX). Advisory by default — lists hits + refactor hints, never blocks on a count.
+~/.claude/skills/carmack/tools/detect-ts-slop.sh src/ 2>&1 || true
+
+# Or scope to this release's diff:
+# ~/.claude/skills/carmack/tools/detect-ts-slop.sh --diff origin/main
+```
+
+**Decision rule (WARN, not BLOCK):** This stage does NOT hard-fail the ship — anti-slop has legitimate exceptions (a *targeted* predicate that genuinely fits, a justified narrow cast). It surfaces every hit with file:line so they get refactored to a named type / discriminated union / Zod schema before merge. Per the Fix-All-Issues rule, treat the list as work, not noise. To enforce a hard ceiling on egregious slop, run with `--threshold N` (exits 1 when total > N) — opt-in, since false positives on a hard block would wrongly stop a clean release.
+
+**Required alternatives (priority):** named `interface`/`type` → discriminated union on a literal field → **Zod/Valibot schema at the trust boundary** with `type X = z.infer<typeof Schema>` → library-inferred types (`z.infer`, Prisma/Drizzle `$inferSelect`, tRPC, Hono `InferResponseType`) → targeted predicate (last resort, justified inline). Typed code should compile (`tsc --noEmit`) with zero casts added to make it pass.

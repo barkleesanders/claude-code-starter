@@ -27,9 +27,129 @@ done
 ```
 - If critical env vars missing from both wrangler.json and secrets: **BLOCK**
 
+**1a. Worker Secret Binding Gate (BLOCKING)**:
+
+Cloudflare Worker `vars` are plaintext config. Any binding name that looks sensitive must be a secret binding, not a literal in `wrangler.json`/`wrangler.toml`.
+
+```bash
+# List sensitive plaintext vars in Wrangler config. Every hit needs review.
+rg -n '"[A-Z0-9_]*(KEY|SECRET|TOKEN|PASSWORD)[A-Z0-9_]*"\s*:' wrangler.json wrangler.toml 2>/dev/null
+
+# Confirm Cloudflare stores the binding as secret_text.
+npx wrangler secret list
+```
+
+- If a sensitive binding appears as a plaintext `vars` value: **BLOCK**
+- If `wrangler secret put <NAME>` fails because the binding name is already in use: remove the plaintext var from config, deploy without `--keep-vars`, immediately run `wrangler secret put <NAME>`, then re-run `wrangler secret list`
+- Do not use `--keep-vars` when the purpose is removing plaintext Worker vars; it preserves the old plaintext binding
+- The safe end state is `wrangler secret list` showing the binding as `secret_text` and no sensitive literal left in Wrangler config
+
+**1b. Production Auth Instance Binding Gate (BLOCKING)**:
+
+Run this for Cloudflare Worker apps that use Clerk/Auth0/Supabase/Firebase or any auth provider with dev/prod instances.
+
+```bash
+# Source/config scan for development auth fingerprints
+rg -n 'pk_test_|sk_test_|\.accounts\.dev|CLERK_PUBLISHABLE_KEY|CLERK_JWT_ISSUER|CLERK_JWKS_URL' \
+  wrangler.toml wrangler.json src --glob '!*.test.*' 2>/dev/null || true
+
+# Effective Worker upload scan. This must be clean before production deploy.
+if [ -f wrangler.toml ] || [ -f wrangler.json ]; then
+  npx wrangler deploy --env="" --dry-run --outdir /tmp/ship-worker-dryrun 2>&1 | tee /tmp/ship-worker-dryrun.log
+  rg 'CLERK_PUBLISHABLE_KEY.*pk_test|CLERK_JWT_ISSUER.*accounts\.dev|CLERK_JWKS_URL.*accounts\.dev|pk_test_|sk_test_' \
+    /tmp/ship-worker-dryrun.log && echo "BLOCK: production Worker dry-run contains development auth fingerprint"
+fi
+```
+
+- If static scan or dry-run shows `pk_test_*`, `sk_test_*`, `.accounts.dev`, or a dev issuer/JWKS in production mode: **BLOCK**
+- If using Clerk production custom domains, verify Clerk Platform domain status is complete before switching to `pk_live_*`:
+
+```bash
+clerk apps list --json
+clerk api --platform "/platform/applications/<app_id>/domains/<domain>/status"
+curl -sI -m 8 "https://clerk.<root>/v1/environment" | head -1
+```
+
+- If Clerk domain DNS/SSL/mail status is incomplete, or `/v1/environment` cannot return 200 for the production domain: **BLOCK**
+- After deploy, fetch live HTML with a cache-buster and verify it contains prod auth fingerprints only:
+
+```bash
+curl -s "https://${PROD_DOMAIN}/?ship_cb=$(date +%s)" | rg 'pk_live_|pk_test_|accounts\.dev'
+```
+
+**1c. External Municipal Form Fallback Gate (BLOCKING when touched)**:
+
+Trigger this when changes touch files containing `sf311`, `verint`, `seeclickfix`, `request_type_id`, `category`, `resubmit`, `rewrite-text`, `analyze`, or `submit`.
+
+```bash
+CHANGED=$(git diff --name-only HEAD 2>/dev/null || git diff --name-only)
+if echo "$CHANGED" | rg -i 'sf311|verint|seeclickfix|request_type_id|categor|resubmit|rewrite-text|analyze|submit'; then
+  echo "Municipal submit/category code changed: require targeted fallback regression"
+  rg -n 'sf311_category_fallback|category_fallback|request_type_id|Verint|SF311 save 500' src tests
+fi
+```
+
+Required verification:
+- A targeted test covers non-default city form/category returning 500.
+- The same test proves fallback to a known-good form/category succeeds.
+- The fallback preserves the user-selected category in description and/or telemetry.
+- Live/post-deploy verification checks the official city tracker when a live ticket is filed.
+
+If municipal submit/category code changed and no fallback regression exists: **BLOCK**.
+
+**1c-bis. Third-Party Response Signal-Extraction Fixture Gate (BLOCKING when touched)**:
+
+Trigger when changes touch ANY parser that classifies a third-party HTTP response as success / failure / pending / partial — i.e., a function whose return type narrows on the response body. Common offenders: ASP.NET WebForms replays (DBI, SF Permit Center), Verint dform `/api/save` interpreters, OAuth-callback decoders, webhook verifiers, scraper detectors.
+
+```bash
+CHANGED=$(git diff --name-only HEAD 2>/dev/null || git diff --name-only)
+TRIPS=0
+for f in $CHANGED; do
+  case "$f" in *.ts|*.tsx|*.mjs|*.js)
+    # File looks like a third-party-response parser if it contains BOTH a return-shape with ok/error AND substring-matching on a fetched response.
+    if rg -q 'ok:\s*(true|false)' "$f" 2>/dev/null && rg -q 'await.*\.(text|json)\s*\(\)|response\.text|html\.includes|html\.match' "$f" 2>/dev/null; then
+      base=$(basename "$f" | sed 's/\.[a-z]*$//')
+      # Look for adjacent fixtures. Common shapes:
+      #   src/__fixtures__/<integration>/...-success.{html,json}
+      #   tests/fixtures/<integration>/...
+      #   __fixtures__/<base>/
+      if ! ls src/__fixtures__/ tests/fixtures/ __fixtures__/ 2>/dev/null | grep -q .; then
+        echo "BLOCK: $f looks like a third-party-response parser but no __fixtures__/ directory exists"
+        TRIPS=$((TRIPS+1))
+        continue
+      fi
+      # Require BOTH success and failure fixtures named for this integration.
+      if ! find src/__fixtures__ tests/fixtures __fixtures__ -type f 2>/dev/null | rg -q -i 'success|recorded|ok\.' ; then
+        echo "BLOCK: $f changed but no captured *-success.* fixture found anywhere under __fixtures__/"
+        TRIPS=$((TRIPS+1))
+      fi
+      if ! find src/__fixtures__ tests/fixtures __fixtures__ -type f 2>/dev/null | rg -q -i 'failure|reject|validation|error\.' ; then
+        echo "BLOCK: $f changed but no captured *-failure.* fixture found anywhere under __fixtures__/"
+        TRIPS=$((TRIPS+1))
+      fi
+      # Verify the test imports / readFileSync's at least one fixture, not just hand-written HTML.
+      test_f="${f%.ts}.test.ts"
+      if [ -f "$test_f" ] && ! rg -q 'readFileSync.*__fixtures__|import.*__fixtures__|loadFixture' "$test_f"; then
+        echo "BLOCK: $test_f exists but doesn't load any __fixtures__/ — synthetic-only tests can't catch heuristic drift"
+        TRIPS=$((TRIPS+1))
+      fi
+    fi
+  ;; esac
+done
+[ "$TRIPS" -gt 0 ] && echo "BLOCK: $TRIPS signal-extraction fixture violations — see ~/.claude/skills/shared/third-party-signal-fixtures.md"
+```
+
+Required to clear this gate:
+- For every modified file that parses a third-party response into `{ok, ...}`, there is at least one captured **real success** response and one captured **real failure** response in `__fixtures__/`.
+- A live-traffic probe under `tools/repro/<integration>-probe.{sh,mjs,py}` is checked in so the next agent can re-capture when the upstream drifts.
+- The test file `readFileSync`s the fixture or `import`s it — synthetic hand-written HTML alone is rejected.
+- The detector's distinguishing feature (anchored DOM id, JSON field, status code combination) is present in exactly one of the two fixtures, verified by `grep`.
+
+Reference incident (2026-05-27): every IBA-submitted SF DBI complaint was reported as `validation` error for ~10 days while the city actually recorded every one of them. `src/sfdbi.ts` `looksLikeEchoedForm = html.includes("Sub_Button0") && html.includes("CheckBox1")` matched the real success page too — DBI's "Thank you" response is the SAME `AddressData2.aspx` page with only `<span id="InfoReq1_lblError">` text changed. The pre-existing test used a 100-byte synthetic success fixture (`<html><body><h1>Thank you</h1>...`) that didn't contain `Sub_Button0`, so the bug never tripped in CI. See Pattern #23 (`error-handling-patterns.md`) and `~/.claude/skills/shared/third-party-signal-fixtures.md` for the generalized rule.
+
 **CSP Lesson (DocuSeal)**: Third-party embeds often load assets from CDNs/cloud storage, not their main domain. Trace actual resource URLs in browser network tab. DocuSeal serves document images from `*.s3.amazonaws.com`, not `docuseal.com`.
 
-**1b. CSP Third-Party Domain Audit (BLOCKING)**:
+**1c. CSP Third-Party Domain Audit (BLOCKING)**:
 
 Third-party services (Clerk, Brevo, DocuSeal, etc.) load images, scripts, and fonts from CDN domains that differ from their API domains. If these CDN domains aren't in the CSP, assets silently fail to load — resulting in broken icons, missing images, or invisible UI elements with no console errors.
 
@@ -274,4 +394,64 @@ grep -B15 "AuditActions" --include="*.ts" -r src/worker/ | \
 
 - Require explicit [CONFIRM CHECKLIST] to proceed
 - Store checklist for Phase 5 monitoring reminders
-- If no risky changes: Skip directly to Phase 2
+- If no risky changes: Skip directly to Phase 1.55
+
+---
+
+## Phase 1.55: HOT-PATH DATA-VOLUME & CACHE-TOPOLOGY GATE (BLOCKING when route handlers, crons, or caches changed)
+
+**Fires when the changeset touches:** any HTTP route handler, a `scheduled()` / cron body, a cache read (`KV.get`, `caches.match`, `readCached*`), a cache write/warm (`KV.put`, `caches.put`, `prewarm*`, `writeCached*`), or any SQL/D1 query. Skip only if the change is purely internal CLI / docs / tests with no route/cron/cache/query in the diff.
+
+**Why this gate exists (2026-05-12 incident):** `improvebayarea.com/dashboard/<city>` ran `coverageForCity()` — `SELECT MIN,MAX,COUNT(*),SUM(...) FROM reports WHERE city_id=?` — UNCONDITIONALLY before every render, just for a footer line + a path-decision gate. For San Francisco that `WHERE` matched **8,603,743 rows**; measured live: **7,970 ms / 8.6M rows_read per request**. Separately, the hourly "transparency cache" cron warmed `refreshCityReports`'s raw-rows KV keys — but the route reads `agg:<city>:<window>` first, which nothing warmed → every request paid a live ~8-statement D1 batch. Two distinct design bugs, both invisible to tsc/biome/tests. The fix took three round trips that this gate would have collapsed to zero.
+
+### Check A — Unbounded per-request work
+For every query/`fetch` that runs **before the response is sent** on a changed (or changed-cache-feeding) route:
+1. Is it bounded? — has a `LIMIT`, an indexed range scan, or a fixed-cardinality `GROUP BY` (≤ a few hundred buckets). OR is it served from a cache (KV/edge) with the live query only on a cold miss?
+2. If it's a `COUNT(*)` / `SUM(CASE...)` / `ORDER BY x LIMIT 1 OFFSET N/2` / any whole-partition aggregate over a `WHERE <partition_key> = ?` that can match a large/growing set — **measure it**:
+   ```bash
+   npx wrangler d1 execute <DB> --remote --json --command "<the exact query with a real param>" \
+     | python3 -c "import sys,json; r=json.load(sys.stdin)[0]; print('duration_ms:', r['meta']['duration'], 'rows_read:', r['meta']['rows_read'])"
+   ```
+   **BLOCK if `rows_read` > ~100,000 on a per-request path.** Fix: cache the result (it's a slow-changing aggregate), or drop it, or scope it to the window.
+3. **Run-before-cache-check trap:** if the route does `const x = await expensiveThing(); ... const cached = await readCache(); if (cached) return render(cached, x);` — `expensiveThing()` runs even on a cache HIT. Either fold its output into the cached payload, or move it after the cache check, or cache it separately.
+
+### Check B — Cache topology (reader ↔ writer must match)
+1. For every `readCached*` / `KV.get(key)` / `caches.match(url)` introduced or in the changed route — `grep` the codebase for who **writes** that exact key/URL. If nothing writes it (or only an out-of-band manual script does, with no cron), it's a permanent cache MISS in production → the route always pays the cold path. **BLOCK.**
+2. For every `prewarm*` / cache-warming cron step — `grep` for who **reads** the keys it writes. A warmer that warms keys nothing reads (or warms a *different* key shape than the route reads — `oak311:open_data:...` vs `agg:...`) is dead work and a latent perf bug. **BLOCK.**
+3. Cache-warmer must run **after** the data it depends on lands (e.g. `prewarmAggregates` after `fetchDelta`, not before/in-parallel).
+4. Cron-written cache keys get a TTL (self-heals a broken cron); manually-seeded keys that the cron must not clobber stay TTL-less and on a disjoint key space.
+
+### Check C — Lagged-source trailing windows
+If a changed query filters `WHERE ts >= now() - <interval>` against a source that publishes with a lag (DataSF/Socrata, batch ETL, anything not real-time), the trailing-N window can be **empty by construction**. Anchor on `MAX(ts)` instead (`WHERE ts >= (SELECT MAX(ts) ... ) - <interval>`) and label it honestly ("latest N of *published* data"). Verify against the live source's `MAX(ts)`.
+
+### Check D — TEXT timestamp index sanity
+If a query does a range scan on a TEXT `created_at`/`ts` column, confirm the stored format and the comparison literal sort lexically the same (e.g. both ISO-with-`Z`, or both floating-no-`Z`). A mismatch (`'2026-05-04T12:00:00.000'` stored vs `'2026-05-04T12:00:00.123Z'` queried) either returns wrong rows or defeats the index. `EXPLAIN QUERY PLAN` should show `USING INDEX`, not `SCAN`.
+
+**Output:** if any check BLOCKs, fix inline before Phase 2 (it's a perf/correctness bug, not a nit). If all pass, one line: `-- Phase 1.55 OK: N route(s)/cron(s)/cache(s) audited, max rows_read=<n>, cache topology consistent --`.
+
+---
+
+## Phase 1.56: D1 SCHEMA-DRIFT / MIGRATION-APPLIED-TO-PROD GATE (BLOCKING when a D1 write column set or a migration file changed)
+
+**Fires when** the diff touches any D1 `INSERT INTO`/`UPDATE … SET`/`SELECT` column set, adds/edits a `migrations/*.sql` file, or references a new column/table. Skip only for diffs with no D1 write or migration change.
+
+**Why (2026-07-05 reference incident):** AIVA `POST /api/intake` 500'd for *every* user. The worker code + Zod schema referenced `mos`, `migrations/25_add_mos_to_intake.sql` existed in the repo, but the column was **never applied to the remote D1** (the team applied later migrations ad-hoc via direct `execute`; the `d1_migrations` tracker only recorded 1–9). The write threw `D1_ERROR: no such column: mos`, surfaced only as Hono's generic "Internal Server Error" with no server log. **A migration FILE existing — and the LOCAL D1 having the column — are NOT proof the column is in prod. Only the remote `PRAGMA table_info` is.**
+
+**Run the automated gate (it does both checks):**
+```bash
+~/.claude/skills/shared/tools/d1-schema-drift-check.sh <repo-dir> [<d1-name-or-id>]
+# exit 0 = clean · 1 = drift (BLOCK) · 2 = setup error
+```
+
+- **Check A — tracker clean:** `wrangler d1 migrations list --remote` must say "No migrations to apply". Unapplied entries = drift (genuinely un-run, or a stale tracker that will re-run on the next `apply`).
+- **Check B — columns exist in prod:** every column in a changed `INSERT INTO t (…)` / `UPDATE t SET …` must appear in that table's remote `PRAGMA table_info`. A code-column-not-in-prod is exactly the outage above → the script exits 1 naming the table + column.
+
+**BLOCK and fix BEFORE the code deploys:**
+1. Apply ONLY the genuinely-missing DDL to remote, additively: `ALTER TABLE t ADD COLUMN c …` / `CREATE TABLE IF NOT EXISTS …`. Confirm with `PRAGMA table_info(t)` on `--remote`.
+2. Reconcile the tracker so a future `apply` skips it: `INSERT OR IGNORE INTO d1_migrations (name) VALUES ('<file>.sql');`.
+3. **NEVER run `wrangler d1 migrations apply` to catch up a drifted DB.** Migrations authored as non-idempotent data transforms corrupt data on re-run (AIVA `16_add_records_request_step.sql` does `UPDATE steps SET order_index = order_index + 1 WHERE order_index >= 3` — a double-run double-shifts every user's step order); bare `CREATE`/`ALTER` (no `IF NOT EXISTS`) error on existing objects. Diff object-by-object vs remote and apply only what's missing.
+4. Confirm the changed write handler wraps its `.run()` in try/catch that logs `sanitizeError(err)` and returns clean JSON (ties to Phase 1.57) — so the next drift is diagnosable, not a silent generic 500.
+
+Full pattern (detect + fix + instrument): `~/.claude/skills/shared/d1-schema-drift.md`.
+
+**Output:** BLOCK if the script exits non-zero; fix prod schema + reconcile inline, re-run until it exits 0. On pass: `-- Phase 1.56 OK: D1 schema in sync — N write-target table(s) verified vs remote PRAGMA, migrations tracker clean --`.

@@ -35,6 +35,32 @@ If the user is in an existing repo, **match what's already there**. Don't introd
 
 ---
 
+## Full-page HTML files: document order
+
+When writing a single self-contained HTML file (vanilla static page, design-system demo, one-shot prototype), use **`<body>` → `<script>` → `<style>`** order. NOT the traditional `<head><style><script></head><body>`.
+
+```html
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>...</title>
+
+<body>
+  <!-- All content here, first. -->
+</body>
+
+<script>/* behavior, after body */</script>
+<style>/* all CSS, last */</style>
+</html>
+```
+
+Why: dramatically improves generation quality — body content gets written first, so scripts and styles are scoped to what's actually on the page instead of being scaffolded against an empty body. Browsers reparse trailing `<style>`/`<script>` into the head correctly; CSS matching is order-agnostic. Do not "fix" generated files back to the standard layout.
+
+This applies to single-file HTML deliverables. Framework components (React/Vue/Svelte/Astro) keep their normal structure — the framework owns the document shell.
+
+---
+
 ## Typography Implementation
 
 From `aesthetic-core.md`'s direction: pair **display + body** fonts.
@@ -160,11 +186,70 @@ If the user has NO library installed: don't add one for a small page. Hand-write
 
 ---
 
+## Device-Frame Previews — render at REAL device width, then scale-to-fit (MANDATORY)
+
+When showing an app/site inside a phone (or tablet/laptop) mockup frame — a showcase of "every screen," a landing-page device shot, an `<iframe>` preview — **never let the embedded page render at the frame's narrow CSS width.** A mobile layout designed for ~390px, rendered into a ~240px iframe, overflows, wraps weirdly, and looks broken ("not formatted within the frame"). This bit the SUSU mockup (2026-06-17): Dashboard/Activity/Loans overflowed because the iframe was the bezel width.
+
+**The fix — the standard product-shot technique:** render the inner page at a true device resolution and visually shrink it with a CSS transform.
+
+```css
+/* Frame inner = the visible window cut into the bezel. Clip with overflow:hidden. */
+.phone-inner { width: 244px; height: 560px; overflow: hidden; border-radius: 32px; }
+/* The iframe renders at a REAL phone width (390px logical) and a tall virtual height,
+   then scales down to fit. scale = innerWidth / 390.  244/390 = 0.626.
+   virtual height = visibleHeight / scale  →  560 / 0.626 ≈ 895. */
+.phone-screen {
+  width: 390px; height: 895px; border: 0;
+  transform: scale(0.626); transform-origin: top left;
+  pointer-events: none; /* preview only; the wrapping <a> opens it full-size */
+}
+```
+
+Geometry recipe for any frame size: pick a real device logical width `D` (390 iPhone, 393 Pixel, 430 Pro Max, 768 iPad). `scale = innerW / D`. `iframeHeight = visibleH / scale`. The iframe's layout box stays `D × iframeHeight`; `overflow:hidden` on the parent clips it; the transform shows it at `innerW × visibleH`.
+
+**Two traps that ride along (both hit SUSU):**
+1. **Scrollbar inside every frame.** A fixed-height iframe whose content is taller shows a scrollbar. Add `scrolling="no"` to preview iframes (they're non-interactive anyway), and for the real app give the scroll root `scrollbar-width:none` + `::-webkit-scrollbar{display:none}` (mobile apps show no persistent bar; content still scrolls).
+2. **`<span>` styled as a block collapses to 0×0.** If you refactor a device frame's notch/bezel from `<div>` to `<span>`, set `display:block` (or absolute) — inline elements ignore `width`/`height`, so the notch silently vanishes.
+
+**Verify in a real browser, not source:** load the page and eval, per frame, `iframe.contentWindow.innerWidth === D` (renders at device width) and `documentElement.scrollWidth <= clientWidth` (no horizontal overflow). Screenshot to confirm the screens sit cleanly inside the bezels.
+
+---
+
+## Deterministic Anti-Pattern Scan (run before declaring done)
+
+After writing the code, run [Impeccable](https://github.com/pbakaus/impeccable)'s CLI scanner. No API key, no LLM round-trip — it's regex + jsdom checking 27 specific patterns (side-stripe borders, gradient text, overused fonts, gray-on-color contrast, pure black/white, nested cards, bounce easing, tiny body text, small touch targets, layout-property animations, etc.). Catches things you'd otherwise notice on a second look.
+
+```bash
+# Scan files / dirs (HTML, CSS, JSX, TSX, Vue, Svelte)
+npx impeccable detect src/
+
+# Scan a deployed URL (uses Puppeteer)
+npx impeccable detect https://your-preview-url
+
+# Faster regex-only mode (skips jsdom)
+npx impeccable detect --fast src/
+
+# JSON output for CI
+npx impeccable detect --json src/
+```
+
+Exit code `0` = clean. Exit code `2` = anti-patterns detected — read the findings and decide whether to rework or whether the violation is deliberate for the direction (e.g. brutalist intentionally uses pure `#000`). Document deliberate violations inline so the next pass doesn't "fix" them.
+
+If `npx` isn't available or scanning fails: don't block, but note it in the handoff so the user can run it manually.
+
+---
+
 ## Final Checklist Before Calling Done
 
 - [ ] Phase 0 direction is visible in the output — not just "I tried"
 - [ ] Anti-slop banlist clear: no Inter/Roboto/Arial unless deliberate, no purple-on-white, no shadcn defaults
+- [ ] Absolute Bans clean (see `aesthetic-core.md` → Absolute Bans): no side-stripe borders, no gradient text, no decorative glassmorphism, no hero-metric template, no identical card grids, no modal-first
+- [ ] Color uses OKLCH (not raw hex), neutrals tinted (no pure `#000`/`#fff`)
+- [ ] Theme choice (dark vs light) backed by a one-sentence scene, not category reflex
+- [ ] AI slop test passes both first-order (theme not guessable from category) and second-order (aesthetic not guessable from category + anti-reference)
+- [ ] `npx impeccable detect` run on the output — clean, or deliberate violations annotated
 - [ ] Real working code, no TODOs, no placeholders, no commented-out blocks
-- [ ] Motion is orchestrated, not scattered
+- [ ] Motion is orchestrated, not scattered; no bounce/elastic; no animating layout properties
 - [ ] Contrast passes AA; reduced-motion respected; focus states visible
+- [ ] Any device-frame/iframe preview renders the inner page at a REAL device width (e.g. 390px) and scales-to-fit — never at the cramped bezel width; no scrollbar in the frame; verified in-browser (innerWidth === device width, no horizontal overflow)
 - [ ] If in an existing repo: framework + conventions + import style match the surrounding code

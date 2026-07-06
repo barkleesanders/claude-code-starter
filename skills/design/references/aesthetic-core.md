@@ -47,10 +47,17 @@ Once direction is locked, every decision below must serve it.
 - Use real type-scale ratios (1.25 / 1.333 / 1.5 / golden), not arbitrary px jumps.
 
 ### 2. Color & Theme
-- **CSS variables** for every color. No raw hex in component code.
-- **Dominant + sharp accent** beats evenly-distributed palettes every time. 60-30-10 is the floor, not the ceiling.
+- **Use OKLCH, not hex/rgb/hsl.** OKLCH gives perceptually uniform lightness — `oklch(0.6 0.15 250)` reads the same brightness as `oklch(0.6 0.15 30)`. Hex doesn't. Reduce chroma as lightness approaches 0 or 100; high chroma at extremes looks garish.
+- **Never `#000` or `#fff` raw.** Tint every neutral toward the brand hue (chroma 0.005–0.01 is enough). Pure black/white reads as undesigned default.
+- **CSS variables** for every color. No raw color values in component code.
+- **Pick a color strategy** before picking colors. Four steps on the commitment axis:
+  - **Restrained** — tinted neutrals + one accent ≤10%. Product default; brand minimalism.
+  - **Committed** — one saturated color carries 30–60% of the surface. Brand default for identity-driven pages.
+  - **Full palette** — 3–4 named roles, each used deliberately. Brand campaigns; product data viz.
+  - **Drenched** — the surface IS the color. Brand heroes, campaign pages.
+  - The "60-30-10 / one accent ≤10%" rule applies to **Restrained only**. Committed / Full palette / Drenched exceed it on purpose. Don't collapse every design to Restrained by reflex.
 - Pick a *temperature* (warm or cool) and stick to it. Mixed-temperature palettes look accidental.
-- Vary light vs. dark across generations — don't default to dark mode every time.
+- **Dark vs light is never a default.** Not dark "because tools look cool dark." Not light "to be safe." Before choosing, write **one sentence of physical scene**: who uses this, where, under what ambient light, in what mood. If the sentence doesn't force the answer, it's not concrete enough — add detail until it does. *"Observability dashboard"* does not force an answer. *"SRE glancing at incident severity on a 27-inch monitor at 2am in a dim room"* does. Run the sentence, not the category.
 
 ### 3. Motion
 - **One well-orchestrated page load with staggered reveals** beats twenty scattered micro-interactions.
@@ -80,6 +87,29 @@ Once direction is locked, every decision below must serve it.
 | **Generic copy** | "Build better, faster." "The all-in-one platform." "Designed for teams." "Powered by AI." | If you'd find it on twenty other landing pages, rewrite it. |
 
 When you catch yourself reaching for one of these, **stop and pick the deliberate opposite** — that's where the design lives.
+
+---
+
+## Absolute Bans (match-and-refuse)
+
+These are visual patterns that are never intentional. If you're about to write any of them, rewrite the element with different structure. Adapted from [Impeccable](https://github.com/pbakaus/impeccable).
+
+- **Side-stripe borders.** `border-left` / `border-right` greater than 1px used as a colored accent on cards, list items, callouts, or alerts. Rewrite with full borders, background tints, leading numbers/icons, or nothing.
+- **Gradient text.** `background-clip: text` combined with a gradient background. Decorative, never meaningful. Use a single solid color. Emphasis via weight or size.
+- **Glassmorphism as default.** Blurs and frosted-glass cards used decoratively. Rare and purposeful, or nothing.
+- **The hero-metric template.** Big number, small label, supporting stats, gradient accent. SaaS cliché.
+- **Identical card grids.** Same-sized cards with icon + heading + text, repeated 3×, 4×, 6× endlessly.
+- **Modal as first thought.** Modals are usually laziness. Exhaust inline / progressive alternatives first.
+- **No em dashes in UI copy.** Use commas, colons, semicolons, periods, or parentheses. Also not `--`.
+
+---
+
+## The AI Slop Test (two altitudes)
+
+If someone could look at the interface and say "AI made that" without doubt, it failed. Run **both** checks:
+
+- **First-order:** could someone guess the theme + palette from the category alone? *"observability → dark blue"*, *"healthcare → white + teal"*, *"finance → navy + gold"*, *"crypto → neon on black"*. If yes, that's the first training-data reflex. Rework the scene sentence and color strategy until the answer isn't obvious from the domain.
+- **Second-order:** could someone guess the aesthetic family from category-plus-anti-reference? *"AI workflow tool that's not SaaS-cream → editorial-typographic"*, *"fintech that's not navy-and-gold → terminal-native dark mode"*. That's the trap one tier deeper — the first reflex was avoided, the second wasn't. Rework until **both** answers are not obvious.
 
 ---
 

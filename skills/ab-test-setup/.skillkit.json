@@ -1,0 +1,10 @@
+{
+  "name": "ab-test-setup",
+  "description": "",
+  "source": "coreyhaines31/marketingskills",
+  "sourceType": "github",
+  "subpath": "ab-test-setup",
+  "installedAt": "2026-04-28T22:49:48.647Z",
+  "enabled": true,
+  "checksum": "f0ec8a14d24834da"
+}

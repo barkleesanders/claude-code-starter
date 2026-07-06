@@ -2,6 +2,10 @@
 
 The shared chrome that every magazine output uses. Read once per conversation; reuse across all spreads.
 
+## Document order (MANDATORY — read first)
+
+Magazine HTML uses **`<body>` → `<script>` → `<style>`** order, NOT the traditional `<head>` layout. See the "Document skeleton" section in `SKILL.md` for the full template. Everything in this file (body shell CSS, spread CSS, masthead CSS, colophon CSS) goes inside the single trailing `<style>` block at the END of the document — after `</body>` and after `<script>`. Do not split CSS into the head.
+
 ## Fonts (always load)
 
 ```html

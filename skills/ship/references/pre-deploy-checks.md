@@ -61,7 +61,54 @@ Covers Phase -1 (repository context verification), Phase -0 (merge conflict reso
    - If no upstream: Offer options to set upstream or continue without
    - If upstream exists: Check ahead/behind status
 
-8. **Display Repository Summary** with all verification results before proceeding to Phase -0
+8. **Auto-Deploy Surface — detect & DISPLAY (MANDATORY — added 2026-06-25)**:
+   **Purpose**: tell the user, up front, whether a push to the production branch **auto-deploys**, and whether this checkout is safe to deploy from. **Verify — never assert** the deploy path (the 2026-06-25 session asserted a CF Workers-Builds auto-deploy that did NOT exist; ground-truth showed exampleapp has no platform auto-deploy and ships via manual CLI `wrangler deploy`).
+   - **GitHub Actions:** read **`origin/main`**, not the local checkout (a behind worktree shows stale/deleted workflows). `git fetch -q origin; for f in $(git ls-tree -r --name-only origin/main .github/workflows/); do git show "origin/main:$f" | grep -qiE 'wrangler-action|pages-action|wrangler (deploy|pages)|CLOUDFLARE_API_TOKEN|command:\s*(deploy|pages)|run deploy|vercel|netlify deploy|actions/deploy-pages' && echo "$f"; done` then confirm a hit's `on:`/`branches:` includes the prod branch. Cross-check empirically with `gh workflow list` + `gh run list --limit 10` (a `workflow_run: ["Deploy"]` ref can be orphaned).
+   - **Cloudflare Pages / Workers Builds (query the API):** with `~/.cloudflared/cf-global-api-key.json`. **Match the prod DOMAIN, not a project name** (red-herring `*.pages.dev` projects exist). Pages auto-deploys only if `GET .../pages/projects/<name>` shows `source.type` github/gitlab + a `production_branch` (null `source`/`ad_hoc` = not auto). Workers Builds: live worker's latest version annotation `workers/triggered_by` == `build` (Build) vs `version_upload` (plain `wrangler deploy`); `builds/triggers` 404 ⇒ no Build.
+   - **Blind spot:** these find only *platform* auto-deploy. Manual/CLI `wrangler deploy` or an off-platform cron can ship `main` invisibly to the APIs. "No auto-deploy detected" = the push won't itself deploy; it does NOT mean main is decoupled from prod. If unsure, ASK the user.
+   - **Vercel** (`.vercel/project.json`) / **Netlify** (`netlify.toml` + linked site) / other CI (Render/Fly/Railway/Amplify) with a prod-branch deploy hook.
+   - **Stale-checkout guard:** `git fetch -q origin && git rev-list --left-right --count origin/<prodbranch>...HEAD` — if HEAD is **BEHIND** origin's prod branch, deploying from here would **REGRESS production**. **STOP** and require deploying from a current checkout (the 375-commits-behind worktree trap, 2026-06-25).
+   - **DISPLAY** a banner before proceeding, e.g.:
+     ```
+     AUTO-DEPLOY: ⚠️ YES — <mechanism> deploys <branch> on push (a push to <branch> = a prod deploy)
+                  — or —  none detected — deploy is manual (this skill performs it)
+     CHECKOUT:    ✅ current with origin/<branch>   — or —  ⛔ BEHIND by N commits → DO NOT deploy from here
+     ```
+   - If AUTO-DEPLOY is YES, make sure the user understands a push itself ships. If CHECKOUT is BEHIND, **STOP** (do not deploy stale code).
+
+9. **Display Repository Summary** with all verification results before proceeding to Phase -0
+
+---
+
+## Phase -0.5: WORKTREE SAFETY GATE (MANDATORY — 2026-05-10)
+
+**Purpose**: Never deploy work that exists only on a local worktree branch with no remote backup. Prevents the silent-loss class that wiped the trust pages on 2026-05-10.
+
+**When this fires**: ALWAYS, even on the main checkout. The check is fast (sub-second) and is no-op when there's nothing at risk.
+
+**Logic**:
+
+1. Walk every worktree via `git worktree list --porcelain`.
+2. For each non-main worktree, check:
+   - `git status --porcelain` — uncommitted changes
+   - `git rev-list --count @{u}..HEAD` — commits ahead of upstream
+   - Branch has no upstream → all commits are local-only
+3. If ANY worktree has uncommitted or unpushed work:
+   - **BLOCK** the deploy
+   - List each worktree + its specific risk
+   - Print the recovery commands the user / agent should run
+
+**Recovery (per worktree)**:
+```bash
+cd <worktree-path>
+git status                                    # confirm what's loose
+git add -A && git commit -m "wip: pre-ship snapshot"   # if dirty
+git push -u origin HEAD                       # always
+```
+
+**Override**: `--allow-unpushed-worktree` flag, plus the destructive-op env override `CLAUDE_ALLOW_WORKTREE_LOSS=1` for the post-deploy cleanup commands. Both are logged to the audit trail.
+
+**Trusts the hooks but verifies**: the `post-bash-worktree-autopush.sh` PostToolUse hook should have already pushed every commit. This phase is the last line of defense — if it fires, something failed silently (network, auth, conflict) and `~/.claude/logs/worktree-autopush.log` will explain.
 
 ---
 
@@ -109,3 +156,27 @@ Covers Phase -1 (repository context verification), Phase -0 (merge conflict reso
     - 20+ deployments: CRITICAL - **BLOCK** deployment
   - If rate limited: Display bypass URL, estimated wait time, offer --force-override
 - If not Vercel project: Skip to Phase 1
+
+
+## Remote CLI / agent-runtime deploy verification (Mac mini · Hermes · launchd) — MANDATORY (2026-06-19)
+
+When a deploy installs a CLI/tool/script on a **remote runner** (Mac mini, Hermes host) for
+unattended/agent use, "files copied" is NOT "works on the runner". Before declaring done:
+
+1. **Pin absolute interpreter paths** in the shim AND the launchd plist / Hermes script —
+   non-interactive ssh, launchd, and cron run with a bare PATH (no Homebrew, no `~/.local/bin`); a
+   `#!/usr/bin/env node` shebang fails there. Put node at `/opt/homebrew/bin/node`; set plist `PATH`.
+2. **Verify via the REAL invocation path, not an interactive shell.** Run the actual launchd-/Hermes-
+   invoked command: `launchctl kickstart gui/$(id -u)/<job>` then read the log;
+   `hermes cron list`/run the tracker script directly; `ssh host 'PATH=… <tool> --json'`. Confirm real
+   output (live data), exit code, and that the job appears loaded.
+3. **A `which`/`grep` over `ssh host 'cmd'` (BatchMode) false-negatives** (bare PATH) — never conclude
+   "not installed / job missing" from it; probe absolute paths. (See the matching blind-spots entry.)
+4. **Secrets / session state**: gitignore captured cookies/tokens; give the remote a refresh path
+   (a capture host pushes fresh state; a keepalive timer keeps a session warm). Split work per the
+   cron-routing rule: deterministic ping → launchd timer; interpret-and-notify → Hermes cron
+   (`--no-agent --deliver origin`).
+
+Reference incident: 2026-06-19 caltrans-pra → mac-mini — node + hermes both "not found" via BatchMode
+ssh but present; verified only after running the real launchd keepalive (HTTP 200 log) + `hermes cron
+list` with an explicit PATH + the tracker script (rc=0, state written with live request data).

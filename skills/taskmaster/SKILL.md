@@ -62,3 +62,31 @@ The hook must be registered in `~/.claude/settings.json`:
 To temporarily disable, either:
 - Remove or comment out the Stop hook in `~/.claude/settings.json`
 - Set `TASKMASTER_MAX=1` to allow only one continuation check
+
+## Lighter Alternative: `/goal` (Claude Code 2.1.139+)
+
+For one-shot autonomous loops where you don't need taskmaster's full
+plan + task list + beads + worktree + AI-verify gating, use the built-in
+`/goal` command instead:
+
+```
+/goal all CI checks green and all worktrees pushed
+```
+
+`/goal` sets a single completion condition and Claude keeps working across
+turns until it's met. Useful when:
+
+- You want a *specific* exit criterion, not "no incomplete signals"
+- The work is bounded (one feature, one bug, one cleanup) and beads/worktree
+  state doesn't matter
+- You want the agent to stop the moment the goal is met, even if other
+  in_progress beads exist
+
+Use **taskmaster** (this skill, always-on Stop hook) when:
+
+- Multi-step plans, multiple beads, multiple worktrees in flight
+- You want adjacent-safety gating (WORKTREE_BLOCK, AI_VERIFY_BLOCK, BEADS_BLOCK)
+- The "done" condition is fuzzy ("ship the feature properly")
+
+The two compose: a `/goal` session still runs through taskmaster's Stop hook,
+so worktree/AI-verify safety still applies even when goal-driven.
