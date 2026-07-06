@@ -112,6 +112,26 @@ git push -u origin HEAD                       # always
 
 ---
 
+## Phase -0.4: WORKERS CACHE SAFETY GATE (MANDATORY for CF Workers — added 2026-07-06)
+
+**Purpose**: A Worker with `cache.enabled: true` (the [Workers Cache](https://developers.cloudflare.com/workers/cache/configuration/) feature) must be enabled *correctly and safely* before it ships. The dangerous class: Workers Cache **heuristically caches any `200` response with no `Cache-Control` for 2 hours** — so a cookie/session-authed GET returning `200` with no `Set-Cookie` and no `Cache-Control` on that response gets cached and served **cross-user** (data leak). The 2026-07-06 audit nearly blanket-enabled it on AIVA (135 Clerk-cookie-authed no-header GET routes) — the gate exists to stop exactly that.
+
+**When this fires**: any repo whose wrangler config sets `cache.enabled: true`. No-op otherwise.
+
+**Run**: `~/.claude/skills/ship/tools/workers-cache-check.sh <repo-dir>` — checks:
+1. `cache.enabled` is actually true (skips cleanly if absent/false).
+2. **wrangler ≥ 4.69** — below that the flag is silently IGNORED at deploy (feature inert). WARN.
+3. Only `enabled` / `cross_version_cache` keys under `cache` (others → wrangler validation error). BLOCK.
+4. **The leak class**: if a cookie/session **auth surface** exists (`getAuth`/`clerk`/`getCookie`/`session*`/`userId`…) AND there is **no global `no-store` default** (a middleware defaulting responses to `no-store`, or the per-entrypoint gateway pattern), it **BLOCKS** (exit 2). Fix = default every response to `Cache-Control: private, no-store` and have public routes explicitly opt in to `public, max-age=…` (reference: `improvebayarea/src/cache_headers.ts`), or disable cache on the `default` entrypoint via the `exports` map.
+
+**Re-verify against LIVE docs (do not trust the cached assumptions in the script)**: `WebFetch https://developers.cloudflare.com/workers/cache/configuration/` and confirm the min wrangler version, the "no-Cache-Control ⇒ heuristically cached" rule, and the allowed `cache` keys still hold. The config surface is new (shipped 2026-07) and may change.
+
+**Full pattern + safe-enable recipe:** `~/.claude/skills/shared/workers-cache-safety.md` (shared with /carmack and /debug).
+
+**BLOCK on exit 2.** Override only with explicit user acknowledgement that no cookie-authed route can return an uncacheable-but-unmarked `200`.
+
+---
+
 ## Phase -0: MERGE CONFLICT AUTO-RESOLUTION
 
 **Purpose**: Ensure the working tree is conflict-free, validated, and committed before linting or testing begins.
