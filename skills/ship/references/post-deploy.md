@@ -1,12 +1,46 @@
 # Post-Deploy Verification & Monitoring
 
-Covers Phase 4.1 (post-deploy verification), Phase 4.2 (multi-agent code review), Phase 4.3 (web performance audit), Phase 4.35 (visual regression check), Phase 4.5 (rollback), Phase 4.6 (CI gate), Phase 5 (monitoring), and Phase 6 (PR babysitter).
+Covers Phase 4.08 (Workers-Cache post-deploy verification), Phase 4.1 (post-deploy verification), Phase 4.2 (multi-agent code review), Phase 4.3 (web performance audit), Phase 4.35 (visual regression check), Phase 4.5 (rollback), Phase 4.6 (CI gate), Phase 5 (monitoring), and Phase 6 (PR babysitter).
+
+---
+
+## Phase 4.08: WORKERS-CACHE POST-DEPLOY VERIFICATION (BLOCKING — added 2026-07-06)
+
+**Fires when**: the deployed changeset enables or modifies the wrangler `cache` block (`"cache": { "enabled": … }`). Full pattern: `~/.claude/skills/shared/workers-cache-safety.md`.
+
+**Why**: enabling Workers Cache changes the runtime's request presentation — the cache front-layer hands the Worker `http://` in `request.url` for HTTPS visitors (`cf-visitor` stays `{"scheme":"https"}`). On 2026-07-06 this 301-looped example.com sitewide for ~25 min (zone analytics: 301s 0–5/hr → 120 → 439/hr). Triage was slowed by a propagation false-negative: a 3-second post-disable curl said "didn't fix it" and triggered an unnecessary rollback — engage/disengage takes >30s to propagate.
+
+**Protocol**:
+1. **Staged enable** — if the diff changes worker code AND newly enables cache: deploy code with `cache.enabled: false` first, verify healthy, then flip the flag in a second deploy. Never combine an untested code change with the first cache-enable.
+2. **Monitoring window** — at t+15s, t+45s, t+90s after the enable deploy:
+   ```bash
+   for p in "/" "/<html-page>" "/<json-api>" "/<public-asset>"; do
+     curl -s -o /dev/null -w "$p -> %{http_code}\n" "https://<domain>$p?r=$RANDOM"
+   done
+   ```
+   All expected 200s. A <60s check proves NOTHING in either direction.
+3. **Semantic header checks** (per route class):
+   ```bash
+   curl -sI "https://<domain>/<json-api>" | grep -iE "^(cache-control|cf-cache-status):"   # authed/dynamic → private, no-store
+   curl -sI "https://<domain>/<public-asset>" | grep -i cache-control                        # keeps its public, max-age opt-in
+   curl -sI "https://<domain>/" | grep -i strict-transport                                   # HSTS present (the http:// presentation silently drops url.protocol-gated HSTS)
+   ```
+4. **Sitewide-3xx tripwire** — if ANY route 301/302s to its own URL: **immediately** redeploy with `cache.enabled: false`, wait ≥60s, re-verify, then diagnose:
+   ```bash
+   (timeout 20 npx wrangler tail --format json > /tmp/tail.json &); sleep 8
+   curl -s -o /dev/null "https://<domain>/?tailprobe=$(date +%s)"; sleep 9
+   grep -oE '"url": "https?://[^"]*tailprobe[^"]*"' /tmp/tail.json
+   ```
+   `http://` for an HTTPS probe = the scheme-presentation class → fix the middleware with the cf-visitor pattern (`visitorIsHttps()`, reference: AIVA `src/worker/middleware/securityHeaders.ts`), never `url.protocol`.
+5. Re-enable only after the fix is deployed and step 2–3 pass clean.
 
 ---
 
 ## Phase 4.1: POST-DEPLOY VERIFICATION
 
 **Purpose**: Verify production deployment serves correct content after deploy.
+
+**Multi-signal battery (fast first pass):** run `~/.claude/skills/ship/tools/fleet-verify.sh <name> <url>` (or `--list <file>` for a whole fleet) — one line per URL with HTTP status · Cache-Control · cf-cache-status · HSTS · CSP · rendered-DOM literal count · static h1 count · og:image · security.txt status. Grep the output for `FAIL:` markers (non-200 or a rendered `undefined`/`NaN`/`[object Object]`/`Invalid Date`). Two caveats baked into the tool: (1) its cache-buster joins `?`/`&` safely so a bare URL never becomes `/&x=…` (the 2026-07-06 false-404 sweep bug); (2) its h1 count is STATIC and includes inert `<template>` content — a `>1` is a "confirm with a live-DOM `querySelectorAll('h1').length`" flag, not an automatic fail (xbox-nxe: static 5, runtime 1). Then proceed to the content-specific checks below.
 
 ### Part 0: Chrome CDP Live Screenshot (if available)
 

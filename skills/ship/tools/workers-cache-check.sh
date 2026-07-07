@@ -118,6 +118,39 @@ else
   echo "  ✅ no cookie/session auth surface detected — public content; heuristic caching is acceptable."
 fi
 
+# --- 3b. REDIRECT-LOOP CLASS: request-scheme sniffing (2026-07-06 AIVA outage) ---
+# With cache.enabled, the cache front-layer presents http:// in request.url for
+# HTTPS visitors (cf-visitor stays https). Any middleware that sniffs the
+# REQUEST url's protocol to force https will 301 every request to itself —
+# sitewide infinite redirect loop (exampleapp down 21:44Z-22:10Z). Detection:
+# a file that builds a URL from the request AND checks protocol === "http".
+# Input-URL validators (new URL(userString) + protocol check) are fine.
+loopfiles=$(grep -rlE "new URL\((c\.req\.url|request\.url)\)" "$SRC" --include='*.ts' --include='*.tsx' --include='*.js' 2>/dev/null | grep -viE 'node_modules|/dist/|\.test\.')
+for lf in $loopfiles; do
+  if grep -qE 'protocol === "http:"|protocol==="http:"' "$lf" && ! grep -q "cf-visitor" "$lf"; then
+    echo "  ❌ BLOCK: $lf sniffs the REQUEST scheme via url.protocol without consulting cf-visitor."
+    echo "     Under Workers Cache the runtime presents http:// for HTTPS visitors → this middleware"
+    echo "     will 301 every request to its own URL (sitewide redirect loop — 2026-07-06 AIVA outage)."
+    echo "     Fix: derive the client scheme from the cf-visitor header ({\"scheme\":\"https\"}) and use"
+    echo "     url.protocol only as a local-dev fallback. Reference: AIVA visitorIsHttps() in"
+    echo "     src/worker/middleware/securityHeaders.ts."
+    RC=2
+  fi
+done
+
+# --- 3c. HSTS-DROP CLASS: HSTS (or any behavior) gated on the REQUEST url's https protocol ---
+# Same http:// presentation as 3b: `if (url.protocol === "https:")` around HSTS never fires
+# under the cache layer → HSTS silently dropped sitewide (found live on AIVA 2026-07-06).
+# WARN not BLOCK — degrades security posture, doesn't take the site down.
+for lf in $loopfiles; do
+  if grep -qE 'protocol === "https:"|protocol==="https:"' "$lf" && ! grep -q "cf-visitor" "$lf"; then
+    echo "  ⚠️  WARN: $lf gates behavior on url.protocol === \"https:\" without consulting cf-visitor."
+    echo "     Under Workers Cache the runtime presents http:// for HTTPS visitors → this branch"
+    echo "     (typically HSTS) silently never fires. Fix: derive the scheme from cf-visitor"
+    echo "     (visitorIsHttps() — AIVA src/worker/middleware/securityHeaders.ts)."
+  fi
+done
+
 # --- 4. re-verify against LIVE docs (the config surface can change) ---
 echo "  ↳ RE-VERIFY at ship time (do NOT trust this script's assumptions): WebFetch"
 echo "     https://developers.cloudflare.com/workers/cache/configuration/ and confirm: (a) min wrangler,"

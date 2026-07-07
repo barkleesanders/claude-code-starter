@@ -1,10 +1,26 @@
 #!/usr/bin/env bash
 # cf-security-insights.sh — triage + safe auto-fix for Cloudflare Security Center "Insights".
 #
-# Applies the 3 REAL, zero-perf-cost fixes account-wide:
-#   1. Block AI bots      (bot_management.ai_bots_protection = "block")
-#   2. AI Labyrinth       (bot_management.crawler_protection = "enabled")
-#   3. security.txt       (security-center/securitytxt, served at edge)
+# Applies the REAL, zero-perf-cost fixes account-wide:
+#   1. security.txt       (security-center/securitytxt, served at edge)
+#   2. Worker preview hostnames OFF (subdomain.previews_enabled=false, EVERY worker) —
+#      (2)+ detail below.
+#
+# NO LONGER auto-applied (user directive 2026-07-07): Block-AI-bots
+# (ai_bots_protection) and AI Labyrinth (crawler_protection). AI bots must reach the
+# sites for AI/LLM SEO in the user's "new AI work"; both settings hurt that. They are
+# now REPORT-ONLY here and are NEVER written. For the zone/DNS security layer (DNSSEC,
+# Free WAF Managed Ruleset, Leaked-Credential detection, CAA) run the companion
+# ~/.claude/skills/carmack/tools/cf-account-harden.py (DRY_RUN=1 to preview).
+#
+#   (2) Worker preview hostnames OFF (subdomain.previews_enabled=false, EVERY worker) —
+#      `<name>.cloudflare.app` previews are half-provisioned (522, no zone security)
+#      and are what CF flags as "Domains missing TLS Encryption" / "without Always
+#      Use HTTPS" / "without HSTS" / "Security.txt not configured". Per-repo /ship
+#      Phase 4.09 closes only the deployed worker; THIS sweep closes all of them
+#      (2026-07-07: 17 workers alerted, 13 more were one scan-wave away).
+#      Custom-domain workers with workers.dev ON are REPORTED (not auto-fixed —
+#      needs repo context; run worker-surface-check.sh <repo> --apply).
 #
 # DELIBERATELY SKIPS the false-positive / judgment-call classes CF flags:
 #   - Bot Fight Mode            -> hurts Lighthouse/CWV (JS challenge). User-excluded.
@@ -69,22 +85,61 @@ for zid,name in seen.items(): print(zid, name)")
 printf "%-34s %-10s %-12s %-9s\n" "ZONE" "AI-bots" "AILabyrinth" "sec.txt"
 while IFS=' ' read -r ZID NAME; do
   [ -z "$ZID" ] && continue
+  # AI-bot blocking + AI Labyrinth (crawler_protection) are NO LONGER auto-applied.
+  # User directive 2026-07-07: AI bots must be able to reach the sites for AI/LLM SEO
+  # ("new AI work"); Block-AI-bots and AI Labyrinth both hurt that. Left as-is per zone;
+  # ab/al columns are now REPORT-ONLY (never written).
+  ab="report"; al="report"
   if [ $APPLY -eq 1 ]; then
-    bm=$(cf -X PUT "https://api.cloudflare.com/client/v4/zones/$ZID/bot_management" \
-         --data '{"ai_bots_protection":"block","crawler_protection":"enabled"}')
-    ab=$(echo "$bm" | python3 -c "import json,sys;d=json.load(sys.stdin);print(d['result']['ai_bots_protection'] if d.get('success') else 'ERR')" 2>/dev/null || echo ERR)
-    al=$(echo "$bm" | python3 -c "import json,sys;d=json.load(sys.stdin);print(d['result']['crawler_protection'] if d.get('success') else 'ERR')" 2>/dev/null || echo ERR)
     st=$(cf -X PUT "https://api.cloudflare.com/client/v4/zones/$ZID/security-center/securitytxt" \
          --data "{\"enabled\":true,\"contact\":[\"$CONTACT\"],\"preferred_languages\":\"en\",\"expires\":\"$EXPIRES\"}" \
          | python3 -c "import json,sys;print('OK' if json.load(sys.stdin).get('success') else 'ERR')" 2>/dev/null || echo ERR)
   else
-    cur=$(cf "https://api.cloudflare.com/client/v4/zones/$ZID/bot_management")
-    ab=$(echo "$cur" | python3 -c "import json,sys;d=json.load(sys.stdin)['result'];print('block' if d.get('ai_bots_protection')=='block' else 'would-set')" 2>/dev/null || echo '?')
-    al=$(echo "$cur" | python3 -c "import json,sys;d=json.load(sys.stdin)['result'];print('enabled' if d.get('crawler_protection')=='enabled' else 'would-set')" 2>/dev/null || echo '?')
     st="would-set"
   fi
   printf "%-34s %-10s %-12s %-9s\n" "$NAME" "$ab" "$al" "$st"
 done <<< "$ZLIST"
+
+# --- 4. Worker preview-hostname sweep (account-wide) -------------------------
+# The `.cloudflare.app` preview class: every worker with previews_enabled=true
+# grows a half-provisioned public hostname CF's scanner flags for missing
+# TLS / Always-HTTPS / HSTS / security.txt. wrangler deploy can silently
+# re-enable it, so this must re-run on every sweep.
+echo
+echo "— Worker preview hostnames (account-wide) —"
+if [ -z "$ACCT" ]; then
+  echo "  (no account_id in creds — skipped)"
+else
+  SCRIPTS=$(cf "https://api.cloudflare.com/client/v4/accounts/$ACCT/workers/scripts?per_page=100" \
+    | python3 -c "import json,sys;[print(s['id']) for s in json.load(sys.stdin).get('result') or []]")
+  CUSTOM_DOMAIN_SVCS=$(cf "https://api.cloudflare.com/client/v4/accounts/$ACCT/workers/domains" \
+    | python3 -c "import json,sys;print('\n'.join(sorted({d['service'] for d in json.load(sys.stdin).get('result') or []})))")
+  NFIX=0; NWARN=0; NTOTAL=0
+  while IFS= read -r W; do
+    [ -z "$W" ] && continue
+    NTOTAL=$((NTOTAL+1))
+    SUB=$(cf "https://api.cloudflare.com/client/v4/accounts/$ACCT/workers/scripts/$W/subdomain")
+    EN=$(echo "$SUB" | python3 -c "import json,sys;d=json.load(sys.stdin);print(str(d.get('result',{}).get('enabled','?')).lower() if d.get('success') else '?')" 2>/dev/null || echo '?')
+    PV=$(echo "$SUB" | python3 -c "import json,sys;d=json.load(sys.stdin);print(str(d.get('result',{}).get('previews_enabled','?')).lower() if d.get('success') else '?')" 2>/dev/null || echo '?')
+    if [ "$PV" = "true" ]; then
+      if [ $APPLY -eq 1 ]; then
+        RES=$(cf -X POST "https://api.cloudflare.com/client/v4/accounts/$ACCT/workers/scripts/$W/subdomain" \
+          --data "{\"enabled\":$EN,\"previews_enabled\":false}" \
+          | python3 -c "import json,sys;print('fixed' if json.load(sys.stdin).get('success') else 'ERR')" 2>/dev/null || echo ERR)
+        printf "  %-40s previews=true -> %s\n" "$W" "$RES"
+      else
+        printf "  %-40s previews=true (would-disable)\n" "$W"
+      fi
+      NFIX=$((NFIX+1))
+    fi
+    if [ "$EN" = "true" ] && echo "$CUSTOM_DOMAIN_SVCS" | grep -qx "$W"; then
+      printf "  ⚠️  %-38s custom-domain worker with workers.dev ENABLED — unprotected prod duplicate.\n" "$W"
+      printf "      NOT auto-fixed (needs repo context): run worker-surface-check.sh <repo> --apply\n"
+      NWARN=$((NWARN+1))
+    fi
+  done <<< "$SCRIPTS"
+  echo "  workers probed: $NTOTAL; previews $([ $APPLY -eq 1 ] && echo disabled || echo to-disable): $NFIX; workers.dev-on-custom-domain warnings: $NWARN"
+fi
 
 cat <<'EOF'
 

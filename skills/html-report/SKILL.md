@@ -39,7 +39,7 @@ If unsure: ask the user where the output is going. Notion / Slack / "send to my 
 
 1. **Single self-contained `.html` file.** No external CSS files, no separate JS, no asset folders. Tailwind via CDN is allowed and encouraged.
 2. **Document order: `<body>` → `<script>` → `<style>`** (NOT the traditional `<head><style><script></head><body>`). Body content first, then scripts, then styles last. See the template below — this dramatically improves generation quality by forcing content-first output. Do not "correct" it back to standard head layout.
-3. **Save to `~/Downloads/` by default**, named `<slug>-<YYYY-MM-DD>.html`, unless the user specifies a path.
+3. **Save to `~/Claude-Reports/` by default**, named `<slug>-<YYYY-MM-DD>.html`, unless the user specifies a path. `~/Claude-Reports` is a symlink to the Google-Drive-synced folder `My Drive/Claude Reports` (Drive-for-Desktop mount `~/Library/CloudStorage/GoogleDrive-you@example.com/My Drive/Claude Reports`), so every report auto-syncs to Drive. Use the clean symlink path (no spaces) in `Write`/`open` commands. If the symlink is missing (e.g. a machine without the mount), fall back to `~/Downloads/`.
 4. **Open it after writing**: run `open <file>` so the user sees the result immediately. Don't require them to ask.
 5. **Print-friendly**: include a `@media print` block so Cmd-P → Save as PDF works without blank pages or cut-off cards.
 6. **No JavaScript unless it earns its keep.** A static HTML page is fine. Add JS only for genuine interactivity (filters, tabs, sortable tables) — not for cosmetic flourish.
@@ -180,9 +180,9 @@ Pick the components that fit the data, then write content. Don't write content f
 1. **Decide HTML vs MD.** Default = HTML. Only switch to MD if destination is clearly a Markdown surface (PR, commit, README, blog source).
 2. **Pick components from the palette** based on the data shape — not based on aesthetic.
 3. **Write the file** using the skeleton + selected components.
-4. **Save** to `~/Downloads/<slug>-<YYYY-MM-DD>.html` (override only if user gave a path).
-5. **Open it**: `open ~/Downloads/<slug>-<YYYY-MM-DD>.html`. Don't ask permission — opening a local file is harmless and the user wants to see the result.
-6. **Tell the user** the path in your reply, and offer to: (a) print-to-PDF, (b) paste into Notion, (c) iterate on the design.
+4. **Save** to `~/Claude-Reports/<slug>-<YYYY-MM-DD>.html` (override only if user gave a path). This lands in the Google-Drive-synced folder automatically.
+5. **Open it**: `open ~/Claude-Reports/<slug>-<YYYY-MM-DD>.html`. Don't ask permission — opening a local file is harmless and the user wants to see the result.
+6. **Tell the user** the path in your reply (note it's in Google Drive → `My Drive/Claude Reports`), and offer to: (a) print-to-PDF, (b) paste into Notion, (c) iterate on the design.
 
 ## Anti-patterns
 
