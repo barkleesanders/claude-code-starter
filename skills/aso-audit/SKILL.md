@@ -39,6 +39,13 @@ If the user gives an app name instead of a URL, search the web for:
 
 Use WebFetch to retrieve the listing page. Extract every available field:
 
+> ⚠️ App Store / Play listing pages are **client-side JS-rendered** (and Apple/Google
+> WAF-block datacenter IPs), so a raw WebFetch often returns a near-empty shell or `403`.
+> When fields come back missing/empty or you get a 403, **fall through to `/chrome`** —
+> `~/tools/fcdp/fcdp open <listing-url>` then `~/tools/fcdp/fcdp js "<extract fields>"` —
+> which drives real Chrome and **runs the page's JS**, so the rendered title/subtitle/
+> screenshots/ratings are actually present. (full pattern: `carmack/references/browser-automation.md`)
+
 **Apple App Store fields:**
 
 - App name (title) — 30 char limit
