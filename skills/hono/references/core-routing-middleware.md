@@ -63,6 +63,26 @@ app.use(secureHeaders())
 app.use('/static/*', etag())
 ```
 
+> ⚠️ **`secureHeaders()` defaults to `Referrer-Policy: no-referrer`** (see
+> `node_modules/hono/dist/middleware/secure-headers/secure-headers.js`:
+> `referrerPolicy: ["Referrer-Policy", "no-referrer"]`, on by default). That
+> silently breaks **every third-party embed that verifies its host via the
+> `Referer` header** — YouTube renders `Error 153: Video player configuration
+> error`, and Vimeo / Spotify / SoundCloud / Brightcove behave similarly. The
+> video is fine and `frame-src` is fine; the embed just never gets configured.
+>
+> Fix it **per iframe**, not by weakening the global header (that would leak
+> referrers on every outbound link to solve one embed):
+>
+> ```jsx
+> <iframe src="https://www.youtube.com/embed/<ID>"
+>         referrerpolicy="strict-origin-when-cross-origin" allowfullscreen />
+> ```
+>
+> Verify on the **rendered** HTML (`curl … | grep '<iframe'`), not the source —
+> then in a real browser. Full pattern + probes:
+> `~/.claude/skills/debug/references/csp-cache-patterns.md` #27.
+
 Order matters: middleware runs top-down to `next()`, then unwinds bottom-up. Put `logger`,
 `secureHeaders`, `cors` early.
 

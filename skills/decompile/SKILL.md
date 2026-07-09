@@ -51,7 +51,7 @@ The routing table is the centerpiece of this skill. Match the artifact to a row,
 | `.xpi` / Firefox extension | Zip JS+JSON | `unzip foo.xpi` | same JS toolkit | [Browser extension](#browser-extension) |
 | `.wasm` | WebAssembly | `wasm2wat foo.wasm > foo.wat` | `wasm-decompile`, Ghidra WASM loader | [WebAssembly](#webassembly) |
 | `.pyc` / `__pycache__/*.pyc` | Python bytecode | `decompyle3` | `uncompyle6` for older Pythons | [Python bytecode](#python-bytecode) |
-| `.hbc` / React-Native Hermes bundle | Hermes bytecode | `hermes-dec` | hbctool | [Hermes](#hermes) |
+| `.hbc` / React-Native Hermes bundle | Hermes bytecode | `hbc-decompiler` / `hbc-disassembler` | hbctool | [Hermes](#hermes) |
 | `.dll`/`.exe` that's actually .NET CIL | MSIL | `ilspycmd` (or Rider GUI) | Ghidra | [.NET](#net) |
 | `.deb` | Debian package | `dpkg-deb -x foo.deb out/` | route on `out/usr/bin/*` | [Installer](#installer) |
 | `.rpm` | RPM package | `rpm2cpio foo.rpm \| cpio -idmv` | route on extracted | [Installer](#installer) |
@@ -82,8 +82,13 @@ The routing table is the centerpiece of this skill. Match the artifact to a row,
 | `frida` | `~/.local/bin/frida` | Dynamic instrumentation (hook funcs at runtime) |
 | `objection` | `~/.local/bin/objection` | Frida-based mobile pentest, SSL pinning bypass |
 | `mitmproxy` | `~/.local/bin/mitmproxy` | TLS-intercepting proxy; reveal API calls from any app |
-| `hermes-dec` | pipx | React Native Hermes bytecode → JS |
+| `hbc-decompiler` / `hbc-disassembler` | `~/.local/bin/` (pipx pkg `hermes-dec`) | React Native Hermes bytecode → JS. Binaries are `hbc-*`, not `hermes-dec <verb>`. |
+| `hbctool` | `~/.local/bin/hbctool` | Hermes `disasm`/`asm` round-trip (patch + repack .hbc) |
 | `decompyle3` | `~/.local/bin/decompyle3` | Python 3.7–3.9 bytecode → source |
+| `uncompyle6` | `~/.local/bin/uncompyle6` | Python 2.7 / 3.0–3.8 bytecode → source (older-Python fallback to decompyle3) |
+| `androguard` | `~/.local/bin/androguard` (pipx) | APK static analysis CLI + Python API (manifest, perms, certs) |
+| `ilspycmd` | `~/.dotnet/tools/ilspycmd` | .NET/MSIL decompiler. Needs `DOTNET_ROOT=/opt/homebrew/opt/dotnet/libexec` (set in `~/.zshrc`) |
+| `webcrack` | `/opt/homebrew/bin/webcrack` (npm global) | JS deobfuscator/unminifier. Installed `--ignore-scripts` (no `isolated-vm`); core deobf works, VM-sandbox bundle-unpack unavailable |
 | `binwalk` | `/opt/homebrew/bin/binwalk` | Extract embedded archives + filesystems in firmware |
 | `yara` | `/opt/homebrew/bin/yara` | Pattern-match across binaries (malware sigs, crypto, regex) |
 | `wasm2wat` | `/opt/homebrew/bin/wasm2wat` (wabt suite) | WebAssembly → readable WAT text |
@@ -93,22 +98,27 @@ The routing table is the centerpiece of this skill. Match the artifact to a row,
 | `prettier` | `/opt/homebrew/bin/prettier` | JS/TS beautifier for minified bundles |
 | `terser` | `/opt/homebrew/bin/terser` | JS minifier — `--beautify` to unminify |
 | `babel` | `/opt/homebrew/bin/babel` | JS transformer; helpful for AST-level deobf |
-| `androguard` | pip user | Python API for APK static analysis (manifest, perms, certs) |
 | `7z` | `/opt/homebrew/bin/7z` | Universal extractor (NSIS, MSI, ISO, DMG, …) |
 | `otool` / `nm` / `lipo` | `/usr/bin/` | Mach-O native tools (Xcode CLT) |
 | `chromectl` | `~/tools/chromectl` | Drive your LOGGED-IN Chrome (CDP) to **acquire** artifacts behind auth: open pages, capture real download URLs (`chromectl net`), reach store/portal downloads. See [Acquisition](#acquisition-get-the-artifact-first). |
 
-**Known-gap tools** (install on demand):
-- `class-dump` — Homebrew formula removed. Use `ipsw class-dump <ipa>` instead, or build from source: `git clone https://github.com/nygard/class-dump && cd class-dump && xcodebuild`.
-- `webcrack` — npm global install breaks on Node 22 (`isolated-vm` gyp). Run from a local project: `mkdir /tmp/wc && cd /tmp/wc && npm i webcrack && npx webcrack input.js -o out/`. One-off alternative: `de4js` web UI.
-- `dnSpy` / `ILSpy` (.NET) — Windows-first. On macOS: `dotnet tool install -g ilspycmd`, or open `.dll` in JetBrains Rider.
+**Tool notes / gotchas:**
+- `ilspycmd` (.NET) — installed, but the Homebrew `dotnet` puts its runtime in a Cellar path the tool's apphost can't find, so it needs `DOTNET_ROOT=/opt/homebrew/opt/dotnet/libexec`. This is exported in `~/.zshrc` (line ~434), so it Just Works in a login shell. If you ever see "You must install .NET to run this application," that env var is missing.
+- `webcrack` — installed globally with `--ignore-scripts`, which skips the `isolated-vm` native build (it fails to compile under Node 26 — no prebuilt binary yet). Core deobfuscation (unminify, string-array decode, control-flow unflatten, prettify) all work. The ONLY thing missing is the VM-sandbox unpacker for some webpack bundles; if you hit a bundle that needs it, fall back to the `de4js` web UI.
+- `uncompyle6` / `decompyle3` / `hbctool` — all run on a Python 3.14 pipx host, which is newer than these tools officially target. They launch and work for the common case; if one chokes on a specific bytecode version, that's the host-version mismatch, not a missing install.
+
+**Known-gap tools** (genuinely not installed — install on demand):
+- `class-dump` — no working install path on modern Xcode: the Homebrew formula was removed and the upstream `nygard/class-dump` source no longer builds against current SDKs. **Use `ipsw class-dump <ipa>` instead** — it's installed and produces the same ObjC header output. Only build from source (`git clone https://github.com/nygard/class-dump && cd class-dump && xcodebuild`) if you specifically need nygard's output format and are willing to patch the build.
+- `dnSpy` (.NET GUI) — Windows-only; not portable to macOS. Use the installed `ilspycmd` for CLI decompilation, or open the `.dll` in JetBrains Rider for a GUI.
 
 ---
 
 ## Pre-flight (do once per machine)
 
 ```bash
-# Java 21 for Ghidra + cfr-decompiler
+# Java for Ghidra + cfr-decompiler. Ghidra 12.0.4 needs Java 21+; verified working on Java 26.
+# NOTE: macOS `java_home -v 21` means "21 OR HIGHER", so it resolves to the newest JDK ≥21
+# (here Java 26) — that's fine, Ghidra 12 runs clean on it (only a harmless sun.misc.Unsafe warning).
 java -version
 /usr/libexec/java_home -V 2>&1 | head
 export JAVA_HOME=$(/usr/libexec/java_home -v 21 2>/dev/null || /usr/libexec/java_home -v 17)
@@ -311,8 +321,9 @@ unzip foo.xpi -d unpacked/
 # Beautify
 cd unpacked && prettier --write '**/*.{js,mjs}'
 
-# Obfuscated bundles → webcrack (run from /tmp project)
-mkdir /tmp/wc && cd /tmp/wc && npm i webcrack && npx webcrack ~/re/$EXT_ID/unpacked/bg.js -o decoded/
+# Obfuscated bundles → webcrack (installed globally)
+webcrack ~/re/$EXT_ID/unpacked/bg.js -o decoded/
+# (webpack bundle that needs the isolated-vm sandbox unpacker? that build is skipped — use the de4js web UI)
 ```
 
 **Reading order**: `manifest.json` (permissions reveal API surface) → entry-point file (background worker for MV3, content_scripts[].js, popup) → imported modules.
@@ -346,14 +357,17 @@ python3 -c "import dis,marshal; print(dis.dis(marshal.load(open('foo.pyc','rb').
 ```bash
 # React Native apps bundle JS as Hermes bytecode (.hbc)
 # In an APK: assets/index.android.bundle is usually the Hermes file
-hermes-dec disassemble index.android.bundle > disasm.txt
-hermes-dec decompile index.android.bundle > decompiled.js   # imperfect but readable
+# NOTE: the hermes-dec pipx package installs binaries named hbc-* (NOT `hermes-dec <verb>`).
+hbc-disassembler index.android.bundle > disasm.txt
+hbc-decompiler   index.android.bundle > decompiled.js       # imperfect but readable
+hbc-file-parser  index.android.bundle                        # header/section inspection
 ```
 
 ### .NET
 
 ```bash
-# Install once: dotnet tool install -g ilspycmd
+# ilspycmd is installed (~/.dotnet/tools). ~/.zshrc exports DOTNET_ROOT so it works in a
+# login shell; if invoking from a bare env, prefix: DOTNET_ROOT=/opt/homebrew/opt/dotnet/libexec
 ilspycmd -o out/ foo.dll                             # full decompilation
 ilspycmd --list foo.dll                              # list types only
 # Or open in JetBrains Rider / Visual Studio for GUI exploration
