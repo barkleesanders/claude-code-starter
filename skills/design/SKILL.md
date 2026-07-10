@@ -71,6 +71,20 @@ The Stitch mockup is the shared reference you and the user agree on before code 
 - **Code mode runs `npx impeccable detect`** before declaring done. 27 deterministic anti-pattern checks, no API key. See `code-implementation.md` → Deterministic Anti-Pattern Scan.
 - **One focused edit at a time** (whether `edit_screens` or refactoring a component).
 - **No "modern" / "clean" / "sleek"** as a direction. Push back to the user.
+- **Emil Kowalski companion skills** (emilkowalski/skills, installed 2026-07-10
+  at `~/.agents/skills/*`, available via the Skill tool — load by need, they
+  complement, never replace, `aesthetic-core.md`):
+  - `emil-design-eng` — UI polish / component-design / animation-decision
+    philosophy; load when building interactive components or when the ask is
+    "make it feel great".
+  - `apple-design` — Apple-style fluid physical motion for the web: springs,
+    gesture-driven sheets/drags, interruptible transitions, translucency,
+    optical typography, reduced-motion. Load for any iOS-flavored web UI,
+    Capacitor app surface, or /ios webview work that should feel native.
+  - `review-animations` — high-bar motion code review (default to flagging);
+    run before declaring animation work done.
+  - `animation-vocabulary` — name a vaguely-described motion effect before
+    prompting/designing it.
 
 ---
 

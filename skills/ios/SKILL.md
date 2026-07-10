@@ -33,6 +33,14 @@ For iOS-version/API questions NEVER answer from memory — `axiom:axiom-apple-do
 `axiom:axiom-swiftui`, or sosumi MCP. iOS 26 / Xcode 26 are current (Apple
 skipped 19-25); newer may exist — check, don't assume.
 
+**Design/motion craft (installed 2026-07-10, emilkowalski/skills):** when the
+work is how the UI *feels* — springs, gestures, sheets, transitions, polish —
+load `apple-design` (Apple's fluid-motion approach translated for web/webview;
+ideal for Capacitor surfaces that should feel native), `emil-design-eng`
+(UI-polish philosophy), and run `review-animations` on motion code before
+declaring done. `animation-vocabulary` names a vaguely-described effect.
+Full routing lives in the `/design` skill's Cross-Mode Rules.
+
 ## Dev loop (xcodebuildmcp — preferred over raw xcodebuild)
 
 1. `session_show_defaults` once per session; set projectPath/scheme/simulatorId/
@@ -62,6 +70,27 @@ skipped 19-25); newer may exist — check, don't assume.
   Testing patterns: `all-ios-skills:swift-testing`.
 - Live a11y/VoiceOver: `xcui assert` / `xcui voiceover traverse` (axiom bin);
   deep audit: `axiom:accessibility-auditor` agent.
+- **Simulator streaming + agent eyes: `/serve-sim` skill** (installed
+  2026-07-10, `~/.claude/skills/serve-sim` → `~/.agents/skills/serve-sim`;
+  EvanBacon/serve-sim, verified live on iPhone 17 Pro). Start daemon:
+  `npx serve-sim --detach -q` → JSON with MJPEG `streamUrl` (:3100) + ws.
+  **Eyes**: grab a frame — `curl -s --max-time 6 <streamUrl> | python3`
+  (slice first `\xff\xd8`…`\xff\xd9`) → Read the JPEG. **Semantic eyes**:
+  `curl :3100/ax` = labeled a11y tree with point frames (native views only —
+  webview content still needs coordinates). **Hands**: `npx serve-sim tap
+  <x> <y>` takes NORMALIZED 0..1 coords (pt/402, pt/874 on iPhone 17 Pro) —
+  prefer `tap` over `gesture` for plain taps (two `gesture` calls =
+  long-press). **Scroll/drag: the `gesture` CLI can NOT do it** (sends ONE
+  event per call; array payload = silent no-op — verified vs AIVA webview
+  2026-07-10): use `node ~/.agents/skills/serve-sim/scripts/drag.mjs
+  <x1> <y1> <x2> <y2> [ms]` (one-socket timed 0x03 frames).
+  `button home|lock|app_switcher`, `rotate`, `type`,
+  `camera --file/--webcam` injection, `permissions grant/revoke`,
+  `ca-debug` overlays, `memory-warning`. Stream in browser: :3200 preview,
+  tunnel it for remote review. Stop: `npx serve-sim --kill`. Complements
+  xcodebuildmcp `screenshot`/`snapshot_ui` — use serve-sim when you need
+  continuous video, camera injection, permissions, CA debug, or a
+  shareable live stream.
 
 ## Debug routing
 

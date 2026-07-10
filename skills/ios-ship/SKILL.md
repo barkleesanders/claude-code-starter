@@ -23,6 +23,10 @@ counterpart of /carmack):
 - **Releasing** (archive, signing, TestFlight, App Store submit, Capacitor
   OTA web-first sync, App Review requirements table) → invoke **/ship**;
   its Phase 4.7 loads `~/.claude/skills/ship/references/ios-release.md`.
+- **Simulator streaming / agent eyes** (MJPEG stream, taps, a11y tree,
+  camera injection, permissions) → the `/serve-sim` skill
+  (`~/.claude/skills/serve-sim`), documented in /ios's
+  "Driving + testing the UI" section.
 
 When invoked: decide which side of the line the user's ask is on and invoke
 /ios or /ship accordingly. Do not duplicate their content here.

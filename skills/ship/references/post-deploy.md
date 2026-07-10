@@ -38,6 +38,44 @@ Covers Phase 4.08 (Workers-Cache post-deploy verification), Phase 4.1 (post-depl
 
 ## Phase 4.1: POST-DEPLOY VERIFICATION
 
+### 4.1.0 — ARTIFACT-FIRST RULE (BLOCKING, read before any browser check — added 2026-07-10)
+
+**Never conclude "the deploy broke production" from a browser tab.** A cached HTML shell referencing
+pre-deploy asset hashes produces a perfect impersonation of a broken deploy: the SPA fallback serves
+`index.html` for the vanished `.js`, the browser refuses HTML as a module script, React never mounts, and
+you see only the SEO fallback text. A `:9222` clone, a long-lived tab, or a service worker makes this
+near-certain. **The origin, not the tab, is the source of truth.**
+
+Run this BEFORE any rollback, revert, or redeploy:
+
+```bash
+SITE=https://<domain>; CB=$(date +%s)
+# 1. Which bundle does the LIVE html reference?
+HASH=$(curl -s "$SITE/?cb=$CB" -H 'Cache-Control: no-cache' \
+       | grep -o 'assets/index-[A-Za-z0-9_-]*\.js' | sort -u | head -1)
+echo "live references: $HASH"
+# 2. Does the origin serve it as JS, not HTML?
+curl -s -o /dev/null -w "%{http_code} %{content_type}\n" "$SITE/$HASH"
+#    200 text/javascript -> healthy.   200 text/html -> the deploy REALLY is broken.
+# 3. Does the deployed chunk contain the change you just shipped?
+curl -s "$SITE/$HASH" | grep -c '<a string only the new code has>'
+```
+
+- `200 text/javascript` + your string present → **prod is healthy; your browser is stale.** Reload with
+  `navigate_page {ignoreCache: true}` or a cache-busting query param. Do not roll back.
+- `200 text/html` on a `.js` URL → the deploy is genuinely broken. Proceed to Phase 4.5.
+
+Also, before calling any post-deploy curl a failure:
+- **Allow >30s for Worker/CDN propagation.** A single immediate failure is not evidence (see Phase 4.08).
+- `location.reload(true)` is a **no-op** in modern browsers — the `forceReload` argument was removed.
+- `ERR_BLOCKED_BY_CLIENT` in the console is an **ad blocker in the profile**, not your code.
+
+Full pattern: `~/.claude/skills/debug/references/csp-cache-patterns.md` #28. Reference incident
+(2026-07-10, AIVA): the `:9222` clone showed the MIME error and an unmounted SPA while the origin served
+the new bundle correctly and the deployed chunk contained the fix. Concluding from the tab would have
+rolled back a correct deploy.
+
+
 **Purpose**: Verify production deployment serves correct content after deploy.
 
 **Multi-signal battery (fast first pass):** run `~/.claude/skills/ship/tools/fleet-verify.sh <name> <url>` (or `--list <file>` for a whole fleet) — one line per URL with HTTP status · Cache-Control · cf-cache-status · HSTS · CSP · rendered-DOM literal count · static h1 count · og:image · security.txt status. Grep the output for `FAIL:` markers (non-200 or a rendered `undefined`/`NaN`/`[object Object]`/`Invalid Date`). Two caveats baked into the tool: (1) its cache-buster joins `?`/`&` safely so a bare URL never becomes `/&x=…` (the 2026-07-06 false-404 sweep bug); (2) its h1 count is STATIC and includes inert `<template>` content — a `>1` is a "confirm with a live-DOM `querySelectorAll('h1').length`" flag, not an automatic fail (xbox-nxe: static 5, runtime 1). Then proceed to the content-specific checks below.
