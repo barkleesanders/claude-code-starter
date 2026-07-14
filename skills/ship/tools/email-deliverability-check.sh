@@ -80,19 +80,51 @@ for addr in $FROMS; do
 done
 
 # ---- S2: onboarded in CF Email Sending --------------------------------------
+# Ask the CF API per-zone, NOT `wrangler email sending list`: that table's
+# columns are wrangler-version-dependent (an older pinned wrangler in the repo
+# renders the zone id in the name column), which false-negatives a domain that
+# IS onboarded. The zone's own subdomains endpoint is the authority.
+# (2026-07-13: notifications.improvebayarea.com WARNed as "not onboarded" while
+#  the API showed enabled=true, tag 0770c1cd — hence this rewrite.)
 echo "2. Static: Cloudflare Email Sending onboarding"
-if command -v npx >/dev/null 2>&1; then
-  ES=$(npx wrangler email sending list 2>/dev/null || true)
-  if [ -n "$ES" ]; then
-    for dom in $(echo "$SENDER_DOMAINS" | tr ' ' '\n' | sort -u); do
-      [ -z "$dom" ] && continue
-      if echo "$ES" | grep -q "$dom"; then ok "$dom onboarded in Email Sending"
-      else warn "$dom NOT in \`wrangler email sending list\` — send() will fail (E_SENDER_NOT_VERIFIED) unless onboarded pre-deploy"; fi
-    done
-  else
-    warn "could not read \`wrangler email sending list\` (auth?) — onboarding unverified"
+CF_CRED="$HOME/.cloudflared/cf-global-api-key.json"
+for dom in $(echo "$SENDER_DOMAINS" | tr ' ' '\n' | sort -u); do
+  [ -z "$dom" ] && continue
+  state=""
+  if [ -f "$CF_CRED" ]; then
+    state=$(SENDER_DOM="$dom" python3 - "$CF_CRED" <<'PY' 2>/dev/null
+import json, os, sys, urllib.request
+cred = json.load(open(sys.argv[1]))
+H = {'X-Auth-Email': cred['email'], 'X-Auth-Key': cred['global_api_key']}
+dom = os.environ['SENDER_DOM']
+def get(p):
+    return json.load(urllib.request.urlopen(
+        urllib.request.Request('https://api.cloudflare.com/client/v4' + p, headers=H), timeout=20))
+try:
+    zones = get('/zones?per_page=100')['result']
+    # longest matching zone suffix (notifications.a.com -> zone a.com)
+    z = max((x for x in zones if dom == x['name'] or dom.endswith('.' + x['name'])),
+            key=lambda x: len(x['name']), default=None)
+    if not z:
+        print('nozone'); sys.exit()
+    if dom == z['name']:
+        print('enabled' if get(f"/zones/{z['id']}/email/sending/settings")['result'].get('enabled') else 'disabled')
+        sys.exit()
+    subs = get(f"/zones/{z['id']}/email/sending/subdomains?per_page=100")['result'] or []
+    hit = next((s for s in subs if s.get('name') == dom), None)
+    print('enabled' if hit and hit.get('enabled') else ('disabled' if hit else 'missing'))
+except Exception:
+    print('unknown')
+PY
+)
   fi
-fi
+  case "$state" in
+    enabled)  ok "$dom onboarded in Email Sending (CF API)" ;;
+    disabled) bad "$dom exists but Email Sending is DISABLED — send() will fail E_SENDER_NOT_VERIFIED" ;;
+    missing|nozone) bad "$dom is NOT onboarded to Email Sending — run: npx wrangler email sending enable $dom" ;;
+    *) warn "could not verify $dom onboarding against the CF API (creds/network) — UNVERIFIED, do not assume" ;;
+  esac
+done
 
 # ---- L1: live mailbox placement + DMARC alignment ---------------------------
 if [ "$STATIC_ONLY" -eq 0 ] && [ -n "$ACCOUNTS" ] && [ -n "$DOMAIN" ]; then

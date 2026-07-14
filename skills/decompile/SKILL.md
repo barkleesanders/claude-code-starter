@@ -101,6 +101,7 @@ The routing table is the centerpiece of this skill. Match the artifact to a row,
 | `7z` | `/opt/homebrew/bin/7z` | Universal extractor (NSIS, MSI, ISO, DMG, …) |
 | `otool` / `nm` / `lipo` | `/usr/bin/` | Mach-O native tools (Xcode CLT) |
 | `chromectl` | `~/tools/chromectl` | Drive your LOGGED-IN Chrome (CDP) to **acquire** artifacts behind auth: open pages, capture real download URLs (`chromectl net`), reach store/portal downloads. See [Acquisition](#acquisition-get-the-artifact-first). |
+| `mimic` | `~/.local/bin/mimic` (uv tool `mimic-client`, from `git+https://github.com/littledivy/mimic`) | Capture an iOS app's traffic → **AI-generate a Python client** for its private API. Automates the manual "capture → extract → build a CLI" flow: `mimic record` (proxy + iPhone setup) → `mimic hosts` → `mimic learn <host>` → `mimic gen <host>`; `mimic unpin <ipa\|id>` defeats cert-pinning via Frida; `mimic doctor` checks setup. Deps already present (mitmproxy, `claude` CLI, frida, objection). See [App-API client generation](#app-api-client-generation-mimic). |
 
 **Tool notes / gotchas:**
 - `ilspycmd` (.NET) — installed, but the Homebrew `dotnet` puts its runtime in a Cellar path the tool's apphost can't find, so it needs `DOTNET_ROOT=/opt/homebrew/opt/dotnet/libexec`. This is exported in `~/.zshrc` (line ~434), so it Just Works in a login shell. If you ever see "You must install .NET to run this application," that env var is missing.
@@ -191,6 +192,22 @@ When the goal is *"what API call does this logged-in web app make to do X"* (so 
 4. **Reuse with the user's own session.** Read-only endpoints → replay with the session cookie/token (see the cookies/`vatp` patterns). **Mutations (submit/file/pay/delete) are outward, irreversible actions → dry-run, show the exact body, get explicit per-action approval.** Never auto-fire a state-changing endpoint, and never populate a legal e-signature field (`statement_of_truth_signature` etc.) on the user's behalf.
 
 Worked example: `~/tools/va-travel-cli/vatp` (VA benefits read commands + the 20-10206 submit contract) was built entirely from rungs 1+3 against `vets-api` — zero binary RE.
+
+### App-API client generation (mimic)
+
+When the goal is *"talk to a mobile app's private API from a CLI"* and the backend is **not** open source (so the endpoint-discovery ladder above can't just read `routes.rb`), `mimic` automates the whole capture→client loop. It runs the mitmproxy capture, lets you pick the API host, shows the endpoints it saw, and has `claude` write a typed Python client for that host. This is the tool version of the manual iOS/Android mitmproxy workflows below.
+
+```bash
+mimic doctor                 # verify setup (proxy, claude CLI, frida/objection); prints your LAN proxy IP
+mimic record                 # starts the proxy + prints iPhone Wi-Fi-proxy + CA-trust setup steps
+#   → on the iPhone: set HTTP proxy to <LAN-IP>:8080, install+trust the mitm CA, exercise the app
+mimic hosts                  # list captured hosts — pick the API host (not analytics/CDN)
+mimic learn api.example.com  # show the endpoints (method + path + params) mimic saw for that host
+mimic gen  api.example.com   # claude AI-writes a Python client for that host's API
+mimic unpin <app.ipa|bundle-id>   # cert-pinning apps: Frida-defeat pinning so capture works first
+```
+
+**Scope + safety (same as the rest of this skill):** only capture apps on **your own device** for interoperability with **your own** account/data (DMCA §1201(f) posture). `mimic gen` sends captured endpoint shapes to Claude to synthesize the client — don't run it on traffic containing third-party PII or another party's secrets. **Cert-pinning / DPoP-bound tokens** block plain capture — `mimic unpin` handles pinning; DPoP-bound apps still won't replay. If `mimic doctor` shows `[MISSING] mitmweb running`, that's expected until you start `mimic record` in another terminal.
 
 ### Native Mach-O
 
