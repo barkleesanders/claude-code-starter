@@ -251,7 +251,7 @@ When code or scripts need cookies from a logged-in browser session, pick by wher
 
 | Session location | Tool | Output |
 |---|---|---|
-| Live `:9222` Chrome (`~/.kuri/chrome-profile`) | chrome-devtools MCP → CDP `Network.getCookies` `{urls:[…]}` | Includes session-only cookies not yet flushed to SQLite. No Keychain prompt. |
+| Live REAL Chrome (fcdp-driven) | `~/tools/fcdp/fcdp raw Network.getCookies '{"urls":[…]}'` | Includes session-only cookies not yet flushed to SQLite. No Keychain prompt. |
 | Regular Chrome (`~/Library/Application Support/Google/Chrome/Default`) | `~/tools/cookies-txt <url>` | Reads SQLite + Keychain. Headless-safe, cron-safe. |
 | Brave / Edge / Chromium | `~/tools/cookies-txt --browser brave\|edge\|chromium <url>` | Same code, different Keychain entry. |
 | Any browser, yt-dlp only target | `yt-dlp --cookies-from-browser chrome:Default <url>` | Bypasses the question entirely. |

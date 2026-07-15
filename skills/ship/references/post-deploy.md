@@ -43,8 +43,8 @@ Covers Phase 4.08 (Workers-Cache post-deploy verification), Phase 4.1 (post-depl
 **Never conclude "the deploy broke production" from a browser tab.** A cached HTML shell referencing
 pre-deploy asset hashes produces a perfect impersonation of a broken deploy: the SPA fallback serves
 `index.html` for the vanished `.js`, the browser refuses HTML as a module script, React never mounts, and
-you see only the SEO fallback text. A `:9222` clone, a long-lived tab, or a service worker makes this
-near-certain. **The origin, not the tab, is the source of truth.**
+you see only the SEO fallback text. A long-lived tab or a service worker makes this near-certain — even
+when driven live via fcdp/ccb. **The origin, not the tab, is the source of truth.**
 
 Run this BEFORE any rollback, revert, or redeploy:
 
@@ -71,38 +71,34 @@ Also, before calling any post-deploy curl a failure:
 - `ERR_BLOCKED_BY_CLIENT` in the console is an **ad blocker in the profile**, not your code.
 
 Full pattern: `~/.claude/skills/debug/references/csp-cache-patterns.md` #28. Reference incident
-(2026-07-10, AIVA): the `:9222` clone showed the MIME error and an unmounted SPA while the origin served
-the new bundle correctly and the deployed chunk contained the fix. Concluding from the tab would have
-rolled back a correct deploy.
+(2026-07-10, AIVA): the debug browser tab (the old seeded-profile clone, since REMOVED 2026-07-14 —
+fcdp replaced it) showed the MIME error and an unmounted SPA while the origin served the new bundle
+correctly and the deployed chunk contained the fix. Concluding from the tab would have rolled back a
+correct deploy.
 
 
 **Purpose**: Verify production deployment serves correct content after deploy.
 
 **Multi-signal battery (fast first pass):** run `~/.claude/skills/ship/tools/fleet-verify.sh <name> <url>` (or `--list <file>` for a whole fleet) — one line per URL with HTTP status · Cache-Control · cf-cache-status · HSTS · CSP · rendered-DOM literal count · static h1 count · og:image · security.txt status. Grep the output for `FAIL:` markers (non-200 or a rendered `undefined`/`NaN`/`[object Object]`/`Invalid Date`). Two caveats baked into the tool: (1) its cache-buster joins `?`/`&` safely so a bare URL never becomes `/&x=…` (the 2026-07-06 false-404 sweep bug); (2) its h1 count is STATIC and includes inert `<template>` content — a `>1` is a "confirm with a live-DOM `querySelectorAll('h1').length`" flag, not an automatic fail (xbox-nxe: static 5, runtime 1). Then proceed to the content-specific checks below.
 
-### Part 0: Chrome CDP Live Screenshot (if available)
+### Part 0: fcdp Live Screenshot (if available)
 
-After deploy, take a screenshot of the live production site to visually verify.
-> For a page that needs the user's REAL login (authed dashboard, admin), use **`fcdp`**
-> (`~/tools/fcdp/fcdp shot|read|js`, `/chrome` Step 0) — it drives the real Default profile
-> so no re-login is needed. The `:9222` clone below is fine for public/unauthed pages.
+After deploy, take a screenshot of the live production site to visually verify. Use **`fcdp`**
+(`~/tools/fcdp/fcdp`) for this — it drives the user's REAL Default-profile Chrome directly, so
+public pages AND pages needing the user's real login (authed dashboard, admin) both work with
+no re-login needed.
 
 ```bash
-CDP="node $HOME/.claude/skills/chrome-cdp/scripts/cdp.mjs"
-TARGET=$($CDP list 2>/dev/null | grep "$DEPLOY_URL" | awk '{print $1}' | head -1)
-
-if [ -n "$TARGET" ]; then
-  # Reload the page to pick up new deploy
-  $CDP nav "$TARGET" "$DEPLOY_URL" 2>/dev/null
-  sleep 3
-  $CDP shot "$TARGET" 2>/dev/null
-  echo "Screenshot saved to /tmp/screenshot.png — verify visually"
-else
-  echo "No Chrome tab open for $DEPLOY_URL — skipping visual check"
-fi
+FCDP=~/tools/fcdp/fcdp
+$FCDP open "$DEPLOY_URL" 2>/dev/null   # opens/selects a tab and reloads to pick up the new deploy
+sleep 3
+$FCDP shot /tmp/screenshot.png 2>/dev/null
+echo "Screenshot saved to /tmp/screenshot.png — verify visually"
 ```
 
-If a tab is open and CDP daemon is warm, this gives instant visual verification with no popups. If not available, skip to curl checks.
+If the fcdp bridge is warm, this gives instant visual verification with no popups. If it's not
+available (`bridge socket not found` — `launchctl kickstart -k gui/$(id -u)/com.barklee.fcdp-bridge`),
+skip to curl checks.
 
 ### Part A: HTML Meta Tag Checks (curl)
 ```bash
@@ -495,24 +491,20 @@ Next steps: /carmack lighthouse 100  (loads lighthouse-optimization.md playbook)
    - Verify no broken images (alt text visible instead of image)
 ```
 
-**Using Chrome CDP (preferred — uses live session)**:
+**Using fcdp (preferred — uses the live, real-profile session)**:
 ```bash
-CDP="node $HOME/.claude/skills/chrome-cdp/scripts/cdp.mjs"
-TARGET=$($CDP list 2>/dev/null | grep "$DEPLOY_URL" | awk '{print $1}' | head -1)
+FCDP=~/tools/fcdp/fcdp
+$FCDP open "$DEPLOY_URL"
+sleep 3
 
-if [ -n "$TARGET" ]; then
-  $CDP nav "$TARGET" "$DEPLOY_URL"
-  sleep 3
+# Desktop screenshot
+$FCDP shot /tmp/screenshot.png
+# Read the screenshot to check for visual issues
 
-  # Desktop screenshot
-  $CDP shot "$TARGET"  # saves to /tmp/screenshot.png
-  # Read the screenshot to check for visual issues
-
-  # For mobile: use agent-browser with viewport setting
-  agent-browser open "$DEPLOY_URL" --viewport 375x812
-  agent-browser screenshot --path /tmp/mobile-screenshot.png
-  agent-browser close
-fi
+# For mobile: use agent-browser with viewport setting
+agent-browser open "$DEPLOY_URL" --viewport 375x812
+agent-browser screenshot --path /tmp/mobile-screenshot.png
+agent-browser close
 ```
 
 **Using agent-browser (fallback — headless)**:

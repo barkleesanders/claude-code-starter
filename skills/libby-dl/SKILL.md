@@ -43,7 +43,7 @@ Token file (optional): `~/.config/libby-dl/libby-token` or `LIBBY_TOKEN` env.
 | **0** | `libby-dl setup --check` or `libby-dl setup --code …` | **Never skip** unless odmpy already passes `--check` |
 | **1** | Confirm format | Loan page has **Listen** / audiobook — not Read/eBook |
 | **2** | `libby-dl init -d DIR` | If new download dir |
-| **3** | `libby-dl discover -d DIR` | Chrome :9222 → `spine.json` (skip if odmpy will run first and `--from-files` later) |
+| **3** | `libby-dl discover -d DIR` | Debug-CDP Chrome (`libby-dl chrome`) → `spine.json` (skip if odmpy will run first and `--from-files` later) |
 | **4** | `libby-dl gate -d DIR` | Loan active, Listen iframe, odmpy or CDP viable |
 | **5** | `libby-dl run -d DIR --title-id ID --loan-url URL` | **Preferred** — auto setup → odmpy → gate → CDP gaps → merge/tag |
 | **6** | `libby-dl verify -d DIR` | Exit 0 = all `requiredParts` full |
@@ -140,9 +140,13 @@ See `~/tools/libby-cli/docs/SPINE.md`.
 ## Chrome
 
 ```bash
-bash ~/tools/chrome-debug-on.sh   # :9222, profile ~/.claude/chrome-debug-profile
-libby-dl chrome --loan-url '...'
+libby-dl chrome --loan-url '...'   # brings up the CDP debug Chrome this tool needs and opens the loan
 ```
+
+> Note: `libby-dl`'s own `discover`/`chrome`/`cdp` commands drive a dedicated CDP debug
+> Chrome internally (their own capture logic, separate from `fcdp`/`ccb`) — this is the
+> libby-cli tool's own mechanism, not the general logged-in-browser default. See the
+> `logged-in-browser` skill for driving any OTHER logged-in site.
 
 ## When loan returned / 403
 

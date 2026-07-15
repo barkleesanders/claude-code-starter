@@ -100,7 +100,7 @@ The routing table is the centerpiece of this skill. Match the artifact to a row,
 | `babel` | `/opt/homebrew/bin/babel` | JS transformer; helpful for AST-level deobf |
 | `7z` | `/opt/homebrew/bin/7z` | Universal extractor (NSIS, MSI, ISO, DMG, …) |
 | `otool` / `nm` / `lipo` | `/usr/bin/` | Mach-O native tools (Xcode CLT) |
-| `chromectl` | `~/tools/chromectl` | Drive your LOGGED-IN Chrome (CDP) to **acquire** artifacts behind auth: open pages, capture real download URLs (`chromectl net`), reach store/portal downloads. See [Acquisition](#acquisition-get-the-artifact-first). |
+| `fcdp` | `~/tools/fcdp/fcdp` | Drive your REAL LOGGED-IN Chrome (via its own extension+bridge, full CDP) to **acquire** artifacts behind auth: open pages, capture real download URLs (`fcdp intercept`), reach store/portal downloads. See [Acquisition](#acquisition-get-the-artifact-first). |
 | `mimic` | `~/.local/bin/mimic` (uv tool `mimic-client`, from `git+https://github.com/littledivy/mimic`) | Capture an iOS app's traffic → **AI-generate a Python client** for its private API. Automates the manual "capture → extract → build a CLI" flow: `mimic record` (proxy + iPhone setup) → `mimic hosts` → `mimic learn <host>` → `mimic gen <host>`; `mimic unpin <ipa\|id>` defeats cert-pinning via Frida; `mimic doctor` checks setup. Deps already present (mitmproxy, `claude` CLI, frida, objection). See [App-API client generation](#app-api-client-generation-mimic). |
 
 **Tool notes / gotchas:**
@@ -140,7 +140,7 @@ xcode-select -p
 ### Acquisition (get the artifact first)
 
 Most artifacts are already local files — route them directly. Two cases need your
-**logged-in Chrome**; use `chromectl` (CDP on your real session, `chromectl --help`).
+**logged-in Chrome**; use `fcdp` (`~/tools/fcdp/fcdp`, full CDP on your REAL session — `fcdp --help`).
 
 **Already-installed browser extension → read it from disk, no download.**
 Installed Chrome extensions are already unpacked JS+JSON — route straight as a
@@ -154,21 +154,21 @@ Match the id by name in each `manifest.json`, or read it off `chrome://extension
 
 **Artifact behind a login (store / vendor portal / private build) → capture the real URL.**
 ```bash
-chromectl up                                   # ensure logged-in Chrome (:9222) is live
-chromectl open "<page-with-the-download>"
-chromectl net | rg -iE '\.(crx|apk|aab|ipa|wasm|jar|zip|dmg|pkg|exe|bin|fw)(\?|$)|download'
+FCDP=~/tools/fcdp/fcdp
+$FCDP open "<page-with-the-download>"          # drives your REAL, already-logged-in Chrome
+$FCDP intercept | rg -iE '\.(crx|apk|aab|ipa|wasm|jar|zip|dmg|pkg|exe|bin|fw)(\?|$)|download'
 curl -L -o artifact "<captured-url>"           # session cookies make auth'd downloads work
-chromectl stop                                 # back to one Chrome
 ```
-`chromectl use aiva` first if the download lives in another account (Profile 4 = hello@example.com).
+If the download lives in another account (Profile 4 = hello@example.com), switch to that
+Chrome profile/window first, then re-run `$FCDP tabs` to confirm you're pointed at it.
 
 **Auth'd download with a plain `curl`/`yt-dlp` (no browser drive needed) → export your real Chrome cookies, LOCAL-only.**
 ```bash
-chromectl cookies <domain> [outfile]           # → ./<domain>.cookies.txt (chmod 600); prints path+count, NEVER values
-curl -b <domain>.cookies.txt -L -o artifact "<url>"   # session cookies authenticate the fetch
-yt-dlp --cookies <domain>.cookies.txt "<url>"         # same file works for yt-dlp
+~/tools/cookies-txt <domain> -o <domain>.cookies.txt   # chmod 600; prints path+count, NEVER values
+curl -b <domain>.cookies.txt -L -o artifact "<url>"    # session cookies authenticate the fetch
+yt-dlp --cookies <domain>.cookies.txt "<url>"          # same file works for yt-dlp
 ```
-Delegates to `~/tools/cookies-txt` (reads the real Chrome profile + decrypts via macOS Keychain). Cookies never leave this machine.
+`~/tools/cookies-txt` reads the real Chrome profile's cookie DB + decrypts via macOS Keychain. Cookies never leave this machine.
 
 > Scope still applies (see top): only acquire artifacts you lawfully possess — your
 > own builds/devices, CTF, samples for triage, things you have rights to. Don't drive
@@ -184,10 +184,10 @@ When the goal is *"what API call does this logged-in web app make to do X"* (so 
    gh api repos/<org>/<repo>/contents/modules/<engine>/config/routes.rb --jq '.content' | base64 -d
    ```
 2. **Deployed frontend bundle (when backend isn't open source).** The SPA's JS references its own API paths. Capture the bundle URL via CDP, `prettier`/`webcrack` it, then `rg -oiE '"/api/[^"]+"|fetch\(|axios\.(get|post)'` for endpoint strings + method.
-3. **Live CDP network capture (ground-truth confirmation — always do this before building a mutation).** Drive the **logged-in `:9222` Chrome** (chrome-devtools MCP / `chromectl net`), perform the action by hand once, and read the network log for the EXACT request: method, full path, headers, and request body. A decompiled/route-listed endpoint is *capability*; the captured call is *proof of the real contract* (params the server actually requires, header shape, CSRF). 
+3. **Live CDP network capture (ground-truth confirmation — always do this before building a mutation).** Drive the **REAL logged-in Chrome via `fcdp`** (`~/tools/fcdp/fcdp intercept`), perform the action by hand once, and read the network log for the EXACT request: method, full path, headers, and request body. A decompiled/route-listed endpoint is *capability*; the captured call is *proof of the real contract* (params the server actually requires, header shape, CSRF). 
    ```bash
-   chromectl open "<the page that does X>"; # …click the button by hand…
-   chromectl net | rg -iE 'POST|PUT|/api/|/v[0-9]+/'   # find the call; then inspect its body
+   ~/tools/fcdp/fcdp open "<the page that does X>"; # …click the button by hand…
+   ~/tools/fcdp/fcdp intercept | rg -iE 'POST|PUT|/api/|/v[0-9]+/'   # find the call; then inspect its body
    ```
 4. **Reuse with the user's own session.** Read-only endpoints → replay with the session cookie/token (see the cookies/`vatp` patterns). **Mutations (submit/file/pay/delete) are outward, irreversible actions → dry-run, show the exact body, get explicit per-action approval.** Never auto-fire a state-changing endpoint, and never populate a legal e-signature field (`statement_of_truth_signature` etc.) on the user's behalf.
 
@@ -309,7 +309,7 @@ strings ipa-extracted/Payload/Foo.app/Foo | rg -iE 'https?://|api\.|sk_|AIza'
 
 Browser extensions are **always** JavaScript source. Ghidra has nothing to disassemble.
 
-> **Already installed in your Chrome?** Skip the download — read it unpacked from disk ([Acquisition](#acquisition-get-the-artifact-first)). **Behind a login / enterprise / unlisted?** Use `chromectl` to drive your logged-in Chrome and capture the `.crx` URL, then continue below.
+> **Already installed in your Chrome?** Skip the download — read it unpacked from disk ([Acquisition](#acquisition-get-the-artifact-first)). **Behind a login / enterprise / unlisted?** Use `fcdp` (`~/tools/fcdp/fcdp`) to drive your REAL logged-in Chrome and capture the `.crx` URL, then continue below.
 
 ```bash
 # Chrome / Edge / Brave: download .crx by extension ID

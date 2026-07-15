@@ -169,7 +169,7 @@ When you need browser cookies for a non-browser tool (curl `--cookie`, yt-dlp `-
 
 | Where the session is | Best tool | Why |
 |---|---|---|
-| Live agent Chrome at `:9222` (`~/.kuri/chrome-profile`) | **chrome-devtools MCP** → CDP `Network.getCookies` for the URL | Includes session-only cookies not yet flushed to SQLite; no Keychain prompt; aligned with `/feedback_browser_default_chrome_profile`. |
+| Live REAL Chrome (fcdp-driven) | **`~/tools/fcdp/fcdp raw Network.getCookies '{"urls":[…]}'`** | Includes session-only cookies not yet flushed to SQLite; no Keychain prompt; aligned with `/feedback_browser_default_chrome_profile`. |
 | Regular Chrome profile (`~/Library/Application Support/Google/Chrome/Default`) | **`~/tools/cookies-txt <url>`** | Reads SQLite + macOS Keychain. Works headless / from cron / without :9222 attached. Outputs Netscape, JSON, or `Cookie:` header. |
 | Brave / Edge / Chromium | `~/tools/cookies-txt --browser brave \| edge \| chromium <url>` | Same code, different Keychain entry. |
 | One-shot, don't care about reuse | `yt-dlp --cookies-from-browser chrome:Default <url>` | Already installed; bypasses the question entirely if all you need is yt-dlp. |
