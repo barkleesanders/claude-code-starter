@@ -147,4 +147,7 @@ if want('caa'):
             lambda zid=zid, body=body: cf(f"/zones/{zid}/dns_records", 'POST', body))
 
 print(f"\n{'DRY-RUN' if DRY else 'APPLIED'}: {len(log)} actions")
-json.dump(log, open('/private/tmp/claude-501/-Users-youruser/4235264f-4286-4044-8447-646a5bd75ab2/scratchpad/cf-harden-log.json','w'), indent=1)
+import os, tempfile
+_logdir = os.path.expanduser('~/.claude/logs')
+os.makedirs(_logdir, exist_ok=True)
+json.dump(log, open(os.path.join(_logdir, 'cf-harden-log.json'), 'w'), indent=1)
