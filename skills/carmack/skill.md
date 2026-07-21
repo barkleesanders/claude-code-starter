@@ -186,6 +186,8 @@ All reference files are in `~/.claude/skills/carmack/references/`.
 
 **Always-BLOCKED (never run, regardless of auto-deploy status):** `wrangler deploy` / `versions deploy` / `pages deploy`, `wrangler secret put`/`delete` (prod), `npm`/`bun`/`pnpm`/`yarn run deploy`, `vercel --prod`, `netlify deploy --prod`, the `/ship` skill / `ship.sh`, force-push to a shared branch, `gh pr merge` / `gh pr close` into main, or any command that explicitly pushes to production.
 
+**Commit on the RIGHT branch (MANDATORY — 2026-07-21):** before `git commit`, run `git branch --show-current`. A hotfix / config change / anything unrelated to an in-progress feature belongs on **main** — do NOT let it land on whatever branch happens to be checked out. Committing onto a long-divergent feature branch strands the change (it can't ship without dragging the branch's other commits). Enforced by the PreToolUse hook `pre-bash-commit-branch-guard.sh`, which BLOCKs a commit on a non-main branch that is behind `origin/main` or ≥6 ahead (override `CLAUDE_ALLOW_BRANCH_COMMIT=1` when the branch IS intended). Reference incident: a robots.txt hotfix committed onto `feat/explain-gap-and-close-it` (11 ahead of main) → needed a cherry-pick + full branch reconciliation to ship.
+
 #### Auto-Deploy Detection (run before any main push — if ambiguous, assume YES = don't push, display, ask)
 A repo auto-deploys on a main push if ANY of these holds:
 1. **GitHub Actions** — read **`origin/main`** workflows, NOT the local checkout (a behind worktree shows stale/deleted workflows — this misled the 2026-06-25 session, which grepped a 375-behind tree). Broad pattern (must catch `cloudflare/wrangler-action`/`pages-action`, which contain no literal "wrangler deploy"):

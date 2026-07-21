@@ -88,6 +88,8 @@ Covers Phase -1 (repository context verification), Phase -0 (merge conflict reso
 
 ## Phase -0.5: WORKTREE SAFETY GATE (MANDATORY — 2026-05-10)
 
+**Right-branch check (2026-07-21):** before deploying, confirm the change being shipped is on **main**, not stranded on a divergent feature branch. If `git branch --show-current` is a feature branch that is ahead of / behind `origin/main`, reconcile FIRST (cherry-pick the shippable change onto main, or merge the branch) — do not deploy a feature branch to prod to work around a mis-placed commit. Enforced at commit time by the PreToolUse hook `pre-bash-commit-branch-guard.sh`. Reference incident: a robots.txt hotfix landed on `feat/explain-gap-and-close-it` (11 ahead of main) and could only ship after a cherry-pick + full branch reconciliation.
+
 **Purpose**: Never deploy work that exists only on a local worktree branch with no remote backup. Prevents the silent-loss class that wiped the trust pages on 2026-05-10.
 
 **When this fires**: ALWAYS, even on the main checkout. The check is fast (sub-second) and is no-op when there's nothing at risk.
