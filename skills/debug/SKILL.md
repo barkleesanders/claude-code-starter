@@ -5,8 +5,11 @@ description: "Quick debugging patterns and known production failure traps. Refer
 allowed-tools:
   - Bash
   - Read
+  - Edit
+  - Write
   - Grep
   - Glob
+  - Skill
 model: inherit
 ---
 
@@ -239,6 +242,14 @@ Allowed under `/debug`: inspect logs, reproduce failures, patch locally, run bou
 ### Installed-Source Ground-Truth Guard (MANDATORY — 2026-06-12)
 
 Before proposing any fix that touches a dependency/plugin/framework/third-party widget, load `~/.claude/skills/shared/installed-source-ground-truth.md` and follow it: read the installed package's types+JSDoc in `node_modules/` for real option semantics, read the native platform implementation when platform support matters, and probe the live DOM/traffic for third-party widgets. Cite file+symbol in the fix. (2026-06-12: three CSS workarounds failed against the Brevo widget; the real fix — StatusBar `overlaysWebView:false` on iOS — was found by reading the installed plugin's Swift source.)
+
+### Semantic Security Review Gate — LOOP UNTIL CLEAN (MANDATORY — 2026-07-22)
+
+**When a `/debug` session lands a code fix, run the built-in `security-review` skill on the fix before declaring it resolved, and loop until it is clean.** A debug fix that patches the symptom but introduces (or leaves) an injection / XSS / SSRF / auth-bypass / secret-exposure / logic flaw is not done. This is AI/semantic dataflow analysis — it catches the vulnerability class the pattern-routing tables above do not.
+
+**⚠️ OPERATIONAL (verified 2026-07-22):** `security-review` runs against the CURRENT WORKING DIRECTORY's git repo (no path arg; hard-fails `"needs to run inside a git repository"` if cwd is wrong — `cd <repo-root>` FIRST) and reviews the **COMMITTED** branch diff vs the base, NOT uncommitted working-tree edits (proven: unstaged changes → empty diff). **Commit the fix before running this gate**, or it reviews nothing. It returns a markdown report (file:line, severity, confidence 1–10) with its own false-positive filter at confidence ≥8. If the Skill returns unknown-skill, tell the user the gate couldn't run rather than passing silently.
+
+**The loop:** (1) `cd` into the repo root, invoke the `security-review` skill (Skill tool) on the changed code; (2) triage its reported (confidence-≥8) findings real vs. genuine-false-positive; (3) FIX every real finding inline, obeying the No-Suppression Rule (no `@ts-ignore`/`eslint-disable`/`biome-ignore` — remove the actual vulnerability); (4) re-invoke `security-review`; (5) repeat until the report is **empty**. Document any genuine false positive inline with its reason; fix everything else, never defer. **Loop guard:** same finding surviving 5 attempts → STOP and surface it to the user. This runs entirely within `/debug`'s allowed scope (local fix + verify) — it does NOT deploy (Deployment Prohibition still holds); the code is left security-clean and committed, and `/ship`'s Phase 1.29 re-runs the same loop at deploy time. Skip only when the session made no code change (pure investigation/reference).
 
 ### Test Safety (CRITICAL)
 
