@@ -14,6 +14,15 @@
 set -uo pipefail
 DIR="${1:-$PWD}"; cd "$DIR" 2>/dev/null || { echo "usage: $0 <repo-dir>"; exit 1; }
 
+# NOTE (2026-07-27): this reads the SOURCE config. Repos using @cloudflare/vite-plugin
+# actually DEPLOY from dist/<uuid>/wrangler.json via the .wrangler/deploy/config.json
+# redirect ("Using redirected Wrangler configuration" on every deploy). Verified for AIVA:
+# the two agree on name/preview_urls/workers_dev/cache, so this check is NOT currently
+# mis-reading anything -- only `main` differs. It becomes wrong if the plugin ever drops or
+# rewrites a field this script inspects. To read the deployed config instead:
+#   RD=.wrangler/deploy/config.json
+#   [ -f "$RD" ] && CFG=$(cd "$(dirname "$RD")" && realpath "$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["configPath"])' config.json)")
+# See ~/.claude/skills/shared/cf-integration-harness.md
 CFG=$(ls wrangler.jsonc wrangler.json wrangler.toml 2>/dev/null | head -1)
 [ -z "$CFG" ] && { echo "workers-cache-check: no wrangler config in $DIR — skip"; exit 0; }
 
