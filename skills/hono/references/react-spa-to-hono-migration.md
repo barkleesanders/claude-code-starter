@@ -108,7 +108,7 @@ so call it out rather than pretend the migration is complete.
 - `rm -rf dist && vite build` exit 0; `tsc --noEmit` exit 0.
 - For EACH route: `curl -s https://<site>/<route>?cb=$(date +%s) | grep` proves the page's real
   content is in the HTML (not an empty root div).
-- For EACH island: the script 200s and the widget updates in a real browser (drive `:9222`
+- For EACH island: the script 200s and the widget updates in a real browser (drive the real profile via fcdp
   Chrome / chrome-devtools MCP; confirm the map renders, the graph draws, the modal opens).
 - Grep the live DOM for `undefined`/`NaN`/`[object Object]` (render-safety).
 - Lighthouse before/after — SSR should jump performance + SEO.

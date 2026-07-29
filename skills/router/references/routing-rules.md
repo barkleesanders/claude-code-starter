@@ -36,7 +36,7 @@
 | Sign a document / signature request | **docuseal-cli** | Always DocuSeal, never typed /s/. |
 | Physical mail / certified letter / check | **postgrid** | |
 | Design a UI / build a component or screen | **design** or **ui-ux-pro-max** | |
-| Drive logged-in Chrome (CDP, snapshots, fill forms) | **chrome** | :9222 profile. |
+| Drive logged-in Chrome (CDP, snapshots, fill forms) | **chrome** | real Chrome profile via fcdp. |
 | Talk to Codex / second opinion / delegate | **codex-chat** | |
 | Job search (US federal/private, Denmark) | **jobsearch** | |
 | Control the local Claude-Science app | **csci** | |

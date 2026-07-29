@@ -6,7 +6,7 @@ description: Interact with local Chrome browser session (only on explicit user a
 
 # Chrome CDP
 
-> **Driving a LOGGED-IN session?** Use the `logged-in-browser` skill (chrome-devtools MCP on `:9222`, full CDP, auto-launched by the chrome-debug-on.sh hook) — that's the one default for authenticated driving. This `chrome-cdp` CLI is the fast-scrape tool: read / screenshot / snapshot / `loadall` across many tabs. Same `:9222` backend, different job.
+> **Driving a LOGGED-IN session?** Use the `logged-in-browser` skill (fcdp on the REAL Chrome profile, full CDP, auto-launched by the chrome-debug-on.sh hook) — that's the one default for authenticated driving. This `chrome-cdp` CLI is the fast-scrape tool: read / screenshot / snapshot / `loadall` across many tabs. Same fcdp/real-profile backend, different job.
 
 Lightweight Chrome DevTools Protocol CLI. Connects directly via WebSocket — no Puppeteer, works with 100+ tabs, instant connection.
 

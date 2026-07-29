@@ -40,8 +40,10 @@ If unsure: ask the user where the output is going. Notion / Slack / "send to my 
 1. **Single self-contained `.html` file.** No external CSS files, no separate JS, no asset folders. Tailwind via CDN is allowed and encouraged.
 2. **Document order: `<body>` → `<script>` → `<style>`** (NOT the traditional `<head><style><script></head><body>`). Body content first, then scripts, then styles last. See the template below — this dramatically improves generation quality by forcing content-first output. Do not "correct" it back to standard head layout.
 3. **Save to `~/Claude-Reports/` by default**, named `<slug>-<YYYY-MM-DD>.html`, unless the user specifies a path. `~/Claude-Reports` is a symlink to the Google-Drive-synced folder `My Drive/Claude Reports` (Drive-for-Desktop mount `~/Library/CloudStorage/GoogleDrive-you@example.com/My Drive/Claude Reports`), so every report auto-syncs to Drive. Use the clean symlink path (no spaces) in `Write`/`open` commands. If the symlink is missing (e.g. a machine without the mount), fall back to `~/Downloads/`.
-4. **Open it after writing**: run `open <file>` so the user sees the result immediately. Don't require them to ask.
-5. **Print-friendly**: include a `@media print` block so Cmd-P → Save as PDF works without blank pages or cut-off cards.
+4. **`<meta charset="utf-8">` MUST be the first line of the file.** Non-negotiable. Without it Chrome falls back to a Latin-1 guess and every `—`, `·`, `§`, `×`, `→` renders as mojibake (`â€"`, `Â·`, `Â§`, `Ã—`, `â†'`) — in the PDF, in Drive's preview, and in any browser that doesn't guess right. It is in the template below; do not omit it when hand-writing a file. (Burned 2026-07-29: a full 12-page report rendered with corrupted punctuation on every page.)
+5. **Always emit a PDF sibling, not just the HTML** — run `~/tools/report-pdf <file.html>`. Google Drive, email, and most share targets **cannot render `.html`**; a Drive link to an HTML report is a download, not a document. The PDF is the shareable artifact. `report-pdf` serves the file over localhost, drives real Chrome via `fcdp` so Tailwind-via-CDN actually applies, then verifies page count, text-layer extractability, and zero mojibake. It **refuses** (exit 2) if rule 4 was violated. Never hand the user a Drive/share link to the `.html` when a PDF exists.
+6. **Open it after writing**: run `open <file>` so the user sees the result immediately. Don't require them to ask.
+7. **Print-friendly**: include a `@media print` block so the PDF (and Cmd-P) comes out without blank pages or cut-off cards. Give wide tables `min-width:0` inside `@media print` so they don't overflow the page box.
 6. **No JavaScript unless it earns its keep.** A static HTML page is fine. Add JS only for genuine interactivity (filters, tabs, sortable tables) — not for cosmetic flourish.
 7. **Cite sources inline.** If the report references files, URLs, or data, link them with `<a href>` so the reader can click through.
 
@@ -181,8 +183,23 @@ Pick the components that fit the data, then write content. Don't write content f
 2. **Pick components from the palette** based on the data shape — not based on aesthetic.
 3. **Write the file** using the skeleton + selected components.
 4. **Save** to `~/Claude-Reports/<slug>-<YYYY-MM-DD>.html` (override only if user gave a path). This lands in the Google-Drive-synced folder automatically.
-5. **Open it**: `open ~/Claude-Reports/<slug>-<YYYY-MM-DD>.html`. Don't ask permission — opening a local file is harmless and the user wants to see the result.
-6. **Tell the user** the path in your reply (note it's in Google Drive → `My Drive/Claude Reports`), and offer to: (a) print-to-PDF, (b) paste into Notion, (c) iterate on the design.
+5. **Render the PDF**: `~/tools/report-pdf ~/Claude-Reports/<slug>-<YYYY-MM-DD>.html`. Always. It prints the verified page/byte/char counts to stderr — report them. If it exits 2, you omitted `<meta charset="utf-8">`; add it and re-run.
+6. **Open it**: `open ~/Claude-Reports/<slug>-<YYYY-MM-DD>.html`. Don't ask permission — opening a local file is harmless and the user wants to see the result.
+7. **Tell the user** both paths in your reply (note they're in Google Drive → `My Drive/Claude Reports`), and offer to: (a) share the **PDF** link, (b) paste into Notion, (c) iterate on the design.
+
+### If the user asks for a shareable link
+Share the **PDF**, never the `.html` — Drive renders PDFs inline and cannot render HTML.
+
+```bash
+# find the synced fileId (wait for Drive sync; do NOT `gog drive upload` into a
+# synced folder — that creates a duplicate instead of versioning)
+#   -> mcp__claude_ai_Google_Drive__search_files:
+#      title contains '<slug>' and mimeType = 'application/pdf'
+gog -a you@example.com drive share <fileId> --to=anyone --role=reader --force
+# then PROVE it works with no session:
+curl -sSL -o /tmp/a.pdf -w '%{http_code} %{size_download}\n' "https://drive.google.com/uc?export=download&id=<fileId>"
+```
+`--force` is required for public shares (gog's own guard). Omit `--discoverable` so it stays link-only and out of search. **Before sharing publicly, confirm the report contains no PII** — if it does, keep it owner-only and attach the file to an email instead (per the Drive-PII rule).
 
 ## Anti-patterns
 
@@ -192,6 +209,9 @@ Pick the components that fit the data, then write content. Don't write content f
 - Adding JavaScript for interactivity the user didn't ask for.
 - External CSS files / asset folders — breaks portability. The whole file should travel as one attachment.
 - Heavy gradients, drop shadows, or animation flourish — clean and scannable beats decorated.
+- **Omitting `<meta charset="utf-8">`** — silently mojibakes every em-dash, `·`, `§`, `×`, `→` in the PDF and in Drive's preview. The template has it; keep it.
+- **Delivering only the `.html`** — then handing over a Drive link the recipient can't read. Run `~/tools/report-pdf` and share the PDF.
+- **Verifying a PDF by eye alone.** Render a page or two (`pdftoppm -r 70 -png -f 1 -l 1 x.pdf /tmp/pg`) and actually look at it. Tag-balance checks and a 200 status do not catch corrupted glyphs or a table overflowing the page box.
 
 ## Relationship to other skills
 

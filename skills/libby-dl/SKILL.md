@@ -59,7 +59,7 @@ Partial recovery (loan still active): `libby-dl plan -d DIR` then `libby-dl cdp 
 | **0b** | `libby-dl deps` — install calibre + Adobe Digital Editions if missing |
 | **1** | `libby-dl hp` or `libby-dl pdf --title-id <id> -d DIR` (**PDF default** for HP) |
 | **1b** | Pipeline: odmpy/Chrome `.acsm` → ADE → `book.epub` → calibre; on **DRM** → `chrome_read_to_pdf.py` (Libby reader screenshots) |
-| **1c** | Requires `:9222` Chrome with Libby signed in; installs/repairs Calibre (`brew reinstall --cask calibre` if stub) |
+| **1c** | Requires the REAL Chrome (fcdp) with Libby signed in; installs/repairs Calibre (`brew reinstall --cask calibre` if stub) |
 
 Do **not** use `run`, `cdp`, `discover`, or `verify` for eBooks.
 

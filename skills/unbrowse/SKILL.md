@@ -25,7 +25,7 @@ Unbrowse is a CLI (and optional MCP server) that gives an agent three things the
 | Use unbrowse for | Use something else for |
 |---|---|
 | Clean-markdown read of any public URL → `unbrowse fetch <url>` | Reading a local file → Read tool |
-| Page that's WAF/cookie-gated and `curl` returns 403 | Page in your already-open Chrome tab → chrome-devtools MCP at :9222 |
+| Page that's WAF/cookie-gated and `curl` returns 403 | Page in your already-open Chrome tab → fcdp (`~/tools/fcdp/fcdp`) on the REAL profile |
 | First-time scrape of an authenticated UI ("download my X from Y") → `unbrowse run <url> "task"` | Sending email → `gog send -a <addr>` |
 | Discovering the JSON API behind a page → `unbrowse resolve --intent "..." --url "..."` | Bulk Composio integrations → Composio CLI |
 | Replaying a captured endpoint with new params → `unbrowse execute --skill ID --endpoint ID -p key=val` | Greping the codebase → Grep/Glob |
@@ -35,7 +35,7 @@ Unbrowse is a CLI (and optional MCP server) that gives an agent three things the
 - **Don't use to extract cookies for another tool.** Use `~/tools/cookies-txt` or chrome-devtools CDP per the cookie-handling rules.
 - **Don't use as a Grep substitute.** It fetches the network — Grep/osgrep is for local files.
 - **Don't use for image or PDF content.** The Read tool handles those natively.
-- **Don't use for already-open browser tabs.** chrome-devtools MCP at `:9222` is faster and sees the live DOM state.
+- **Don't use for already-open browser tabs.** fcdp on the REAL Chrome profile is faster and sees the live DOM state.
 
 ## The 5 commands an agent uses 95% of the time
 
