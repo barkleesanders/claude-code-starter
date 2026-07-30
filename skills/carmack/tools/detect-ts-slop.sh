@@ -25,14 +25,32 @@ while [ $# -gt 0 ]; do
 done
 [ ${#PATHS[@]} -eq 0 ] && PATHS=(".")
 
-# Build file list
+# Build file list.
+# NOTE: `mapfile`/`readarray` is bash 4+. macOS ships bash 3.2.57 as /bin/bash, where
+# `mapfile` is not a builtin — it failed, left FILES/TARGET unbound, and every rg call
+# silently scanned NOTHING while the script still printed "✅ no slop found". A gate that
+# cannot read its input must fail loudly, never pass. Portable read-loop instead.
+FILES=()
 if [ -n "$DIFF_BASE" ]; then
-  mapfile -t FILES < <(git diff --name-only --diff-filter=d "$DIFF_BASE" -- '*.ts' '*.tsx' 2>/dev/null \
+  while IFS= read -r _f; do
+    [ -n "$_f" ] && FILES+=("$_f")
+  done < <(git diff --name-only --diff-filter=d "$DIFF_BASE" -- '*.ts' '*.tsx' 2>/dev/null \
     | grep -vE '\.(test|spec)\.tsx?$|\.d\.ts$')
-  [ ${#FILES[@]} -eq 0 ] && { echo "anti-slop: no changed .ts/.tsx vs $DIFF_BASE — clean."; exit 0; }
+  if [ ${#FILES[@]} -eq 0 ]; then
+    echo "anti-slop: no changed .ts/.tsx vs $DIFF_BASE — clean."
+    exit 0
+  fi
   TARGET=("${FILES[@]}")
 else
   TARGET=("${PATHS[@]}")
+fi
+
+# Anti-vacuous-pass guard: bash 3.2 treats an empty array as unbound under `set -u`, so a
+# future refactor that leaves TARGET empty would resurrect the silent-pass bug. Refuse to
+# report a verdict we did not actually compute.
+if [ ${#TARGET[@]} -eq 0 ]; then
+  echo "anti-slop: ERROR — empty scan target; refusing to report a pass." >&2
+  exit 2
 fi
 
 # Patterns (PCRE). Each maps to a refactor hint.
@@ -56,7 +74,7 @@ run_rg() {  # $1=pattern
 }
 
 TOTAL=0
-echo "── anti-slop TypeScript scan ──"
+echo "── anti-slop TypeScript scan (${#TARGET[@]} target(s)) ──"
 for i in "${!PAT[@]}"; do
   OUT=$(run_rg "${PAT[$i]}")
   if [ -n "$OUT" ]; then

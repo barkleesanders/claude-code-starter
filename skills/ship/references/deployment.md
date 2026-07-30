@@ -14,6 +14,67 @@ Covers Phase 2 (manual override), Phase 3 (GitHub deployment), Phase 3.5 (README
 
 ---
 
+## Phase 2.95: NO-REMOTE AUTO-PROVISION (added 2026-07-30)
+
+**Fires when `git remote` is empty.** /ship's rule is "GitHub deployment ALWAYS happens
+before any other platform", so a repo with no remote previously hard-blocked every ship.
+Auto-provision it instead — but a *first* push publishes the entire history at once, so the
+ordering below is the safety property, not bureaucracy.
+
+**Run in exactly this order. Do not reorder — steps 1–2 are what make step 4 safe.**
+
+```bash
+# 1. SECRET SWEEP FIRST — before anything leaves the machine.
+#    A first push ships every commit, so a secret in commit #1 is published even if
+#    later commits removed it. Filenames AND content.
+git ls-files | grep -iE 'dev\.vars$|\.env$|secret|credential|\.pem$|\.p12$|\.key$'   # must be empty
+git ls-files -z | xargs -0 grep -lniE \
+  'AIza[0-9A-Za-z_-]{20,}|sk_live_|ghp_[A-Za-z0-9]{30,}|-----BEGIN (RSA|OPENSSH|PRIVATE)'  # must be empty
+# BLOCK on any hit. Do not "fix" by deleting the file in a new commit — the blob is still
+# in history; rewrite or start a fresh repo.
+
+# 2. Confirm .gitignore covers the local-secret conventions before the first push.
+git check-ignore -v .dev.vars .env .env.local 2>/dev/null
+
+# 3. Create PRIVATE. Never omit --private, never use --public.
+gh repo create "$NAME" --private --source=. --remote=origin --description "<one line>"
+
+# 4. VERIFY the visibility from the API — do not trust the flag you passed.
+gh repo view "$OWNER/$NAME" --json isPrivate,visibility
+#    isPrivate MUST be true. If false: `gh repo edit --visibility private` and re-verify.
+
+# 5. Push and set upstream.
+git push -u origin "$(git branch --show-current)"
+
+# 6. Set origin/HEAD — Phase 1.29's security-review resolves `origin/HEAD...` and
+#    hard-fails with "ambiguous argument 'origin/HEAD...'" without it. A fresh
+#    `gh repo create` + push does NOT always set it.
+git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null || git remote set-head origin -a
+```
+
+**Standing rule this enforces:** personal work is PRIVATE. A fork of a public upstream is
+PUBLIC by default — check `gh repo view --json isPrivate` before ANY push to a repo you did
+not just create. See `feedback_never_push_personal_work_to_public_repos.md`.
+
+### ⚠️ Phase 1.29 is VACUOUS on the first push — say so, don't call it a pass
+
+After a first push `HEAD == origin/HEAD`, so `security-review` sees an **empty diff** and
+reports 0 findings. The skill documents "empty diff = 0 findings (a genuine no-change ship
+passes correctly)" — true for a no-change ship, and **misleading here**: the entire
+codebase, including any auth code, has never been through the gate.
+
+On a first push you MUST either:
+- review the security surface directly (auth/authz, `dangerouslySetInnerHTML`, script-tag
+  JSON embedding, template interpolation, any string reaching a shell/SQL/HTML sink) and
+  report *that* as the evidence, or
+- state plainly that the semantic gate was vacuous and is deferred to the next push.
+
+Never report "security-review: 0 findings" from an empty first-push diff as if the code was
+examined. Generalizes: **a gate whose pass state is indistinguishable from its
+not-run state needs its own gate.**
+
+---
+
 ## Phase 3: GITHUB DEPLOYMENT
 
 - Stage all changes with git add
