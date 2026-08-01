@@ -27,6 +27,31 @@ When each fix makes the symptom *change* instead of *disappear* — `fetch_error
 
 **PREMISE-CHECK GATE — run BEFORE the first fix (not just on the staircase). Full rule: `~/.claude/skills/shared/premise-check.md`.** Two questions, answered against LIVE upstream docs (not a cached `/skill` note): (1) **Is this approach even valid for THIS runtime/SDK/platform?** The browser SDK ≠ native SDK ≠ server SDK — a strategy/option/API documented under one is routinely absent or *forbidden* in another. If every doc/example for the thing you want sits under a *different* platform than yours, that's your answer — stop. (2) **What's the cheapest probe** (curl the API / grep the installed bundle / read the doc's "supported platforms" line) that proves it's possible here? Run it before coding. **Docs-before-note (always):** a `/skill` recipe, comment, memory, or prior conclusion is a HYPOTHESIS — re-verify any load-bearing "API/SDK can/can't do X" claim against the upstream's own *current* docs/source before building on it; live source wins, fix the stale note in the same pass. **2026-06-13 reference incident:** hours spent debugging Clerk native `oauth_token_apple` from a Capacitor webview — clerk-js (browser SDK) can never send it (browser-forced `Origin` vs Clerk Native-API `Authorization` conflict), a fact Clerk's docs state plainly under "Expo only." A wrong `/ios` trap-#4 note was trusted as fact; the working web-OAuth fix was a 5-minute live-doc read away. Now also enforced session-wide by the `premise-check-session-start.sh` SessionStart hook.
 
+## Route-coverage bugs: get the site's route list before you sample (2026-07-31)
+
+When the symptom is **about which pages/endpoints exist or work** — "page X 404s in prod",
+"some routes broke after the deploy", "the new pages aren't live", "search can't find our
+docs" — do NOT debug from the handful of URLs you happened to click. Get the declared
+inventory first, then diff it against reality:
+
+```bash
+curl -sL https://<host>/robots.txt | grep -i sitemap
+curl -sL https://<host>/sitemap.xml | grep -o '<loc>[^<]*' | sed 's|<loc>||' > /tmp/declared.txt
+# now diff DECLARED against DEPLOYED — the bug is usually in the gap
+while read -r u; do printf '%s %s\n' "$(curl -s -o /dev/null -w '%{http_code}' -m 10 "$u")" "$u"; done < /tmp/declared.txt | grep -v '^200'
+```
+
+For an **API**, the analog is the published spec (`/openapi.json`, `/swagger.json`,
+`/api-docs`, GraphQL introspection, or `unbrowse_eval_spec_discover`) — not a sitemap.
+
+This is the **"Compared to What?"** rule applied to debugging: a sampled set of working
+URLs is a delta, the declared route list is the denominator. Two failures it prevents:
+declaring "routes are fine" after checking the three you remembered, and declaring "page X
+doesn't exist" when it exists but 404s (a very different bug).
+
+Distinct from the security-baseline check below, where a **missing** `sitemap.xml` is itself
+the finding (#16). Here the sitemap is the *instrument*, not the defect.
+
 ## No-Lie Post-Fix Gate (MANDATORY — 2026-05-18)
 
 A "fixed" symptom is one that fails to reproduce on the *deployed/built artifact*, not in the source. After EVERY fix, before declaring root cause resolved, run the **No-Lie Verification Protocol** from `~/.claude/skills/shared/no-lie-verification.md` Checks 3 + 4:

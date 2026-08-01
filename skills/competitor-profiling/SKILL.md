@@ -80,11 +80,31 @@ For each competitor URL, scrape key pages to extract positioning, features, pric
 
 #### Step 1: Map the site
 
-Use **Firecrawl Map** to discover the competitor's site structure and identify key pages:
+**Try the competitor's own sitemap first — it's free, instant, and authoritative.** Firecrawl
+Map is a crawler's *inference* of the structure; `sitemap.xml` is the site owner's own
+declaration of what exists. It also needs no API key, so it works when Firecrawl isn't
+configured or is out of credits.
+
+```bash
+curl -sL https://<competitor>/robots.txt | grep -i sitemap        # names the real sitemap(s)
+curl -sL https://<competitor>/sitemap.xml | grep -o '<loc>[^<]*' | sed 's|<loc>||'
+# sitemap index? follow one level:
+curl -sL https://<competitor>/sitemap_index.xml | grep -o '<loc>[^<]*' | sed 's|<loc>||'
+```
+
+This matters for competitor work specifically: it surfaces pages that aren't linked from the
+nav — unlaunched product pages, comparison/"vs" pages targeting *you*, pricing tiers not shown
+on `/pricing`, careers pages that reveal roadmap. A crawler that follows links can miss all of
+those; the sitemap lists them.
+
+Then use **Firecrawl Map** to fill gaps (JS-rendered routes, or when there's no sitemap):
 
 ```
 firecrawl_map → competitor URL
 ```
+
+If you later claim "they don't offer X" or "they have no <feature> page", that exhaustive
+claim must rest on the sitemap enumeration, not on the pages you happened to scrape.
 
 From the map, identify and prioritize these page types:
 - Homepage

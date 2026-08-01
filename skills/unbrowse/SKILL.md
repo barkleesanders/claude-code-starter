@@ -37,6 +37,30 @@ Unbrowse is a CLI (and optional MCP server) that gives an agent three things the
 - **Don't use for image or PDF content.** The Read tool handles those natively.
 - **Don't use for already-open browser tabs.** fcdp on the REAL Chrome profile is faster and sees the live DOM state.
 
+## Step 0 — check if the site PUBLISHES its surface (before capture/resolve)
+
+The MCP server ships **`unbrowse_eval_spec_discover`** and it is under-used. It probes a
+target's spec-publishing endpoints (**openapi / swagger / sitemap / robots / graphql**,
+~3s budget each) and returns endpoint METADATA — paths, methods, parameter names and
+types, response schema keys. When a site publishes any of these, that is **ground truth
+for the whole surface**, and it beats the browse→capture→rank cycle outright: capture only
+ever yields the endpoints the page happened to fire, with no schemas.
+
+```
+mcp__unbrowse__unbrowse_eval_spec_discover  { target: "example.com" }
+# optional: { graphql: true } to opt into introspection, { budget_ms: 3000 }
+```
+
+Decision rule:
+- **OpenAPI/Swagger found** → you have every route + params. Go straight to `unbrowse_act_execute`
+  / plain `curl`; skip `unbrowse_act_navigate` and the capture dance entirely.
+- **Only sitemap/robots** → you have the *page* inventory (useful for content work, and for
+  any exhaustive/negative claim about the site), but not the API. Continue to resolve/capture.
+- **Nothing** → normal path, proceed below. A 404 sweep costs seconds, so there's no reason
+  to skip Step 0.
+
+Pointer-only output by design (no response bodies), and cross-domain redirects are refused.
+
 ## The 5 commands an agent uses 95% of the time
 
 ### 1. `unbrowse fetch <url>` — clean markdown of any URL
