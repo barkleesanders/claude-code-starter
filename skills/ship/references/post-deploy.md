@@ -260,17 +260,99 @@ If anything matches: either remove the worktree (`git worktree remove --force <p
 
 Another agent, shell, or CI run can `wrangler deploy` (or equivalent) seconds after yours, overwriting your bundle with a stale build. Pin to the version_id you just deployed and warn if it changes during the verification window:
 
+**⚠️ The snippet that lived here until 2026-08-03 was BROKEN and silently always passed.** Keep the
+corrected commands below; do not "restore" the old ones. Both of its operands evaluated to the empty
+string, so the comparison was `[ "" = "" ]` — true, every time, on every repo. It never once detected a
+clobber while looking exactly like a working gate. The two defects, verified against wrangler 4.113:
+
+| Old line | Why it produced `""` |
+|---|---|
+| `wrangler deployments list \| awk '/Current Version ID:/'` | **`deployments list` never prints that string.** Only `wrangler deploy` does, on its last line. |
+| `... \| grep -A1 'Created:' \| head -2 \| awk '/Version/'` | `deployments list` prints **oldest-first**, so `head` grabs the OLDEST deployment — and the field is `Version(s):`, which that `awk` misses anyway. |
+
+Correct version — capture from the deploy itself, compare against `deployments status`:
+
 ```bash
-# After your wrangler deploy, capture the version you just shipped
-DEPLOYED_VERSION=$(wrangler deployments list 2>&1 | awk '/Current Version ID:/ {print $NF; exit}')
-# wait + re-check; if a NEWER deploy landed, you got clobbered
-sleep 10
-LATEST=$(wrangler deployments list 2>&1 | grep -A1 'Created:' | head -2 | awk '/Version/ {print $NF}' | tr -d '()' )
-[ "$DEPLOYED_VERSION" = "$LATEST" ] || \
-  echo "WARN: another deploy landed after yours ($DEPLOYED_VERSION → $LATEST). Re-deploy + purge."
+# 1. Capture the version FROM THE DEPLOY OUTPUT. This is the only command that prints it.
+DEPLOYED_VERSION=$(wrangler deploy 2>&1 | tee /dev/stderr | awk '/Current Version ID:/ {print $NF; exit}')
+[ -n "$DEPLOYED_VERSION" ] || { echo "BLOCK: could not capture a version id — deploy may have failed"; }
+
+# 2. Wait past propagation (>30s; a <60s check is not evidence), then ask what is CURRENTLY live.
+sleep 45
+LIVE=$(wrangler deployments status 2>&1 \
+       | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)
+
+# 3. A MISMATCH IS NOT A CLOBBER. It is a prompt to verify by CONTENT (step 4).
+if [ "$DEPLOYED_VERSION" != "$LIVE" ]; then
+  echo "NOTE: live version is $LIVE, not the $DEPLOYED_VERSION wrangler printed."
+  echo "      This is EXPECTED on some repos (see below). Do NOT roll back."
+  echo "      Resolve it with the content check in step 4, not by version id."
+fi
 ```
 
-**Real incident (2026-04-30):** Three separate `wrangler deploy` runs from concurrent shells/agents on the same machine overwrote each other within 30 seconds. The deploy log said "success" each time, but the live bundle ship-tested against the wrong version twice in a row before being caught. Auto-detection: compare your captured `version_id` against the latest in `wrangler deployments list` after a short sleep.
+> ⚠️ **A version-id mismatch is NOT evidence of a clobber, and on its own must never
+> justify a rollback.** Verified on exampleapp 2026-08-03: `wrangler deploy` printed
+> `Current Version ID: b0e60e43` (21:23:05Z) and **29 s later** `587279b3` (21:23:34Z)
+> became the live version. The step-3 comparison therefore reports a clobber on a
+> completely normal, successful deploy. Versions land in pairs/triples with irregular
+> gaps (29 s, 35 s, 43 s, 61 s), all stamped `src=wrangler trig=version_upload` by the
+> same author — so the CF annotation in the next section **cannot** separate them either.
+> This exact false signal is what made `wrangler rollback` feel justified once before,
+> and the rollback is what actually broke production.
+
+**4. Verify by CONTENT — this is the check that actually proves your deploy landed.**
+Version ids are metadata; the bytes being served are the fact.
+
+```bash
+# Pick a string that exists ONLY in this change (test id, event name, data-attribute).
+MARKER='composer-sms-transport-warning'
+
+# Resolve the REAL module script. Do NOT grep the first /assets/*.js in the HTML —
+# a modulepreload or JSON-LD ref will point at a stale/nonexistent bundle and mislead you.
+CB=$(date +%s%N)
+HTML=$(curl -s -m 20 "https://$HOST/$ROUTE?cb=$CB")
+ENTRY=$(printf '%s' "$HTML" | grep -oE '<script type="module"[^>]*src="[^"]+"' | grep -oE '/assets/[^"]+')
+
+# A .js URL answering 200 text/html means that asset is ABSENT and the SPA
+# fallback replied. Content-type is the tell, not the status code.
+curl -s -o /dev/null -w '%{http_code} %{content_type}\n' -m 20 "https://$HOST$ENTRY?cb=$CB"
+
+# Then grep the chunk that carries your change (often a code-split chunk, not the entry).
+curl -s -m 30 "https://$HOST/assets/<your-chunk>.js?cb=$CB" | grep -c "$MARKER"   # expect >=1
+```
+
+Expect the live chunk's **hash to differ** from your local build even when the deploy is
+yours: a rebuild that changes one chunk's content hash cascades into every importer,
+because the import specifier is part of the importing file's bytes. Diff the two and
+confirm the only differences are sibling-chunk filenames — if the application code is
+identical, it is your build. On exampleapp the live and local admin chunks were both
+100,283 B and differed solely in `index-BqvIB0ze.js` vs `index-CybPCm53.js` and
+`jszip.min-CjCcE8IK.js` vs `jszip.min-DHek5_FY.js`.
+
+**Then attribute it before reacting.** A version you did not expect is not proof of a rogue actor.
+Ask the Cloudflare API who made it — `annotations['workers/triggered_by']` is authoritative:
+
+```bash
+# build → Cloudflare Workers Builds (CI).  version_upload → a plain `wrangler deploy` by someone.
+curl -s -H "X-Auth-Email: $CFE" -H "X-Auth-Key: $CFK" \
+  "https://api.cloudflare.com/client/v4/accounts/$ACCT/workers/scripts/$NAME/versions/$LIVE" \
+| python3 -c "import sys,json;r=json.load(sys.stdin)['result'];m=r.get('metadata',{});a=r.get('annotations',{}) or {};print(m.get('source'),m.get('author_email'),a.get('workers/triggered_by'))"
+```
+
+**Real incident (2026-04-30):** Three separate `wrangler deploy` runs from concurrent shells/agents on the same machine overwrote each other within 30 seconds. The deploy log said "success" each time, but the live bundle ship-tested against the wrong version twice in a row before being caught.
+
+**Real incident (2026-08-03, AIVA — the one that proved this gate was dead):** several unexplained versions
+appeared minutes apart during a ship. Because the guard above silently passed, the drift was invisible; the
+agent then saw a blank admin page **in a long-lived browser tab**, concluded production was down, and ran
+`wrangler rollback`. *The rollback is what actually broke production* — it pinned the worker to an old
+bundle while users held the new shell. The origin had been healthy the whole time (`/assets/index-*.js`
+→ `200 text/javascript`). Two lessons, both now mechanical:
+- Never conclude "prod is broken" from a browser. Check the ORIGIN (debug Pattern #28, and the
+  pre-rollback block at the top of this file). Enforced by the PreToolUse hook
+  `~/.claude/skills/hooks/pre-bash-rollback-origin-gate.sh`, which BLOCKS `wrangler rollback` when the
+  origin still serves the entry bundle as real JS (override: `CLAUDE_ALLOW_ROLLBACK=1`).
+- An unexpected version means **investigate**, never **roll back**. Rollback is for a *proven* bad
+  deploy, not for an unexplained one.
 
 ### Sitemap Live Check
 ```bash
