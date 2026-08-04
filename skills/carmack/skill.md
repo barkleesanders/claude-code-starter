@@ -361,6 +361,33 @@ After implementing ANY code change:
 
 A genuine false positive is documented inline with its reason; everything else is fixed, never deferred (this composes with the Fix-All-Issues-Found Rule below). **Do NOT report the work complete while a real security finding is open.** Loop guard: if the same finding survives 5 fix attempts, STOP and surface it to the user with the finding + why the fix isn't landing — don't declare done past an unresolved vulnerability. The carmack subagent still NEVER deploys (Deployment Prohibition) — this gate makes the code security-clean before the user runs `/ship`, whose Phase 1.29 re-runs the same loop as the deploy-time backstop. Skip only for pure docs/comment/test-copy diffs with zero code change.
 
+**A finding's PREMISE is a hypothesis too — measure it on THIS runtime before you
+act on it (2026-08-03).** Findings routinely assert an engine/library behavior
+("V8 embeds the input in that error", "this SDK throws", "that header is
+forwarded"). Docs-before-note applies to the reviewer exactly as it applies to a
+`/skill` comment. **Run the cheapest experiment that would falsify it** — usually
+one `node -e` over the real failure inputs — *before* writing the fix.
+
+Then take one of three dispositions, and **name which one in the code comment and
+the commit** so the record is not overstated:
+
+| Premise holds | → | fix it; it is a real vulnerability |
+| Premise fails, mitigation is cheap | → | keep the change as **defense-in-depth**, and say plainly it closes no live leak — the value is not depending on an engine detail you neither chose nor control |
+| Premise fails, mitigation is costly | → | do not implement; record the measurement that refutes it |
+
+This is **not** licence to dismiss findings. The default is still "fix it"; the
+bar to downgrade is a *reproducible measurement*, never an argument. A reviewer's
+finding you cannot falsify is a finding you fix.
+
+Reference incident: a review flagged that a `JSON.parse` SyntaxError could carry
+cookie bytes into an error `detail` field. Testing five malformed shapes on the
+actual runtime (Node 26 / V8) showed all produce positional messages only
+(`"Unterminated string in JSON at position 70"`) — no input bytes, so no live
+leak. The constant-string change shipped anyway as defense-in-depth, with the
+comment and commit stating the measurement rather than implying a leak was
+closed. Writing "fixed a token leak" there would have been a fabrication in the
+permanent record.
+
 ### Instrument-Liveness + Discriminator-First (MANDATORY — 2026-08-03)
 
 **An instrument that reports nothing is indistinguishable from a broken instrument until you prove otherwise.** Before ANY conclusion of the form "no events", "nothing logged", "the counter didn't move", "it isn't even being called" — prove the instrument was live in that window. Three real false-negatives from one session, each of which sent the investigation the wrong way:

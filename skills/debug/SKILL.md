@@ -25,6 +25,50 @@ When the symptom involves a third-party integration falling back to a worse path
 
 When each fix makes the symptom *change* instead of *disappear* — `fetch_error` → `handshake_rejected` → `publicid_timeout`, every "fix" peeling back to reveal a new failure one layer deeper — STOP. That staircase is the tell that the whole feature premise is wrong, not that you are three fixes from done. Before fixing layer N+1, verify the premise itself: does the real client even use this code path? Capture live traffic and confirm. Reference incident: the SF311 cable chain — four green-tested fixes (`wss://`→`https://`, missing `Origin` header, subscription identifier, publicId timeout) each surfaced the next layer; a live mitm capture then proved the real app never opens the WebSocket at all — the whole path was dead code. Many round-trips of "fix the next layer" should have been one round-trip of "verify the premise."
 
+## Recurring symptom after a DOCUMENTED remediation = the runbook's causal model is wrong (MANDATORY — 2026-08-03)
+
+The third sibling of the two rules above. Mutating error = wrong premise. Static
+error = missing discriminator (#32). **A symptom that keeps COMING BACK on a
+schedule, after you keep applying the documented fix, = the runbook is wrong
+about what causes it.**
+
+The trap is that the remediation *appears* to work every time. It restores
+service, so it never reads as a failed fix — it reads as an unlucky recurrence.
+That is what lets a wrong causal model survive N repetitions. **Executing a
+runbook is not debugging, and "the alert told me to" is not a diagnosis.**
+
+**Tripwire — fires on the SECOND repetition, not the fifth:** if a documented
+remediation has been applied ≥2 times and the symptom returned, stop executing
+it and ask the two questions that the runbook is silently answering for you:
+
+1. **What actually MINTS the thing I keep replacing, and does my system ever
+   call it?** Replacing an artifact is not the same as participating in its
+   lifecycle. If nothing in your code ever calls the issuer, you are refilling a
+   bucket with a hole and the interval between refills is the hole's size.
+2. **Measure the true survival time, don't inherit the folklore number.** Time
+   the interval yourself; the remembered figure is usually the longest one
+   anyone noticed, and the real number is a much sharper clue.
+
+**Reference incident (2026-08-03, AIVA Google Voice).** An alert said "session
+expired — reseed the cookies," with a copy-paste command. It was followed three
+times in 18 hours. Each reseed restored SMS, so each expiry read as bad luck.
+The runbook was wrong: `__Secure-1PSIDTS`/`__Secure-3PSIDTS` are minted ONLY by
+`accounts.google.com/RotateCookies` on a ~600s cadence and gate every RPC, while
+the Worker talked only to `clients6.google.com`, which never returns them.
+Nothing in the system ever called the issuer, so reseeding could never have
+fixed it — it just restarted the same clock. The cookie-refresh code was present
+and correct; it simply had nothing to persist. Question 2 mattered too: the
+folklore said "about an hour," but timing it gave **~20 minutes** (21:51 ok →
+22:11 alerted), which matches the 600s rotation cadence and pointed straight at
+the mechanism. Fix = call the issuer on the cadence it declares.
+
+**Corollary — "SAPISID present=true" class of false-healthy signal.** The alert
+reported the long-lived credential as present while the short-lived one that
+actually gates access had already expired. When a health line reports a
+credential/resource as OK during a confirmed outage, check whether it is
+reporting a *different-lifetime* component than the one that fails. Enumerate
+the credential set by lifetime before trusting any "present=true".
+
 **PREMISE-CHECK GATE — run BEFORE the first fix (not just on the staircase). Full rule: `~/.claude/skills/shared/premise-check.md`.** Two questions, answered against LIVE upstream docs (not a cached `/skill` note): (1) **Is this approach even valid for THIS runtime/SDK/platform?** The browser SDK ≠ native SDK ≠ server SDK — a strategy/option/API documented under one is routinely absent or *forbidden* in another. If every doc/example for the thing you want sits under a *different* platform than yours, that's your answer — stop. (2) **What's the cheapest probe** (curl the API / grep the installed bundle / read the doc's "supported platforms" line) that proves it's possible here? Run it before coding. **Docs-before-note (always):** a `/skill` recipe, comment, memory, or prior conclusion is a HYPOTHESIS — re-verify any load-bearing "API/SDK can/can't do X" claim against the upstream's own *current* docs/source before building on it; live source wins, fix the stale note in the same pass. **2026-06-13 reference incident:** hours spent debugging Clerk native `oauth_token_apple` from a Capacitor webview — clerk-js (browser SDK) can never send it (browser-forced `Origin` vs Clerk Native-API `Authorization` conflict), a fact Clerk's docs state plainly under "Expo only." A wrong `/ios` trap-#4 note was trusted as fact; the working web-OAuth fix was a 5-minute live-doc read away. Now also enforced session-wide by the `premise-check-session-start.sh` SessionStart hook.
 
 ## Route-coverage bugs: get the site's route list before you sample (2026-07-31)

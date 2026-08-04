@@ -277,6 +277,37 @@ broke. **Run the gate, read its result, then decide.** This is not hypothetical:
 2026-07-30 recipe-flow ship the agent chained the gates twice and shipped past 2 failing
 tests and then a tsc error — in a run whose whole purpose was to run the gates.
 
+#### 🛑 …and never read `$?` through a pipe — it reports the LAST stage, not the gate
+
+Same root cause, different disguise, and this one looks like it worked:
+
+```bash
+tsc -b 2>&1 | tail -5;  echo "TSC=$?"      # ← reports TAIL's status. ALWAYS 0.
+```
+
+`tail`/`head`/`grep`/`tee` succeed on the failing gate's own error text, so the
+gate prints red and the line right under it prints `TSC=0`. Worse: `tail -5` can
+scroll the diagnostics off-screen entirely, so you see a clean `0` and no errors.
+**Capture to a file, read the real code, then look:**
+
+```bash
+tsc -b > /tmp/gate.log 2>&1; RC=$?     # RC is the GATE's
+tail -20 /tmp/gate.log; echo "RC=$RC"
+```
+
+In zsh the array is `$pipestatus[1]` (1-indexed); in bash `${PIPESTATUS[0]}` — and
+the Bash tool here runs **zsh**, so a copy-pasted bash idiom silently yields the
+empty string, which reads as "no error". Prefer the redirect form; it is
+shell-agnostic. **Rule: a gate's verdict is the number you captured on the gate's
+own command — never a number printed after a pipeline, and never the absence of
+visible output.**
+
+Reference incident (2026-08-03, AIVA GV-rotation ship): `tsc -b | tail -5; echo
+"TSC=$?"` printed `TSC=0` while hiding three real errors (TS2307 `node:fs`,
+TS2307 `node:path`, TS2304 `__dirname` — a test placed under a Workers-scoped
+tsconfig). It passed vitest, which runs in Node, so only the typecheck knew. The
+gate was "run" and reported green for a full cycle.
+
 Execute phases in this order:
 
 0. **Phase -2**: World-state refresh (from `~/.claude/skills/shared/no-lie-verification.md` Check 1) — **MANDATORY FIRST STEP.** Run `git fetch origin --prune`, then `git log --oneline @{u}..origin/main 2>/dev/null | head -10` and `git status`. If `origin/main` has commits not in the current branch's history (other developers / other agents pushed during this session), BLOCK and rebase before any other phase. If the current branch is a PR branch and its base moved, rebase + `git push --force-with-lease` + re-verify `gh pr view <N> --json mergeable` returns MERGEABLE before continuing. **Why:** the 2026-05-18 hospital-ledger incident — /carmack agent pushed PR #2, main moved during the session (3 commits including one that touched `src/routes/home.tsx`), the PR went CONFLICTING, the agent reported "PR opened, branch tracking origin" because it never re-fetched. /ship caught it in this session; this gate makes it the FIRST thing /ship does next time.

@@ -329,6 +329,55 @@ identical, it is your build. On exampleapp the live and local admin chunks were 
 100,283 B and differed solely in `index-BqvIB0ze.js` vs `index-CybPCm53.js` and
 `jszip.min-CjCcE8IK.js` vs `jszip.min-DHek5_FY.js`.
 
+**5. Worker-side code has no client asset to grep — fetch the DEPLOYED SCRIPT.**
+The check above only proves the *client bundle* landed. A change to `scheduled()`,
+a service, or a route handler ships in the Worker script, which is not reachable
+by curling the site. Pull it from the CF API and grep for a marker only your
+change has:
+
+```bash
+CFG=~/.cloudflared/cf-global-api-key.json
+EMAIL=$(python3 -c "import json;print(json.load(open('$CFG'))['email'])")
+KEY=$(python3   -c "import json;print(json.load(open('$CFG'))['global_api_key'])")
+ACC=$(python3   -c "import json;print(json.load(open('$CFG'))['account_id'])")
+
+curl -s -H "X-Auth-Email: $EMAIL" -H "X-Auth-Key: $KEY" \
+  "https://api.cloudflare.com/client/v4/accounts/$ACC/workers/scripts/<script-name>" \
+  -o /tmp/deployed_worker.js
+wc -c /tmp/deployed_worker.js                      # non-trivial size = real script
+grep -c '<marker-from-your-change>' /tmp/deployed_worker.js   # expect >=1
+```
+
+Grep **several** markers, not one — a single hit can come from a comment or a
+string that predates your change. Note the credential file key is
+`global_api_key`, not `api_key`. This is the only way to answer "is my worker
+code live" without waiting for it to run.
+
+**6. A NEGATIVE result from an eventually-consistent store is not evidence — poll it.**
+Cloudflare KV reads lag. A key your new code writes can read `404` for minutes
+*after it was written*, so a single read that comes back empty proves nothing and
+will send you diagnosing a fix that already worked.
+
+```bash
+# WRONG — one read, then a conclusion
+wrangler kv key get <key> --namespace-id <ns> --remote     # 404 -> "it failed"
+
+# RIGHT — poll until it appears or a real deadline passes
+until R=$(wrangler kv key get <key> --namespace-id <ns> --remote 2>&1 \
+          | grep -oE '<expected-shape>'); [ -n "$R" ]; do sleep 20; done
+```
+
+**Also check the write is even reachable before treating absence as failure.** If
+the key is written only on a success branch (`if (result.ok) await kv.put(...)`),
+its absence during a known-bad upstream state is the CORRECT behavior, not a bug.
+Establish that the precondition holds before you read.
+
+Reference incident (2026-08-03, AIVA GV-rotation): `gv_rotated_at` read `404`
+twice post-deploy and the agent began reasoning about why rotation "didn't
+return ok". It had succeeded at `22:40:59.844Z`; KV simply had not propagated. A
+polling monitor produced the truth. Pattern #32's "KV reads lag" line existed and
+was still walked into — hence this concrete recipe rather than a warning.
+
 **Then attribute it before reacting.** A version you did not expect is not proof of a rogue actor.
 Ask the Cloudflare API who made it — `annotations['workers/triggered_by']` is authoritative:
 

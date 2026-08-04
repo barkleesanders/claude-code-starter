@@ -97,6 +97,7 @@ Why preview at all (2026-07-02, thermostat dashboard): restyling directly in cod
 - **Code mode runs `npx impeccable detect`** before declaring done. 27 deterministic anti-pattern checks, no API key. See `code-implementation.md` → Deterministic Anti-Pattern Scan.
 - **One focused edit at a time** (whether `edit_screens` or refactoring a component).
 - **No "modern" / "clean" / "sleek"** as a direction. Push back to the user.
+- **UI descriptions:** Do not add subtitles, helper text, or descriptive copy beneath headings, labels, cards, or settings by default. Prefer one concise, self-explanatory heading or label. Only add supporting copy when the user explicitly asks for it or when it is necessary to prevent misunderstanding or error, and never use it to restate the heading.
 - **Emil Kowalski companion skills** (emilkowalski/skills, installed 2026-07-10
   at `~/.agents/skills/*`, available via the Skill tool — load by need, they
   complement, never replace, `aesthetic-core.md`):
