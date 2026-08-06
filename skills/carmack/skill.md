@@ -402,6 +402,49 @@ Two bisect disciplines that belong with it: **change exactly ONE variable per pr
 
 **Reference incident (2026-08-03, improvebayarea Solve SF):** one `400 {"error":"Invalid"}` covered FIVE independent causes (`//` sequence, astral/emoji char, two reserved phrases, length). Each single-cause fix looked like a non-fix, costing ~6 deploys. A confounded bisect step (removing a URL *also* cut 371→261 chars and dropped an emoji) sent the fix in the wrong direction for two of them. Shipping the properties-diagnostic ended it in one deploy.
 
+### Fix the CALL-SITE CLASS, not the instance you were looking at (MANDATORY — 2026-08-05)
+
+**Before you call a bug fixed, enumerate every site that could exhibit it, and leave behind
+a test that fails on a NEW one.** Fixing the instance in front of you is the default failure
+mode, and it is invisible: the symptom goes away, the tests you just wrote pass, and the
+sibling call site ships the same bug in a narrower window.
+
+Three steps, none optional:
+
+1. **Name the class, then grep for it repo-wide** — not "the watch is fixed" but "every
+   writer of `STATE.geo`". `grep -n "setGeoFromSource(\|applyGeoFromSource(\|STATE\.geo = "`
+   returns the denominator. Check EVERY hit, including other files.
+2. **Ask what else reaches the same sink by a different path.** A one-shot and a subscription
+   are different code but the same class; so are a cron and an HTTP handler that call one
+   helper, or two components rendering one API shape.
+3. **Add a STRUCTURAL test** that asserts the invariant over the whole artifact, not a
+   behavioral test of the one site you fixed. Behavioral tests prove today's instance;
+   structural tests fail on tomorrow's. Then **prove it fails** by re-injecting the bug.
+
+```bash
+# structural: no PASSIVE writer may use the deliberate-action source tag
+offenders = renderedBundle.split("\n").filter(l => /setGeoFromSource\([^)]*['"]gps['"]\s*\)/.test(l))
+expect(offenders).toEqual([])        # fails on any FUTURE passive writer, naming its line
+```
+
+**Reference incident (2026-08-05, improvebayarea — the same miss twice in one session).**
+A moving-vehicle GPS watch was overwriting a committed report location. Fix #1 (`b11d1f7`)
+tagged `watchPosition` `'gps_watch'` and guarded it — and missed that `startGeo()` ALSO
+calls `getCurrentPosition`, still tagged `'gps'`. `clearWatch()` cannot cancel an in-flight
+`getCurrentPosition`, so with `timeout: 12000` a user tapping the camera within ~12s of page
+load (the normal case — GPS cold-start is slow) got the identical bug back. Fix #2
+(`fa7265b`) added the structural test above; reverting only the source tag makes it fail and
+print the offending line number. Nothing behavioral would have caught it, because the
+behavior of the site I fixed was correct.
+
+**Corollary — a lint/type complaint on your own new code is a design signal, not a chore.**
+The same session, biome flagged `{ ...h.STATE.geo! }` in a new test. Removing the non-null
+assertion (rather than suppressing it) revealed the assertion had made the test **vacuous**:
+spreading a null yields `{}`, and `{} toEqual {}` passes while proving nothing. Snapshot-then-
+compare assertions are the common shape for this — if the snapshot can silently become empty,
+the comparison always passes. Read what the tool is telling you about the code, not just what
+it wants you to type.
+
 ### Fix-All-Issues-Found Rule (MANDATORY — 2026-04-12)
 
 **When an audit/review/diagnostic step surfaces issues, FIX THEM — do not only report.** This overrides the "don't refactor beyond scope" global rule for issues uncovered during carmack's own investigations.
