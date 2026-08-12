@@ -99,23 +99,55 @@ npx eslint "src/react-app/**/*.{ts,tsx}" 2>&1 | grep "error"
 
 **The #1 pattern:** `noUselessEscapeInString` removes backslash escapes that are *syntactically necessary* inside embedded JS strings. Example: Biome converts `Didn\'t` → `Didn't` inside a single-quoted JS string embedded in a TypeScript template literal — this unescaped apostrophe terminates the JS string and kills the entire client-side script.
 
-**After every `biome check --fix` or `biome check --write --unsafe`, run this check:**
+**Biome is only ONE cause. The bug class is: code inside a string is invisible to every
+compiler you run.** A hand edit, a search-and-replace, a sed, or an agent rewriting a
+comment breaks it exactly as easily — and `tsc --noEmit`, `vite build`, `wrangler deploy
+--dry-run` and a **full green test suite** all pass on a bundle whose client script cannot
+parse, because none of them ever parse that string. The failure appears only in a user's
+browser, as a dead page.
+
+**Reference incident (2026-08-05, improvebayarea).** A `python3 -c` replace intended for a
+COMMENT also rewrote real code inside the template literal:
+`setGeoFromSource(..., 'photo_exif', { force: true })` → `..., force:true)`. `tsc` exit 0,
+`vite build` exit 0, `wrangler deploy --dry-run` exit 0, **56 tests passed**. It was caught
+by eye while reading a diff. Nothing mechanical would have stopped that deploy.
+
+**So run a PARSE gate, not a pattern grep.** `new Function(code)` parses without executing —
+no DOM, no globals, no side effects — and it is cause-agnostic: it catches Biome damage, a
+bad sed, a stray backtick in a comment (a backtick or `${` inside a template literal
+terminates it), and anything else. Trigger it after **ANY** edit to a file that emits code
+inside a string, not just after a Biome fix.
 
 ```bash
-# Detect inline HTML projects (Workers, SSR, template-literal HTML)
-if grep -q "text/html\|innerHTML\|<script>" src/*.ts src/*.tsx 2>/dev/null; then
-  echo "INLINE HTML DETECTED — checking for Biome string-escape damage..."
-
-  # Check for unescaped apostrophes inside single-quoted JS strings in HTML templates
-  # Pattern: single-quote string containing an unescaped apostrophe
-  grep -nP ":'[^']*'[^']*'" src/*.ts 2>/dev/null | grep -v "^.*//.*$" | head -20
-
-  # Check for JS syntax errors in the rendered HTML output
-  # Build/deploy and verify JS actually runs:
-  # - curl the page, extract <script> content, check for syntax errors
-  # - OR: node -c on the extracted JS
-fi
+# Cause-agnostic: does every inline <script> in the RENDERED output actually parse?
+node -e '
+const fs=require("fs");
+// LAST argv element, not argv[1]: as `node -e" argv[1] is the file, but if you save
+// this snippet to guard.js then argv[1] is the SCRIPT PATH and it silently parses
+// its own source (0 blocks -> exit 2). Verified by doing exactly that, 2026-08-05.
+const html=fs.readFileSync(process.argv[process.argv.length-1],"utf8");
+const blocks=[...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
+  .map(m=>m[1]).filter(s=>s.trim());
+if(!blocks.length){console.error("GUARD VACUOUS: 0 inline <script> found — regex drifted");process.exit(2);}
+let bad=0;
+blocks.forEach((c,i)=>{try{new Function(c)}catch(e){bad++;console.error(`block #${i}: ${e.message}`)}});
+console.log(`${blocks.length} inline <script> block(s), ${bad} parse failure(s)`);
+process.exit(bad?1:0);
+' /tmp/rendered.html
 ```
+
+Feed it the **rendered** HTML — `curl` the live page post-deploy, or call the render
+function in a test pre-deploy. As a permanent repo gate, make it a unit test over the
+render function (improvebayarea `src/geo_freeze.test.ts`, "inline browser bundle stays
+syntactically valid"), so it runs on every `vitest` rather than only when someone
+remembers. **Prove the guard can fail** — re-inject the exact corruption and confirm it
+reports `SyntaxError`; a guard that has never failed is a guard you have not tested. Note
+the `0 blocks → exit 2` branch: if the regex ever drifts, the gate must scream rather than
+silently pass on nothing.
+
+**Same class, other hosts:** SQL built into a string, CSS in a `<style>` template, a shell
+script emitted by a generator, an email HTML template. If your toolchain does not parse it,
+add a parse gate for it.
 
 **Fix patterns:**
 - Change single-quoted strings containing apostrophes to double-quoted: `'Didn't'` → `"Didn't"`
