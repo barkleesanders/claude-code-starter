@@ -1,13 +1,13 @@
 ---
 name: unbrowse
 description: >-
-  Web content + endpoint discovery without the browser-driving overhead. Use for
-  clean markdown fetch of any URL (libcurl-impersonate Chrome JA4, auto-pulls
-  cookies from your real browser), one-shot intent-driven scraping (`unbrowse
-  run`), and capture/replay of authenticated JSON endpoints so you don't have
-  to drive a UI every time. Primary surface is the CLI (`unbrowse <cmd>`);
-  MCP server is available at `npx -y unbrowse mcp` as an alternative for hosts
-  that have it wired up.
+  DEPRECATED 2026-08-13 — unbrowse is UNINSTALLED from this machine (npm package
+  removed, MCP unregistered; its MCP leaked orphaned kuri/headless-Chrome
+  processes). Do NOT route work here. Replacements: agent-browser read/open
+  (anonymous fetch + fresh headless), fcdp via /chrome (logged-in), fapi via
+  /chromeapi or fhar via /decompile (capture/replay of site APIs). This file is
+  kept only as historical reference for ~/.unbrowse data.
+
 user-invocable: true
 metadata: {"openclaw": {"requires": {"bins": ["unbrowse"]}, "install": [{"id": "npm", "kind": "node", "package": "unbrowse", "bins": ["unbrowse"]}], "emoji": "🔍", "homepage": "https://github.com/unbrowse-ai/unbrowse"}, "version": "7.1.0", "updated": "2026-05-27"}
 ---
