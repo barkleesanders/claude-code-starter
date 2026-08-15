@@ -1,15 +1,12 @@
 ---
 name: unbrowse
 description: >-
-  DEPRECATED 2026-08-13 — unbrowse is UNINSTALLED from this machine (npm package
-  removed, MCP unregistered; its MCP leaked orphaned kuri/headless-Chrome
-  processes). Do NOT route work here. Replacements: agent-browser read/open
-  (anonymous fetch + fresh headless), fcdp via /chrome (logged-in), fapi via
-  /chromeapi or fhar via /decompile (capture/replay of site APIs). This file is
-  kept only as historical reference for ~/.unbrowse data.
-
-user-invocable: true
-metadata: {"openclaw": {"requires": {"bins": ["unbrowse"]}, "install": [{"id": "npm", "kind": "node", "package": "unbrowse", "bins": ["unbrowse"]}], "emoji": "🔍", "homepage": "https://github.com/unbrowse-ai/unbrowse"}, "version": "7.1.0", "updated": "2026-05-27"}
+  DEPRECATED 2026-08-13 — unbrowse is UNINSTALLED (npm gone, MCP removed from
+  Grok 2026-08-15). Do NOT route work here. Replacement: /localbrowse.
+  Also agent-browser, fcdp via /chrome, fapi via /chromeapi, fhar via
+  /decompile. Kept only as historical reference for ~/.unbrowse data.
+user-invocable: false
+disable-model-invocation: true
 ---
 
 # Unbrowse — Web fetch, intent-driven scrape, endpoint capture/replay

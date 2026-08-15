@@ -469,15 +469,17 @@ Launch 3 Agent tools in parallel (single message):
 ```bash
 PROD_URL="https://example.com"
 
-# HTML must be freshly fetched and must reference expected production auth domains.
+# HTML must be freshly fetched and contain no retired auth-provider fingerprint.
 curl -sS "${PROD_URL}/?ship_cb=$(date +%s)" > /tmp/ship-live.html
-rg 'clerk\.exampleapp\.com' /tmp/ship-live.html
-rg 'prime-rhino-99|\.clerk\.accounts\.dev|pk_test|sk_test' /tmp/ship-live.html && echo "BLOCK: dev auth fingerprint in live HTML"
+rg -i 'clerk\.[a-z0-9.-]+|clerk-js|@clerk/|prime-rhino-99|\.clerk\.accounts\.dev|pk_(live|test)|sk_test' /tmp/ship-live.html && echo "BLOCK: retired auth fingerprint in live HTML"
 
 # CSP must not retain stale dev origins.
 curl -sSI "${PROD_URL}/?ship_cb=$(date +%s)" > /tmp/ship-live.headers
 rg -i 'content-security-policy|cf-ray|cf-cache-status' /tmp/ship-live.headers
-rg 'prime-rhino-99|\.clerk\.accounts\.dev|pk_test|sk_test' /tmp/ship-live.headers && echo "BLOCK: dev auth fingerprint in live headers"
+rg -i 'clerk\.[a-z0-9.-]+|clerk-js|@clerk/|prime-rhino-99|\.clerk\.accounts\.dev|pk_(live|test)|sk_test' /tmp/ship-live.headers && echo "BLOCK: retired auth fingerprint in live headers"
+
+# First-party Better Auth must be alive and distinguish invalid credentials.
+curl -sS -o /dev/null -w '%{http_code}\n' "${PROD_URL}/api/auth/ok"
 
 # Worker secrets must be secrets, not plaintext vars.
 npx wrangler secret list
@@ -487,8 +489,8 @@ npm run test:integration:prod
 ```
 
 **Decision logic**:
-- BLOCK if live HTML or CSP lacks the expected production auth domain after an auth/CSP change
-- BLOCK if live HTML or CSP contains `prime-rhino-99`, `.clerk.accounts.dev`, `pk_test`, or `sk_test`
+- BLOCK if AIVA live HTML or CSP contains any Clerk host/key/SDK/JWKS fingerprint; absence of `clerk.example.com` is expected
+- BLOCK if `/api/auth/ok` is not 200 or wrong-password sign-in is not 401
 - BLOCK if a sensitive Worker binding is still a plaintext var instead of `secret_text`
 - BLOCK if production integration fails
 

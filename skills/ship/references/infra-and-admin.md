@@ -48,6 +48,8 @@ npx wrangler secret list
 
 Run this for Cloudflare Worker apps that use Clerk/Auth0/Supabase/Firebase or any auth provider with dev/prod instances.
 
+**AIVA override (current architecture, August 2026):** AIVA uses first-party Better Auth at `/api/auth/*`; Clerk is retired. Do not require a Clerk custom domain or `pk_live_*`. For AIVA, block on **any** Clerk host/key/SDK/JWKS fingerprint in source, dry-run, live HTML, or CSP, then require `GET /api/auth/ok` → 200 and a wrong-password `POST /api/auth/sign-in/email` → 401. If auth/session/passkey/TOTP/password/recovery/sign-out code changed, also run `~/.claude/skills/shared/account-security-lifecycle.md`.
+
 ```bash
 # Source/config scan for development auth fingerprints
 rg -n 'pk_test_|sk_test_|\.accounts\.dev|CLERK_PUBLISHABLE_KEY|CLERK_JWT_ISSUER|CLERK_JWKS_URL' \
@@ -146,6 +148,27 @@ Required to clear this gate:
 - The detector's distinguishing feature (anchored DOM id, JSON field, status code combination) is present in exactly one of the two fixtures, verified by `grep`.
 
 Reference incident (2026-05-27): every IBA-submitted SF DBI complaint was reported as `validation` error for ~10 days while the city actually recorded every one of them. `src/sfdbi.ts` `looksLikeEchoedForm = html.includes("Sub_Button0") && html.includes("CheckBox1")` matched the real success page too — DBI's "Thank you" response is the SAME `AddressData2.aspx` page with only `<span id="InfoReq1_lblError">` text changed. The pre-existing test used a 100-byte synthetic success fixture (`<html><body><h1>Thank you</h1>...`) that didn't contain `Sub_Button0`, so the bug never tripped in CI. See Pattern #23 (`error-handling-patterns.md`) and `~/.claude/skills/shared/third-party-signal-fixtures.md` for the generalized rule.
+
+**1c-ter. Experience Cloud / Aura 311 catalog + submit envelope (BLOCKING when touched) — Phase 1.45g:**
+
+Trigger when the diff touches Salesforce/Aura 311 catalog JSON, `fetchCaseTypeDetails` parse, `submitCase` / `addressDetails` / `sObjCase`, `captureFailure`, or the KV catalog cache key (`la311:catalog:`). Full class: Pattern #36.
+
+```bash
+CHANGED=$(git diff --name-only HEAD 2>/dev/null || git diff --name-only)
+if echo "$CHANGED" | rg -i 'myla311|auraGuest|fetchCaseTypeDetails|submitCase|addressDetails|sObjCase|captureFailure|la311:catalog|classifyCaseType|submitGate'; then
+  echo "Aura 311 catalog/envelope changed: require Pattern 36 structural tests"
+  rg -n 'toastPayload|objCaseConfigWrapper|captureFailure|caseConfigId|Permit_Number__c|unwrapLocator' src tests
+fi
+```
+
+BLOCK until:
+- A toast/`validateAddress` fixture unwraps to locator keys (`address`/`location`), **not** `toastPayload`. Prove with `gron fixture.json | rg 'toastPayload|response.address'` (toast-only = fail) or a `hurl --test` jsonpath assert.
+- Every id-bearing type has `caseConfigId`+`sCaseType` **or** explicit `captureFailure`. 0 dummy `modelFlags`.
+- Refuse strings name official field API names, not class stubs.
+- Catalog schema change bumped the KV cache key.
+- Post-deploy: cache-busted `GET /api/categories` matches those counts. `hurl --test` is a valid structural-test form.
+
+`/carmack` must not have been the deployer — this gate runs only under `/ship`.
 
 **CSP Lesson (DocuSeal)**: Third-party embeds often load assets from CDNs/cloud storage, not their main domain. Trace actual resource URLs in browser network tab. DocuSeal serves document images from `*.s3.amazonaws.com`, not `docuseal.com`.
 

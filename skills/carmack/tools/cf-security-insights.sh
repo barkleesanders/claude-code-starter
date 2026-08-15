@@ -38,7 +38,8 @@
 set -euo pipefail
 
 APPLY=0
-CONTACT="mailto:you@example.com"
+# 2026-08-15 user directive: public contact is the org address, never gmail.
+CONTACT="mailto:youruser@esbe.tech"
 while [ $# -gt 0 ]; do
   case "$1" in
     --apply) APPLY=1 ;;
