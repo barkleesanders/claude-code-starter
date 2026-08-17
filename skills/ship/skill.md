@@ -39,6 +39,7 @@ If the verification confirms the downgrade is necessary, document the upstream e
 | -0.4 | Workers Cache safety (`tools/workers-cache-check.sh` — leak/loop/HSTS classes, wrangler ≥4.69) | exit 0 (BLOCK on rc=2) |
 | 0 | Biome lint (full project) | 0 errors, 0 warnings |
 | 0 (Stage 1.5) | `npm audit` | 0 vulnerabilities |
+| 0 (Stage 1.8) | **TypeScript anti-slop — AUTO-FIX LOOP UNTIL 0 (both paths)** — Path A (repo with the vendored dmmulroy/anti-slop Oxlint plugin — `tools/oxlint/anti-slop/` or `anti-slop/` rules in its oxlint config): loop `./node_modules/.bin/oxlint` → fix every `anti-slop/*` finding in source by adding evidence (inference/`satisfies`/named types/Zod/genuinely-checked `// SAFETY:`) → re-run oxlint + typecheck → repeat to 0. Path B (no plugin): identical loop on `detect-ts-slop.sh --threshold 0` to Σ 0 hits + offer `/install-anti-slop`. The rules have no mechanical `--fix` — the agent is the autofixer (same model as Phase 1.29's security-review loop). Loop guard: one finding surviving 5 fix attempts → STOP and surface. Never `oxlint-disable`/severity-weakening/launder-casts/hollow SAFETY comments. See `code-quality.md` Stage 1.8 + `~/.claude/skills/shared/anti-slop-typescript.md`. | 0 findings on the final re-run (or STOP surfaced after 5 attempts on one finding) |
 | 1 | Build (repo typecheck/build, using the same TS mode as production) | Exit 0 |
 | 1 | Tests (`vitest run --changed` with timeout) | All pass |
 | 1.1 | Frontend-backend API contract | 0 missing routes |
