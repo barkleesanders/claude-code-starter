@@ -21,6 +21,16 @@ Fast reference for known production failure patterns. For deep debugging, use `/
 
 When the symptom involves a third-party integration falling back to a worse path (handoff, redirect, "manual step required") — Verint dform, Clerk, Stripe, SeeClickFix, OAuth, any SaaS — load `~/.claude/skills/shared/upstream-protocol-investigation.md` BEFORE proposing a fix. Read the upstream's primary client source, capture real network traffic, inspect rendered `data-*` attributes. Treat any "Verified YYYY-MM-DD" comment in our codebase as a hypothesis to re-verify, not a fact. Token cost is unlimited for this; user explicitly authorized it (2026-05-09 SF311 graffiti incident: bandaid `0b746a4` → real fix `f27d1e3` after reading dform's `api.js` lines 462–520).
 
+## DocuSeal template-vs-submission gate
+
+When a DocuSeal form is missing fixed business values, load
+`~/.claude/skills/shared/docuseal-template-contract.md`. Prove whether the signer
+used a unique submission URL or the template shared link; inspect both the live
+submission and live template because mocked payload tests cannot detect template
+default drift. For multi-party templates, a public shared link is unsafe unless
+party ownership is explicit; AIVA's HIPAA template must keep it disabled.
+`/debug` remains read-only for production state.
+
 ## Mutating symptom across fixes = wrong premise (MANDATORY — 2026-05-19)
 
 When each fix makes the symptom *change* instead of *disappear* — `fetch_error` → `handshake_rejected` → `publicid_timeout`, every "fix" peeling back to reveal a new failure one layer deeper — STOP. That staircase is the tell that the whole feature premise is wrong, not that you are three fixes from done. Before fixing layer N+1, verify the premise itself: does the real client even use this code path? Capture live traffic and confirm. Reference incident: the SF311 cable chain — four green-tested fixes (`wss://`→`https://`, missing `Origin` header, subscription identifier, publicId timeout) each surfaced the next layer; a live mitm capture then proved the real app never opens the WebSocket at all — the whole path was dead code. Many round-trips of "fix the next layer" should have been one round-trip of "verify the premise."

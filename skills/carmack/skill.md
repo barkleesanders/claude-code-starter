@@ -20,6 +20,13 @@ model: inherit
 
 Universal engineering agent for building, debugging, fixing, reviewing, and shipping. Combines carmack-mode deep debugging with systematic 5-phase investigation, plus all development workflow tools.
 
+For missing DocuSeal defaults or signer-path mismatches, load
+`~/.claude/skills/shared/docuseal-template-contract.md` before changing code.
+Separate unique-submission payload state from live shared-template defaults, and
+check whether multiple signing parties make the shared link ambiguous. AIVA's
+HIPAA template must keep its shared link disabled. Hand any production template
+mutation or deployment to `/ship`.
+
 ## Usage
 
 ```
