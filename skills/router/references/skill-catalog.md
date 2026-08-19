@@ -169,7 +169,7 @@
 - **twitter-cards** — When the user wants to add or optimize Twitter Card metadata for X (Twitter) link previews. Also use when the user mentions "Twitter Card," "twitter:card," "twitter:image," "twitter:title," "X preview," or "tweet preview." For Facebook/Link
 - **ui-improver** — Complete UI improvement workflow combining design intelligence, micro-polish, and code simplification. Use when building, reviewing, or improving any UI — new pages, components, style decisions, accessibility reviews, animation polish, code
 - **ui-ux-pro-max** — UI/UX design intelligence for web and mobile. Includes 50+ styles, 161 color palettes, 57 font pairings, 161 product types, 99 UX guidelines, and 25 chart types across 10 stacks (React, Next.js, Vue, Svelte, SwiftUI, React Native, Flutter, 
-- **unbrowse** — Capture once, replay everywhere — Unbrowse learns reusable route metadata from allowed browsing sessions and replays it as a fast, cheap, indexed route. Brings back the skill surface alongside the MCP server + SDK + CLI. 
+- **localbrowse** — Inspect / fetch / capture / GET-replay / drive a site locally. Replaces Unbrowse. 
 - **va-appeal** — | 
 - **va-claims** — End-to-end VA disability claim package generator from medical evidence. Use when the user requests a full multi-document VA claim package from files; do not use for general VA Q&A. 
 - **va-community-care** — > 
