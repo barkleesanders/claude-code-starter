@@ -1,0 +1,1 @@
+Analyze Claude Code token usage across all projects. Run `python3 ~/.claude/skills/token-usage/token-usage.py` and summarize the results. Accepts optional argument: a number for "last N days" or a date string for "since date". Present key findings including total tokens, top projects, costliest sessions, and cache efficiency.
