@@ -1,0 +1,7 @@
+interface:
+  display_name: "Make Goal"
+  short_description: "Turn a task into parallel goals"
+  default_prompt: "Use $makegoal to turn this task into a build brief, top-level goal, and parallel subgoals."
+
+policy:
+  allow_implicit_invocation: true
