@@ -98,8 +98,46 @@ Read `references/react-spa-to-hono-migration.md`. The short version:
 - **Don't big-bang it blindly.** Keep the build green at every step; convert page-by-page and
   curl each route. A working SSR page with a missing island beats a broken全-rewrite.
 
+## 🛑 "Using Hono" means SSR — a Hono ROUTER in front of static HTML is NOT the default (2026-08-31)
+
+**The most likely way to think you built a Hono site and not have one:** `new Hono()` for the
+API, `secureHeaders()`, typed `Bindings` — all correct — and then the actual page is a
+hand-written `public/index.html` served through the `ASSETS` binding. Every Hono symbol is
+present. Zero HTML is server-rendered. That is **Hono-as-router**, and it satisfies none of the
+reasons the Hono default exists (real markup to crawlers/curl/Wayback, no CSR shell, FCP).
+
+It passes every check you would naively run: `tsc` clean, `wrangler deploy --dry-run` rc=0,
+`import { Hono } from "hono"` right there at the top of the file.
+
+**The one-command test — run it before claiming a site is Hono:**
+```bash
+grep -rn 'c\.html(' src/ | grep -v node_modules     # ZERO hits => you have a router, not SSR
+grep -rln 'hono/jsx' src/                            # ZERO files => no server JSX exists
+```
+Any page a human reads must reach the browser via `c.html(<Page/>)`. `ASSETS.fetch` is for
+**assets** — `.js`, `.css`, images, fonts — never for the document.
+
+**Reference incident (2026-08-31, improvecortland).** Built the Worker in Hono, wrote the portal
+as `public/index.html`, and reported the site as built on Hono. The user asked *"did you build
+this on hono framework btw like /carmack says to"* — the honest answer was *partially*. The
+conversion afterwards was ~30 minutes and had one non-obvious constraint worth stealing:
+
+**Converting static-HTML → SSR when tests execute the shipped page.** The harnesses regex-
+extracted JS out of `public/index.html` and ran it, so deleting that file would have broken
+them. The fix is better than the original on both axes: move the executable blocks into a real
+`public/foil-core.js`, `<script src>` it from the SSR page, and point the tests at that file.
+One source, no HTML parsing in the test, and the tests still execute **the shipped bytes**.
+Deleting the old `index.html` then doubles as a free negative control — the suites would fail if
+they were still reading it. Keep DOM-touching wiring in a separate `public/ui.js`, because the
+harnesses run the core in plain Node with no `document`.
+
+Also: JSX in a `.ts` file is `error TS1005: '>' expected`. Rename to `.tsx` **and** update
+`main` in `wrangler.toml` — the rename alone leaves the config pointing at a file that is gone.
+
 ## Hard rules
 
+- **A page is not "in Hono" until it renders through `c.html(<Page/>)`.** A Hono router serving
+  static HTML via `ASSETS` is the anti-pattern above — grep `c.html(` before you claim SSR.
 - **Never mix `hono/jsx` and `hono/jsx/dom` in the same module.** Pick by where the code runs.
 - **No `process.env` on Workers** — use `c.env` (typed `Bindings`) or `env(c)` from `hono/adapter`.
 - **Don't hand-serve static files from route handlers** when the platform has an `assets` binding.

@@ -3,7 +3,7 @@
 #
 # Catches the 2026-07-13 diy-fax class: email "works" (send() resolves) but the
 # message lands in SPAM because the From domain is misaligned — e.g. an APEX
-# sender (fax@aivaclaims.com) delivered into a Google-Workspace mailbox on that
+# sender (sender@example.com) delivered into a Google-Workspace mailbox on that
 # same strictly-DMARC'd domain. Code review, tests, and even a resolved send()
 # cannot see mailbox placement; only reading the destination mailbox can.
 #

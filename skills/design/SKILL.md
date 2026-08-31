@@ -146,8 +146,8 @@ This skill follows the progressive-disclosure pattern (same as `/carmack`): the 
 
 - `/design build a hospital ledger landing page` → Phase 0 (pick direction, e.g., "editorial / magazine") → **Hallmark** default Design flow
 - `/design build a sticky pricing card component in this Next.js repo` → Phase 0 (e.g., "brutalist raw") → **Hallmark** Component-scope flow (all 8 interactive states mandatory)
-- `/design make aivaclaims.com look less AI-generated` → Phase 0 → **Hallmark `audit`** (read-only punch list) → then `redesign` on approval
+- `/design make example.com look less AI-generated` → Phase 0 → **Hallmark `audit`** (read-only punch list) → then `redesign` on approval
 - `/design here's a site I love: https://…` → **Hallmark `study`** (extract DNA — never copies pixels; refuses template-marketplace URLs)
-- `/design create a design system for esbe.tech` → Phase 0 → **Hallmark** for the DNA + `design.md` → `code-implementation.md` to wire the tokens
+- `/design create a design system for example.org` → Phase 0 → **Hallmark** for the DNA + `design.md` → `code-implementation.md` to wire the tokens
 - `/design generate a hospital ledger landing page **in Stitch**` → Phase 0 → Stitch mode (explicit opt-in) → `generate_screen_from_text`
 - `/design` (no context) → ask what they're designing, then route (almost always Hallmark)

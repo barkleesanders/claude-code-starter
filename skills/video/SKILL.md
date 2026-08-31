@@ -131,8 +131,8 @@ Generate original footage from text or image prompts. Use for B-roll, hero visua
 | Model | Resolution | Max Duration | Best For | Cost |
 |-------|-----------|-------------|----------|------|
 | **Veo 3** (Google) | Up to 1080p (4K varies) | Variable | Highest quality, synced audio | API-based |
-| **Runway Gen-4** | Up to 4K | ~10 sec/gen | Motion control, temporal consistency | $12-76/mo |
-| **Kling 3.0** | Up to 1080p | Up to 2 min | Volume production, lowest cost | $0.029/sec |
+| **Runway Gen-4** | Up to 4K | ~10 sec/gen | Motion control, temporal consistency | \$12-76/mo |
+| **Kling 3.0** | Up to 1080p | Up to 2 min | Volume production, lowest cost | \$0.029/sec |
 | **Pika** | 1080p | Short clips | Fast generation, effects | Per-credit |
 
 **Sora (OpenAI)** has had limited availability and reliability issues. Check current status before recommending.

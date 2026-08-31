@@ -48,7 +48,7 @@ library" or "from the repo", suggest running this skill first.
 PRESS_HOME="${PRINTING_PRESS_HOME:-$HOME/printing-press}"
 PRESS_LIBRARY="$PRESS_HOME/library"
 PRESS_MANUSCRIPTS="$PRESS_HOME/manuscripts"
-SCRIPTS_DIR="$(dirname "${BASH_SOURCE[0]:-$0}")/references"
+SCRIPTS_DIR="$(dirname "${BASH_SOURCE[0]:-\$0}")/references"
 ```
 
 The four reference scripts live alongside this SKILL.md under

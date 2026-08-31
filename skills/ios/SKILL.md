@@ -44,7 +44,7 @@ Full routing lives in the `/design` skill's Cross-Mode Rules.
 ## Dev loop (xcodebuildmcp — preferred over raw xcodebuild)
 
 1. `session_show_defaults` once per session; set projectPath/scheme/simulatorId/
-   bundleId (AIVA: `ios/App/App.xcodeproj`, scheme `App`, `com.aivaclaims.app`).
+   bundleId (AIVA: `ios/App/App.xcodeproj`, scheme `App`, `com.example.app`).
 2. `build_run_sim` — build+install+launch in one call; the returned runtime
    log captures the app/webview console — **read it instead of guessing**.
 3. Iterate: edit → (Capacitor: `npx vite build && npx cap sync ios`) →

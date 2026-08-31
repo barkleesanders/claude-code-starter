@@ -51,7 +51,7 @@ The steps above are the happy path. Apply the shared **Dependency Audit Playbook
 - **Cross-major bump (e.g. tar 6→7, uuid 7→11)?** Check the consumer survives: `require('pkg')`+named-method survives, `require('pkg/v4')` deep-import breaks; and CJS-consumer + ESM-only-major breaks. `grep -rn "require('<pkg>" node_modules/<consumer>/`.
 - **NEVER blind `npm audit fix --force`.** It proposed downgrading `wrangler 4→3` (major runtime regression). Read its plan; prefer scoped `overrides`.
 - **Build verification per project** (Step 6 below): `npm run build` often doesn't exist — Workers projects use `npx wrangler deploy --dry-run`, libraries use `npx tsc --noEmit`. Use the project's REAL build + one `vitest run` to confirm the runner boots.
-- **If `npm` is a wrapper shim** (`npm is an alias for socket npm`), call the real binary (`/opt/homebrew/bin/npm`) so non-interactive installs don't hang on a prompt.
+- **`npm` is a shell function, not the raw binary** — it routes install-class commands through `sfw` (Socket Firewall). In scripts/non-interactive contexts the function is not loaded, so call `/opt/homebrew/bin/npm` (or `command npm`) directly rather than depending on it.
 
 ### Dependabot Auto-Fix (MANDATORY — BLOCKING)
 

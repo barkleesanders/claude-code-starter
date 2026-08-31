@@ -108,7 +108,7 @@ mkdir -p "$PRESS_RUNSTATE" "$PRESS_LIBRARY" "$PRESS_MANUSCRIPTS" "$PRESS_CURRENT
 # cost is not worth its own cache here.
 if [ "$_press_repo" != "true" ] && command -v curl >/dev/null 2>&1; then
   _semver_lt() {
-    awk -v a="$1" -v b="$2" 'BEGIN {
+    awk -v a="\$1" -v b="\$2" 'BEGIN {
       split(a, x, "."); split(b, y, ".")
       for (i = 1; i <= 3; i++) {
         if ((x[i] + 0) < (y[i] + 0)) exit 0
@@ -120,11 +120,11 @@ if [ "$_press_repo" != "true" ] && command -v curl >/dev/null 2>&1; then
   _floor_installed=$("$PRINTING_PRESS_BIN" version --json 2>/dev/null | sed -nE 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p')
   _floor_doc=$(curl -fsSL --max-time 5 \
     https://raw.githubusercontent.com/mvanhorn/cli-printing-press/main/supported-versions.txt 2>/dev/null || true)
-  _floor_min=$(printf '%s\n' "$_floor_doc" | awk -F= '/^min_supported=/{print $2; exit}')
+  _floor_min=$(printf '%s\n' "$_floor_doc" | awk -F= '/^min_supported=/{print \$2; exit}')
   _floor_reason=$(printf '%s\n' "$_floor_doc" | sed -nE 's/^reason=//p' | head -n 1)
   _floor_latest=""
   if command -v go >/dev/null 2>&1; then
-    _floor_latest=$(go list -m -json github.com/mvanhorn/cli-printing-press/v4@latest 2>/dev/null | awk '/"Version":/{v=$2; gsub(/[",]/,"",v); sub(/^v/,"",v); print v; exit}')
+    _floor_latest=$(go list -m -json github.com/mvanhorn/cli-printing-press/v4@latest 2>/dev/null | awk '/"Version":/{v=\$2; gsub(/[",]/,"",v); sub(/^v/,"",v); print v; exit}')
   fi
   if [ -n "$_floor_min" ] && [ -n "$_floor_installed" ] && [ -n "$_floor_latest" ] &&
      _semver_lt "$_floor_installed" "$_floor_min" &&

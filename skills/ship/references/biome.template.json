@@ -1,0 +1,69 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.9/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": [
+      "src/**",
+      "public/*.js",
+      "public/*.ts",
+      "public/*.css",
+      "public/*.html",
+      "scripts/**/*.js",
+      "scripts/**/*.ts",
+      "scripts/**/*.mjs",
+      "tests/**",
+      "*.ts",
+      "*.tsx",
+      "*.js",
+      "*.mjs",
+      "*.cjs",
+      "package.json",
+      "tsconfig.json",
+      "vite.config.ts",
+      "wrangler.jsonc",
+      "biome.json",
+      "!!**/dist",
+      "!!**/node_modules",
+      "!!**/.wrangler",
+      "!!**/coverage",
+      "!!**/.beads",
+      "!!**/*.min.js",
+      "!!**/*.jsonl",
+      "!!**/public/data",
+      "!!**/.prices_build_stash",
+      "!!**/data"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "tab"
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double"
+    }
+  },
+  "css": {
+    "linter": {
+      "enabled": false
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  }
+}

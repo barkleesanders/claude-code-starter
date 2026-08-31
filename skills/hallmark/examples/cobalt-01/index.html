@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en" data-theme="cobalt">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Distil — Turn any website into clean Markdown for LLMs.</title>
+  <meta name="description" content="Distil is an API that fetches any URL and returns clean, LLM-ready Markdown — boilerplate stripped, main content only. One POST, structured output, built for RAG pipelines and agents." />
+  <meta name="theme-color" content="#f6f7f9" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="tokens.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <!-- ─── Nav · cool dev-tool bar · single hairline under · ⌘K + cobalt CTA ─── -->
+  <header class="nav" id="nav">
+    <div class="nav__inner">
+      <a class="nav__brand" href="#" aria-label="Distil — home">
+        <span class="nav__mark" aria-hidden="true"></span>
+        Distil
+      </a>
+
+      <nav class="nav__links" aria-label="Primary">
+        <a href="#docs">Docs</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#changelog">Changelog</a>
+      </nav>
+
+      <div class="nav__right">
+        <button class="cmdk" type="button" id="cmdk-trigger" aria-label="Search documentation" aria-keyshortcuts="Meta+K Control+K" aria-haspopup="dialog" aria-expanded="false" aria-controls="palette">
+          <span class="cmdk__label">Search</span>
+          <kbd class="cmdk__keys"><span>&#8984;</span>K</kbd>
+        </button>
+        <a class="btn btn--accent" href="#pricing">Get API key</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <!-- ─── Hero · text LEFT, live API request/response RIGHT · asymmetric ─── -->
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero__copy">
+        <p class="eyebrow reveal" style="--i:0">
+          <span class="eyebrow__dot" aria-hidden="true"></span> Content extraction API
+        </p>
+        <h1 class="hero__title reveal" id="hero-title" style="--i:1">
+          Any URL in. Clean Markdown out.
+        </h1>
+        <p class="hero__lede reveal" style="--i:2">
+          Distil fetches a page, renders the JavaScript, strips nav, ads and
+          chrome, and hands back the main content as tidy Markdown your model
+          can actually read. One <code>POST</code> — structured, deterministic,
+          ready for retrieval.
+        </p>
+        <div class="hero__cta reveal" style="--i:3">
+          <a class="btn btn--accent btn--lg" href="#pricing">Get an API key</a>
+          <a class="link-arrow" href="#docs">Read the docs <span aria-hidden="true">&#8594;</span></a>
+        </div>
+        <p class="hero__meta reveal" style="--i:4">
+          No credit card · 1,000 free pages · <code>p50 1.4s</code> per fetch
+        </p>
+      </div>
+
+      <!-- The wow — a request card + a response card on graphite -->
+      <div class="demo reveal" style="--i:2" aria-label="Example API request and response">
+        <figure class="code-card code-card--req">
+          <figcaption class="code-card__bar">
+            <span class="code-card__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="code-card__file">request.sh</span>
+          </figcaption>
+          <pre class="code"><code><span class="c-dim">$</span> <span class="c-fn">curl</span> https://api.distil.dev/v1/extract \
+  <span class="c-flag">-H</span> <span class="c-str">"Authorization: Bearer $DISTIL_KEY"</span> \
+  <span class="c-flag">-H</span> <span class="c-str">"Content-Type: application/json"</span> \
+  <span class="c-flag">-X</span> <span class="c-method">POST</span> <span class="c-flag">-d</span> <span class="c-punc">'{</span>
+    <span class="c-key">"url"</span><span class="c-punc">:</span> <span class="c-str">"https://example.com/blog/rag-tips"</span><span class="c-punc">,</span>
+    <span class="c-key">"format"</span><span class="c-punc">:</span> <span class="c-str">"markdown"</span><span class="c-punc">,</span>
+    <span class="c-key">"main_only"</span><span class="c-punc">:</span> <span class="c-bool">true</span>
+  <span class="c-punc">}'</span></code></pre>
+        </figure>
+
+        <figure class="code-card code-card--res">
+          <figcaption class="code-card__bar">
+            <span class="code-card__file code-card__file--res">response.json</span>
+            <span class="status-chip"><span class="status-chip__dot" aria-hidden="true"></span>200 OK</span>
+          </figcaption>
+          <pre class="code"><code><span class="c-punc">{</span>
+  <span class="c-key">"title"</span><span class="c-punc">:</span> <span class="c-str">"Seven RAG tips"</span><span class="c-punc">,</span>
+  <span class="c-key">"word_count"</span><span class="c-punc">:</span> <span class="c-num">2184</span><span class="c-punc">,</span>
+  <span class="c-key">"markdown"</span><span class="c-punc">:</span> <span class="c-str">"# Seven RAG tips</span><span class="type" data-type="\n\n## 1. Chunk on headings, not bytes\n\nSplit"></span><span class="c-cursor" aria-hidden="true"></span><span class="c-str">..."</span>
+<span class="c-punc">}</span></code></pre>
+        </figure>
+      </div>
+    </section>
+
+    <!-- ─── Quick-start strip · one install line + trusted-by · thin hairline band ─── -->
+    <section class="strip" aria-label="Quick start and customers">
+      <div class="strip__install reveal" style="--i:0">
+        <span class="strip__label">Install</span>
+        <code class="strip__cmd"><span class="c-dim">$</span> npm i <span class="c-accent">@distil/sdk</span></code>
+        <button class="strip__copy" type="button" aria-label="Copy install command">Copy</button>
+      </div>
+      <div class="strip__trust reveal" style="--i:1">
+        <span class="strip__label">Powering retrieval at</span>
+        <ul class="trust">
+          <li>Meridian AI</li>
+          <li>Halcyon Labs</li>
+          <li>Northwind</li>
+          <li>Corvus</li>
+          <li>Lumen Stack</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ─── Features · ASYMMETRIC — one wide code example + two narrow text points ─── -->
+    <section class="features" id="docs" aria-labelledby="features-title">
+      <header class="features__head">
+        <p class="eyebrow reveal" style="--i:0">
+          <span class="eyebrow__dot" aria-hidden="true"></span> Built for pipelines
+        </p>
+        <h2 class="features__title reveal" id="features-title" style="--i:1">
+          The boilerplate problem, solved at the API.
+        </h2>
+        <p class="features__lede reveal" style="--i:2">
+          You don&rsquo;t want raw HTML in your context window. Distil returns the
+          part that matters — and tells you exactly what it kept.
+        </p>
+      </header>
+
+      <div class="features__grid">
+        <!-- wide: a worked SDK example -->
+        <article class="feature feature--wide reveal" style="--i:0">
+          <div class="feature__text">
+            <p class="feature__kicker">Typed SDK</p>
+            <h3 class="feature__title">Five lines to a clean document.</h3>
+            <p class="feature__body">
+              Point the client at a URL and stream structured Markdown straight
+              into your splitter. Retries, render-wait and rate limits are
+              handled for you.
+            </p>
+          </div>
+          <figure class="code-card code-card--inline">
+            <figcaption class="code-card__bar">
+              <span class="code-card__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="code-card__file">ingest.ts</span>
+            </figcaption>
+            <pre class="code"><code><span class="c-kw">import</span> <span class="c-punc">{</span> Distil <span class="c-punc">}</span> <span class="c-kw">from</span> <span class="c-str">"@distil/sdk"</span><span class="c-punc">;</span>
+
+<span class="c-kw">const</span> distil <span class="c-punc">=</span> <span class="c-kw">new</span> <span class="c-fn">Distil</span><span class="c-punc">(</span>process.env.<span class="c-key">DISTIL_KEY</span><span class="c-punc">);</span>
+
+<span class="c-kw">const</span> doc <span class="c-punc">=</span> <span class="c-kw">await</span> distil.<span class="c-fn">extract</span><span class="c-punc">(</span><span class="c-punc">{</span>
+  <span class="c-key">url</span><span class="c-punc">:</span> <span class="c-str">"https://example.com/docs"</span><span class="c-punc">,</span>
+  <span class="c-key">format</span><span class="c-punc">:</span> <span class="c-str">"markdown"</span><span class="c-punc">,</span>
+  <span class="c-key">render</span><span class="c-punc">:</span> <span class="c-str">"auto"</span><span class="c-punc">,</span>     <span class="c-comment">// wait for JS only if needed</span>
+<span class="c-punc">});</span>
+
+index.<span class="c-fn">add</span><span class="c-punc">(</span>doc.<span class="c-key">markdown</span><span class="c-punc">);</span>  <span class="c-comment">// straight into your vector store</span></code></pre>
+          </figure>
+        </article>
+
+        <!-- narrow text point 1 -->
+        <article class="feature feature--point reveal" style="--i:1">
+          <span class="feature__num" aria-hidden="true">01</span>
+          <h3 class="feature__title">Main content, not the menu.</h3>
+          <p class="feature__body">
+            A readability model isolates the article body and drops nav, cookie
+            banners, footers and related-post rails — so your embeddings learn
+            signal, not chrome.
+          </p>
+          <ul class="feature__list">
+            <li>Headings, lists &amp; tables preserved</li>
+            <li>Links and image alt-text kept inline</li>
+            <li>Scripts, styles &amp; tracking removed</li>
+          </ul>
+        </article>
+
+        <!-- narrow text point 2 -->
+        <article class="feature feature--point reveal" style="--i:2">
+          <span class="feature__num" aria-hidden="true">02</span>
+          <h3 class="feature__title">Deterministic &amp; observable.</h3>
+          <p class="feature__body">
+            Same URL, same Markdown — every call returns a content hash, token
+            count and the rules that fired, so a re-index is a diff, not a
+            guessing game.
+          </p>
+          <ul class="feature__list">
+            <li><code>content_hash</code> on every response</li>
+            <li>Token count for your budget</li>
+            <li>Webhooks for batch crawls</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <!-- ─── Quickstart band · FULL-BLEED DARK graphite · Cobalt's signature band ─── -->
+    <section class="quickstart" aria-labelledby="quickstart-title">
+      <div class="quickstart__inner">
+        <div class="quickstart__copy">
+          <p class="eyebrow eyebrow--dark reveal" style="--i:0">
+            <span class="eyebrow__dot" aria-hidden="true"></span> Quickstart
+          </p>
+          <h2 class="quickstart__title reveal" id="quickstart-title" style="--i:1">
+            Live in three lines.
+          </h2>
+          <p class="quickstart__lede reveal" style="--i:2">
+            Install the SDK, point <code>extract</code> at a URL, and read clean
+            Markdown back. No headless browser to babysit, no HTML to scrub —
+            the happy path is the whole path.
+          </p>
+          <p class="quickstart__meta reveal" style="--i:3">
+            <a class="quickstart__link" href="#docs">Full SDK reference <span aria-hidden="true">&#8594;</span></a>
+          </p>
+        </div>
+
+        <figure class="code-card code-card--quick reveal" style="--i:2">
+          <figcaption class="code-card__bar">
+            <span class="code-card__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="code-card__file code-card__file--res">quickstart.ts</span>
+            <span class="status-chip"><span class="status-chip__dot" aria-hidden="true"></span>ready</span>
+          </figcaption>
+          <pre class="code"><code><span class="c-kw">import</span> <span class="c-punc">{</span> extract <span class="c-punc">}</span> <span class="c-kw">from</span> <span class="c-str">"@distil/sdk"</span><span class="c-punc">;</span>
+
+<span class="c-kw">const</span> doc <span class="c-punc">=</span> <span class="c-kw">await</span> <span class="c-fn">extract</span><span class="c-punc">(</span><span class="c-str">"https://example.com/blog/rag-tips"</span><span class="c-punc">);</span>
+
+console.<span class="c-fn">log</span><span class="c-punc">(</span>doc.<span class="c-key">markdown</span><span class="c-punc">);</span>  <span class="c-comment">// → "# Seven RAG tips\n\n## 1. Chunk on…"</span></code></pre>
+        </figure>
+      </div>
+    </section>
+
+    <!-- ─── Pricing band · simple, hairline-framed · one cobalt CTA ─── -->
+    <section class="pricing" id="pricing" aria-labelledby="pricing-title">
+      <div class="pricing__head">
+        <p class="eyebrow reveal" style="--i:0">
+          <span class="eyebrow__dot" aria-hidden="true"></span> Pricing
+        </p>
+        <h2 class="pricing__title reveal" id="pricing-title" style="--i:1">
+          Pay for pages, not seats.
+        </h2>
+        <p class="pricing__lede reveal" style="--i:2">
+          Metered per successful extraction. Failed fetches are never billed.
+        </p>
+      </div>
+
+      <div class="plans">
+        <article class="plan reveal" style="--i:0">
+          <p class="plan__name">Free</p>
+          <p class="plan__price"><span class="plan__num">$0</span></p>
+          <p class="plan__unit">1,000 pages / month</p>
+          <ul class="plan__list">
+            <li>Markdown &amp; JSON output</li>
+            <li>Auto JS rendering</li>
+            <li>Community support</li>
+          </ul>
+          <a class="btn btn--ghost btn--block" href="#">Start building</a>
+        </article>
+
+        <article class="plan plan--feature reveal" style="--i:1">
+          <span class="plan__badge">Most teams</span>
+          <p class="plan__name">Scale</p>
+          <p class="plan__price"><span class="plan__num">$0.0008</span></p>
+          <p class="plan__unit">per page · volume tiers</p>
+          <ul class="plan__list">
+            <li>Everything in Free</li>
+            <li>Batch crawl &amp; webhooks</li>
+            <li>99.9% uptime SLA</li>
+            <li>Priority render queue</li>
+          </ul>
+          <a class="btn btn--accent btn--block" href="#">Get API key</a>
+        </article>
+
+        <article class="plan reveal" style="--i:2">
+          <p class="plan__name">Enterprise</p>
+          <p class="plan__price"><span class="plan__num">Custom</span></p>
+          <p class="plan__unit">dedicated &amp; on-prem</p>
+          <ul class="plan__list">
+            <li>Private rendering region</li>
+            <li>SSO, audit log, DPA</li>
+            <li>Solutions engineer</li>
+          </ul>
+          <a class="btn btn--ghost btn--block" href="#">Talk to us</a>
+        </article>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ─── Footer · Ft1 mast-headed ─── -->
+  <footer class="foot" id="changelog">
+    <div class="foot__top">
+      <div class="foot__brandcol">
+        <a class="foot__brand" href="#" aria-label="Distil — home">
+          <span class="nav__mark" aria-hidden="true"></span> Distil
+        </a>
+        <p class="foot__tagline">Clean Markdown for language models.</p>
+      </div>
+      <nav class="foot__cols" aria-label="Footer">
+        <div class="foot__col">
+          <p class="foot__heading">Product</p>
+          <a href="#">API reference</a>
+          <a href="#">SDKs</a>
+          <a href="#">Status</a>
+          <a href="#">Changelog</a>
+        </div>
+        <div class="foot__col">
+          <p class="foot__heading">Use cases</p>
+          <a href="#">RAG ingestion</a>
+          <a href="#">Agents &amp; tools</a>
+          <a href="#">Search indexing</a>
+          <a href="#">Datasets</a>
+        </div>
+        <div class="foot__col">
+          <p class="foot__heading">Company</p>
+          <a href="#">Docs</a>
+          <a href="#">Security</a>
+          <a href="mailto:hello@distil.dev">Contact</a>
+        </div>
+      </nav>
+    </div>
+    <div class="foot__bottom">
+      <span>© 2024&ndash;2026 Distil, Inc.</span>
+      <span class="foot__set">Built in Lisbon &amp; Toronto</span>
+      <code class="foot__ver">v1 · api.distil.dev</code>
+    </div>
+  </footer>
+
+  <!-- ─── Command palette · Cobalt's signature interactive feature · ⌘K / Ctrl+K ─── -->
+  <div class="palette" id="palette" hidden>
+    <div class="palette__backdrop" data-palette-close></div>
+    <div class="palette__panel" role="dialog" aria-modal="true" aria-labelledby="palette-label">
+      <h2 class="palette__label" id="palette-label">Command palette</h2>
+      <div class="palette__field">
+        <span class="palette__prompt" aria-hidden="true">&#8250;</span>
+        <input
+          class="palette__input"
+          id="palette-input"
+          type="text"
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
+          spellcheck="false"
+          placeholder="Search docs, endpoints…"
+          aria-label="Search docs and endpoints"
+          aria-controls="palette-list"
+        />
+      </div>
+      <ul class="palette__list" id="palette-list" role="listbox" aria-label="Commands">
+        <li class="palette__row" role="option" id="cmd-0" data-cmd="quickstart" aria-selected="true">
+          <span class="palette__row-label">Quickstart</span>
+          <span class="palette__row-hint">3 lines</span>
+        </li>
+        <li class="palette__row" role="option" id="cmd-1" data-cmd="api" aria-selected="false">
+          <span class="palette__row-label">API reference</span>
+          <span class="palette__row-hint">/v1/extract</span>
+        </li>
+        <li class="palette__row" role="option" id="cmd-2" data-cmd="pricing" aria-selected="false">
+          <span class="palette__row-label">Pricing</span>
+          <span class="palette__row-hint">per page</span>
+        </li>
+        <li class="palette__row" role="option" id="cmd-3" data-cmd="key" aria-selected="false">
+          <span class="palette__row-label">Get an API key</span>
+          <span class="palette__row-hint">free tier</span>
+        </li>
+        <li class="palette__row" role="option" id="cmd-4" data-cmd="copy" aria-selected="false">
+          <span class="palette__row-label">Copy install command</span>
+          <span class="palette__row-hint">npm i</span>
+        </li>
+      </ul>
+      <p class="palette__foot" aria-hidden="true">
+        <kbd>&#8593;</kbd><kbd>&#8595;</kbd> navigate
+        <kbd>&#8629;</kbd> select
+        <kbd>esc</kbd> close
+      </p>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

@@ -278,14 +278,14 @@ npx wrangler whoami 2>&1 | head -5
 
 **🔑 PRIMARY AUTH METHOD (this account): Global API Key**
 
-For barkleesanders@gmail.com (account `370916317cb5ba9f1162c8e420fa86b4`), the persistent auth is the **Cloudflare Global API Key** stored at `~/.cloudflared/cf-global-api-key.json`. It is exported automatically by `~/.zshrc` as `CLOUDFLARE_API_KEY` + `CLOUDFLARE_EMAIL` and has FULL account permissions (Workers, Pages, DNS, KV, D1, R2, Zone — everything). This bypasses per-token permission gaps.
+For you@example.com (account `<CLOUDFLARE_ACCOUNT_ID>`), the persistent auth is the **Cloudflare Global API Key** stored at `~/.cloudflared/cf-global-api-key.json`. It is exported automatically by `~/.zshrc` as `CLOUDFLARE_API_KEY` + `CLOUDFLARE_EMAIL` and has FULL account permissions (Workers, Pages, DNS, KV, D1, R2, Zone — everything). This bypasses per-token permission gaps.
 
-This is the source of truth — DO NOT prompt the user for `wrangler login` if `wrangler whoami` already shows "Global API Key, associated with the email barkleesanders@gmail.com". Just deploy.
+This is the source of truth — DO NOT prompt the user for `wrangler login` if `wrangler whoami` already shows "Global API Key, associated with the email you@example.com". Just deploy.
 
 ```bash
 # If wrangler whoami fails in a non-interactive shell, source zshrc env vars manually:
 export CLOUDFLARE_API_KEY="$(python3 -c 'import json;print(json.load(open("$HOME/.cloudflared/cf-global-api-key.json"))["global_api_key"])')"
-export CLOUDFLARE_EMAIL="barkleesanders@gmail.com"
+export CLOUDFLARE_EMAIL="you@example.com"
 unset CLOUDFLARE_API_TOKEN  # narrower-scope tokens override the global key — unset them
 ```
 
