@@ -37,7 +37,7 @@ read -r NAME HASROUTES < <(node -e '
   let name="",hasRoutes="n";
   if(process.argv[1].endsWith(".toml")){
     const m=t.match(/^\s*name\s*=\s*"([^"]+)"/m); name=m?m[1]:"";
-    if(/^\s*(routes?\s*=|\[\[?routes\]?\]|\[env\.[^\]]*\.routes\])/m.test(t)||/custom_domain\s*=\s*true/.test(t))hasRoutes="y";
+    const tt=t.replace(/^\s*#.*$/gm,"");if(/^\s*(routes?\s*=|\[\[?routes\]?\]|\[env\.[^\]]*\.routes\])/m.test(tt)||/custom_domain\s*=\s*true/.test(tt))hasRoutes="y";
   } else {
     // strict JSON first; string-aware comment strip as jsonc fallback
     const parse=(s)=>JSON.parse(s);

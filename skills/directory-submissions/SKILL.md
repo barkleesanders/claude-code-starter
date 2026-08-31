@@ -47,7 +47,7 @@ Never submit to a directory until the landing page it will link to is live, inde
 Directories are the *source* of link equity. You need *destinations* that can convert the resulting traffic. Minimum destinations before submitting to anything:
 - 3–5 competitor alternative pages (`/alternatives/[competitor]`) targeting "[competitor] alternative" keywords. Comparison/alternative pages convert at **5–15%** vs 0.5–2% for generic content.
 - 3–5 use-case pages (`/for/[audience]` or `/use-cases/[use-case]`).
-- Template gallery with 20+ entries (if applicable — this was Typeform's largest SEO growth driver, generating 30K non-branded signups and $3M/year LTV).
+- Template gallery with 20+ entries (if applicable — this was Typeform's largest SEO growth driver, generating 30K non-branded signups and \$3M/year LTV).
 - 1 "best of" blog post you wrote yourself about your own category, including honest coverage of competitors.
 
 ### Rule 3: Positioning varies by directory type
@@ -165,7 +165,7 @@ G2 and Capterra (now owned by G2 as of Feb 2026) listings are **worthless withou
 
 1. **Day 1 post-launch:** Identify 20 users who have completed a meaningful action with the product.
 2. **Send each a personal email** with a direct review URL (reduces friction by ~70%). No forms, no landing pages — direct link.
-3. **Offer a modest thank-you.** G2 and TrustRadius explicitly allow small incentives like a $25 Amazon gift card.
+3. **Offer a modest thank-you.** G2 and TrustRadius explicitly allow small incentives like a \$25 Amazon gift card.
 4. **Follow up once** after 5 days. Don't follow up twice — it becomes annoying and damages the relationship.
 5. **Target:** 50% conversion → 10 reviews from 20 asks.
 
@@ -178,7 +178,7 @@ G2 and Capterra (now owned by G2 as of Feb 2026) listings are **worthless withou
 ### Badges and paid plans
 
 - **"Users Love Us" badge** is still free: requires 20 reviews at 4.0+ average.
-- **Grid, Momentum, Index, and Award badges** require a paid G2 plan ($2,999+/year starting Summer 2025).
+- **Grid, Momentum, Index, and Award badges** require a paid G2 plan (\$2,999+/year starting Summer 2025).
 - **Do not spend on paid G2 in year one.** The free listing + Users Love Us badge is sufficient.
 
 ### Cross-platform
@@ -213,7 +213,7 @@ Every ICP gets a dedicated landing page:
 
 ### 3. Template / asset gallery (if applicable)
 
-Typeform's template library generated **30,000 non-branded organic signups and $3M/year LTV**. The pattern:
+Typeform's template library generated **30,000 non-branded organic signups and \$3M/year LTV**. The pattern:
 - One indexable page per template at `/templates/[slug]`.
 - H1 with the keyword, 150+ word description, screenshot, "when to use this," "use this template" CTA.
 - Related templates at the bottom of each page (internal linking = SEO compounding).
@@ -316,7 +316,7 @@ Track weekly. If a number isn't moving, investigate — don't just submit more d
 
 ## What NOT to Do
 
-1. **Don't pay for directory submission services** ($60–$200 packages). The whole point is these are free. It's an afternoon of copy-paste.
+1. **Don't pay for directory submission services** (\$60–\$200 packages). The whole point is these are free. It's an afternoon of copy-paste.
 2. **Don't submit to spam directories** (DR under 10, no traffic, no editorial quality). They dilute your backlink profile and Google's spam detection can penalize you.
 3. **Don't submit with the wrong positioning.** Re-read the positioning table per tier. Generic descriptions waste the listing.
 4. **Don't treat directories as your entire GTM.** They're the foundation. Content + community + reviews are what actually convert.

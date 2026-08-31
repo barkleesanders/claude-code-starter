@@ -186,8 +186,8 @@ Identifies which features customers value most:
 ### Pricing Psychology
 - **Anchoring:** Show higher-priced option first
 - **Decoy effect:** Middle tier should be best value
-- **Charm pricing:** $49 vs. $50 (for value-focused)
-- **Round pricing:** $50 vs. $49 (for premium)
+- **Charm pricing:** \$49 vs. \$50 (for value-focused)
+- **Round pricing:** \$50 vs. \$49 (for premium)
 
 ---
 

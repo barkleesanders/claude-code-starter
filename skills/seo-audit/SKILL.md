@@ -69,12 +69,12 @@ done
 # exit 0 = pass; exit 1 = CRITICAL (fix before any other SEO work)
 ```
 
-A **200 is necessary but NOT sufficient** — this miss has TWO layers, and the second is the one that's easy to declare "fixed" while it's still broken (learned the hard way on aivaclaims.com, 2026-06-25):
+A **200 is necessary but NOT sufficient** — this miss has TWO layers, and the second is the one that's easy to declare "fixed" while it's still broken (learned the hard way on example.com, 2026-06-25):
 
 - **Layer 1 — edge reachability:** any AI bot returning 403/429 while a browser gets 200 = a WAF/CDN block firing *before* the app. `robots.txt: Allow /` does NOT override it. **Cloudflare:** the usual culprit is `zones/<id>/bot_management` → `ai_bots_protection: "block"` (set it to `"disabled"`). Verify via the CF API, not just robots.txt.
 - **Layer 2 — prerender parity:** a bot can get 200 *and still* be served the route-blind SPA shell (homepage `<title>` + homepage canonical on every route) because its UA isn't in the app's SSR/prerender allowlist. **`OAI-SearchBot` (ChatGPT Search's index crawler) is the one most often forgotten** — and a quick homepage check can look fine while every money page is collapsed to the homepage. The gate's parity check compares the AI crawler's per-route `<title>`/canonical against Googlebot's prerender; if they differ, add the UA to the allowlist (e.g. `crawler-detect` `CRAWLER_PATTERNS`).
 
-Then verify facts survive without JS, per-route canonicals self-reference, and schema is in the static bytes — full framework, detection scripts, 10-point scorecard, and fix patterns: **[AI Source Selection reference](references/ai-source-selection.md)** (synthesized from Suganthan's "How ChatGPT Picks Its Sources" + the live aivaclaims.com audit). For the content/answer-phrasing side, see the **ai-seo** skill.
+Then verify facts survive without JS, per-route canonicals self-reference, and schema is in the static bytes — full framework, detection scripts, 10-point scorecard, and fix patterns: **[AI Source Selection reference](references/ai-source-selection.md)** (synthesized from Suganthan's "How ChatGPT Picks Its Sources" + the live example.com audit). For the content/answer-phrasing side, see the **ai-seo** skill.
 
 ### Priority Order
 0. **AI Crawl Reachability** (can OpenAI/Anthropic/Perplexity bots even fetch it? — run the matrix above)

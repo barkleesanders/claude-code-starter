@@ -65,17 +65,17 @@ Get a Gemini API key at: https://aistudio.google.com/apikey
 
 | Alias | Model | Use When |
 |-------|-------|----------|
-| `flash`, `nb2` | Gemini 3.1 Flash | Default. Fast, cheap (~$0.067/1K image) |
-| `pro`, `nb-pro` | Gemini 3 Pro | Highest quality needed (~$0.134/1K image) |
+| `flash`, `nb2` | Gemini 3.1 Flash | Default. Fast, cheap (~\$0.067/1K image) |
+| `pro`, `nb-pro` | Gemini 3 Pro | Highest quality needed (~\$0.134/1K image) |
 
 ## Sizes
 
 | Size | Cost (Flash) | Cost (Pro) |
 |------|-------------|------------|
-| `512` | ~$0.045 | Flash only |
-| `1K` | ~$0.067 | ~$0.134 |
-| `2K` | ~$0.101 | ~$0.201 |
-| `4K` | ~$0.151 | ~$0.302 |
+| `512` | ~\$0.045 | Flash only |
+| `1K` | ~\$0.067 | ~\$0.134 |
+| `2K` | ~\$0.101 | ~\$0.201 |
+| `4K` | ~\$0.151 | ~\$0.302 |
 
 ## Aspect Ratios
 

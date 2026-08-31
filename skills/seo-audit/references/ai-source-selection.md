@@ -7,7 +7,7 @@ assistant searches the web, can it FETCH your page, and once fetched, will it CI
 Framework synthesized from Suganthan Mohanadasan's teardown of ChatGPT's live search
 internals — "How ChatGPT Picks Its Sources"
 (https://suganthan.com/blog/how-chatgpt-picks-sources/) — plus a real audit of
-aivaclaims.com (2026-06-25) that the methodology below is derived from.
+example.com (2026-06-25) that the methodology below is derived from.
 
 > Use this section for any client that cares about appearing in ChatGPT / Perplexity /
 > Claude / Bing Copilot / Google AI answers. Cross-reference the **ai-seo** skill for the

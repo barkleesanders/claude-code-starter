@@ -299,8 +299,21 @@ const FALLBACK = "pk_live_..."; // prod custom domain
 
 ```bash
 # The repo opted into these rules — enforce them like any configured linter. 0 errors required.
-timeout 120 ./node_modules/.bin/oxlint 2>&1
+# Read the exit code UNPIPED — `oxlint | grep` replaces $? with grep's status.
+timeout 120 ./node_modules/.bin/oxlint > /tmp/ship_oxlint.log 2>&1; OX_RC=$?
+NDIAG=$(grep -cE ':[0-9]+:[0-9]+: (error|warning)' /tmp/ship_oxlint.log)
+echo "rc=$OX_RC diagnostics=$NDIAG"
 ```
+
+**⚠️ Gate the gate first — `0 findings` and `the linter never ran` look identical.** Measured on oxlint 1.80.0: an unknown rule name in the config (`Failed to parse oxlint configuration file`) or an unloadable `jsPlugins` specifier (`Failed to load JS plugin: ...`) makes oxlint exit **1**, print **zero** diagnostics, and lint **nothing at all** — not the plugin, not the core rules. A `debugger;` file with `no-debugger: error` came back clean because a *sibling* rule name in the same config was bad. So this is a **three-outcome** check, never two:
+
+| `OX_RC` | `NDIAG` | Verdict |
+|---|---|---|
+| 0 | any | **measured, clean** → proceed |
+| ≠0 | ≥1 | **measured, findings** → run the loop |
+| ≠0 | 0 | **UNMEASURED — the gate is dead.** STOP. Fix the config per `~/.claude/skills/install-anti-slop/SKILL.md` step 4b. Never record this as a pass. |
+
+Don't test for the error strings alone — a broken local install exits 1 with a bare node `ERR_MODULE_NOT_FOUND` and none of oxlint's own wording. The diagnostic-line count is the reliable signal.
 
 **The loop (runs itself to a terminal state, no check-ins between iterations):** (1) run oxlint, capture every `anti-slop/*` finding with file:line; (2) fix EVERY finding in source by adding evidence — inference, `as const`, `satisfies`, named owner contracts, discriminated unions, Zod boundary parsing, or a genuinely-checked `// SAFETY: <invariant>` line; (3) re-run oxlint AND the repo's typecheck (a fix that silences lint but breaks `tsc` — or adds a new cast to compile — is not a fix); (4) repeat until **0 findings → proceed to the next stage immediately**; (5) loop guard: the same finding surviving **5 fix attempts → STOP the ship** and surface it to the user with why the fix isn't landing. NEVER weaken rule severity, add `oxlint-disable`, launder types, or write a hollow SAFETY comment to reach green — that's the No-Suppression Rule. If oxlint itself fails to run (missing dep, version drift with the vendored plugin), fix the setup per `~/.claude/skills/install-anti-slop/SKILL.md` rather than skipping the gate. (Plugin verified armed 2026-08-16 on oxlint 1.78.0: 10 errors on a known-bad file, 0 on a clean control.)
 
@@ -315,5 +328,14 @@ timeout 120 ./node_modules/.bin/oxlint 2>&1
 ```
 
 Run the identical loop: fix every hit by adding evidence, re-run detector + typecheck, repeat until the detector exits 0 with **Σ 0 hits**; 5 failed attempts on one hit → STOP and surface. The detector's three patterns (generic structural guards, `as unknown as T` launder-casts, `(x as any).field` reach-casts) essentially never have a legitimate keep — in the rare case one genuinely is the right tool, the "fix" is an inline justification comment at the site plus a note in the ship report, never silent skipping. For actively-developed TS repos, also offer the `/install-anti-slop` skill so future ships get the fuller 15-rule Path A gate.
+
+**Cyclomatic complexity — ADVISORY, both paths, never blocking.** A global oxlint + config lives at `/opt/homebrew/bin/oxlint` + `~/.config/oxlint/oxlintrc.json` (`complexity` at `max: 15`, `variant: "modified"`), so this runs even in repos with no vendored plugin and no local oxlint:
+
+```bash
+oxlint -c ~/.config/oxlint/oxlintrc.json src/ > /tmp/ship_cplx.log 2>&1
+grep 'eslint(complexity)' /tmp/ship_cplx.log
+```
+
+Report these in the ship summary; **do not gate the release on them and do not add them to the auto-fix loop.** Every anti-slop rule names a defect with one correct repair, so looping to 0 converges. Complexity does not — splitting a function is a design decision that can be wrong, and forcing the number down produces exactly the laundering this stage exists to prevent (six extracted one-line helpers score better and read worse). Fix the ones inside functions the release already touches; leave the rest for the user.
 
 **Required alternatives (priority):** named `interface`/`type` → discriminated union on a literal field → **Zod/Valibot schema at the trust boundary** with `type X = z.infer<typeof Schema>` → library-inferred types (`z.infer`, Prisma/Drizzle `$inferSelect`, tRPC, Hono `InferResponseType`) → targeted predicate (last resort, justified inline). Typed code should compile (`tsc --noEmit`) with zero casts added to make it pass.

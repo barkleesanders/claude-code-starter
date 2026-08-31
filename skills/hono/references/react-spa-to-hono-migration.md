@@ -71,7 +71,7 @@ Put `<title>`, `<meta name=description>`, canonical, OG/Twitter, JSON-LD directl
 route's SSR `<head>`. This is the concrete reason to convert — crawlers and social scrapers now
 get real markup on first byte instead of an empty SPA shell.
 
-### Why this matters more than "add SSR" — the crawler-shadow trap (measured, aivaclaims.com 2026-06-28)
+### Why this matters more than "add SSR" — the crawler-shadow trap (measured, example.com 2026-06-28)
 
 A SPA often already has a **crawler-only SEO shadow**: a worker branch that UA-sniffs
 (`isCrawler(ua)`) and serves hand-written `<head>` meta to Googlebot, while humans get the empty

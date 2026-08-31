@@ -1,0 +1,79 @@
+/* Hallmark · theme: cobalt · design tokens
+   Cool cobalt-on-light, dev-tool / API register. Never pure white, never pure
+   black. ONE electric cobalt signal accent; hairlines do the structural work. */
+
+:root {
+  /* ─── Colour ─────────────────────────────────────────────── */
+  --color-paper:   oklch(98.5% 0.004 250);  /* cool engineered near-white — page ground */
+  --color-paper-2: oklch(96.5% 0.005 252);  /* alt band / quiet inset */
+  --color-paper-3: oklch(94% 0.006 254);    /* card tint / chip ground */
+
+  --color-ink:     oklch(24% 0.02 258);     /* headlines + wordmark — cool charcoal */
+  --color-ink-2:   oklch(34% 0.018 257);    /* body copy */
+  --color-muted:   oklch(56% 0.013 255);    /* captions, meta, punctuation */
+
+  --color-rule:    oklch(91% 0.008 255);    /* hairlines */
+  --color-rule-2:  oklch(83% 0.011 255);    /* stronger hairline / hover rule */
+
+  --color-accent:     oklch(58% 0.20 256);  /* electric cobalt — THE one signal */
+  --color-accent-ink: oklch(99% 0.004 256); /* text on cobalt */
+  --color-accent-dim: oklch(58% 0.20 256 / 0.10); /* cobalt wash / focus halo */
+
+  --color-graphite:   oklch(22% 0.016 260); /* dark code-card ground */
+  --color-graphite-2: oklch(27% 0.018 260); /* code window bar */
+  --color-graphite-3: oklch(34% 0.02 260);  /* code card hairline */
+
+  /* text on the full-bleed dark quickstart band (light cool ink) */
+  --color-quick-ink:   oklch(92% 0.01 255);   /* headings on dark */
+  --color-quick-ink-2: oklch(80% 0.012 256);  /* body on dark */
+  --color-quick-muted: oklch(64% 0.014 256);  /* labels on dark */
+
+  /* code syntax on graphite */
+  --code-text:   oklch(86% 0.01 258);   /* default code ink (light) */
+  --code-dim:    oklch(58% 0.014 258);  /* punctuation / comments */
+  --code-string: oklch(82% 0.04 150);   /* strings — cool desaturated */
+  --code-accent: oklch(72% 0.16 256);   /* method / keys — cobalt, lifted for contrast */
+
+  /* ─── Type ───────────────────────────────────────────────── */
+  --font-display: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body:    "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* fluid scale */
+  --step-hero:    clamp(2.6rem, 5.2vw + 0.8rem, 5rem);
+  --step-section: clamp(1.9rem, 3.2vw, 3rem);
+  --step-lede:    clamp(1.0625rem, 0.8vw + 0.7rem, 1.3125rem);
+  --step-body:    1.0625rem;
+  --step-code:    0.875rem;
+  --step-small:   0.75rem;                 /* mono labels / eyebrows */
+
+  --tracking-display: -0.03em;
+  --tracking-snug:    -0.015em;
+  --tracking-label:   0.06em;              /* mono uppercase labels */
+
+  --weight-body:    400;
+  --weight-medium:  500;
+  --weight-semi:    600;
+
+  --leading-tight:  1.04;
+  --leading-snug:   1.18;
+  --leading-body:   1.62;
+  --measure:        62ch;
+
+  /* ─── Space & layout ─────────────────────────────────────── */
+  --gutter:     clamp(1.1rem, 4vw, 3.25rem);  /* full-bleed page inset */
+  --maxw:       1200px;                       /* content frame */
+  --section-y:  clamp(4.5rem, 9vw, 8rem);
+  --rule:       1px;
+
+  /* ─── Shape ──────────────────────────────────────────────── */
+  --radius-btn:  6px;
+  --radius-card: 10px;
+  --shadow-card: 0 1px 2px oklch(22% 0.016 260 / 0.08);  /* the one barely-there lift */
+
+  /* ─── Motion ─────────────────────────────────────────────── */
+  --reveal-dist: 10px;
+  --reveal-dur:  600ms;
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --t-quiet:     240ms cubic-bezier(0.4, 0, 0.2, 1);
+}

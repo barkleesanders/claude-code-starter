@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ai-crawl-reachability.sh — MANDATORY gate for any AI-visibility SEO audit.
 #
-# Catches the two-layer failure that made aivaclaims.com invisible to ChatGPT (2026-06-25):
+# Catches the two-layer failure that made example.com invisible to ChatGPT (2026-06-25):
 #   LAYER 1 (edge): a WAF/CDN returns 403/429 to AI bots before the app runs.
 #                   robots.txt "Allow: /" does NOT override this — it's a lower layer.
 #   LAYER 2 (app):  the bot gets 200 but the route-blind SPA shell (homepage <title> +
@@ -15,7 +15,7 @@
 # allowlist is missing that bot.
 #
 # Usage:  ai-crawl-reachability.sh <domain-or-url> [deep-route-path]
-#   e.g.  ai-crawl-reachability.sh aivaclaims.com /services/disability-claims
+#   e.g.  ai-crawl-reachability.sh example.com /services/disability-claims
 # Exit:   0 = pass, 1 = CRITICAL (edge block or shell-parity miss), 2 = usage error.
 
 set -uo pipefail

@@ -1,7 +1,7 @@
 interface:
-  display_name: "Make Goal"
-  short_description: "Turn a task into parallel goals"
-  default_prompt: "Use $makegoal to turn this task into a build brief, top-level goal, and parallel subgoals."
+  display_name: "Make Goal (→ /goal make)"
+  short_description: "Merged into /goal — routes to /goal make"
+  default_prompt: "Use $goal in make mode (read goal/references/make-mode.md) to turn this task into a build brief, a top-level goal, and ledger deliverables."
 
 policy:
   allow_implicit_invocation: true

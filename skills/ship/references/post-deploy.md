@@ -8,7 +8,7 @@ Covers Phase 4.08 (Workers-Cache post-deploy verification), Phase 4.1 (post-depl
 
 **Fires when**: the deployed changeset enables or modifies the wrangler `cache` block (`"cache": { "enabled": … }`). Full pattern: `~/.claude/skills/shared/workers-cache-safety.md`.
 
-**Why**: enabling Workers Cache changes the runtime's request presentation — the cache front-layer hands the Worker `http://` in `request.url` for HTTPS visitors (`cf-visitor` stays `{"scheme":"https"}`). On 2026-07-06 this 301-looped aivaclaims.com sitewide for ~25 min (zone analytics: 301s 0–5/hr → 120 → 439/hr). Triage was slowed by a propagation false-negative: a 3-second post-disable curl said "didn't fix it" and triggered an unnecessary rollback — engage/disengage takes >30s to propagate.
+**Why**: enabling Workers Cache changes the runtime's request presentation — the cache front-layer hands the Worker `http://` in `request.url` for HTTPS visitors (`cf-visitor` stays `{"scheme":"https"}`). On 2026-07-06 this 301-looped example.com sitewide for ~25 min (zone analytics: 301s 0–5/hr → 120 → 439/hr). Triage was slowed by a propagation false-negative: a 3-second post-disable curl said "didn't fix it" and triggered an unnecessary rollback — engage/disengage takes >30s to propagate.
 
 **Protocol**:
 1. **Staged enable** — if the diff changes worker code AND newly enables cache: deploy code with `cache.enabled: false` first, verify healthy, then flip the flag in a second deploy. Never combine an untested code change with the first cache-enable.
@@ -37,6 +37,34 @@ Covers Phase 4.08 (Workers-Cache post-deploy verification), Phase 4.1 (post-depl
 ---
 
 ## Phase 4.1: POST-DEPLOY VERIFICATION
+
+### 4.1.-1 — VERIFY A GUARD WITHOUT FIRING ITS SIDE EFFECT (added 2026-08-25)
+
+When the thing you shipped is a **guard on a side-effecting endpoint** (rate limit,
+auth check, size cap, feature flag), the obvious live test is also a live *abuse* of
+your own production system — sending five real bug reports, five real emails, five
+real notifications to the operator's phone. That cost is usually why the guard goes
+unverified, and an unverified guard is the same as no guard.
+
+**Order the guard before the side effect and the free test falls out of the design.**
+If the guard runs before the body is parsed, you can drive it with a body that is
+*rejected downstream*, so every probe exercises the guard and none reaches the
+side-effecting code:
+
+```bash
+# The guard runs first; `[]` then fails the "object body required" check, so
+# recordBugReport() / sendTelegram() are never reached. Zero side effects.
+for i in $(seq 1 7); do
+  curl -sS -o /dev/null -w "%{http_code} " -X POST https://<site>/api/bug-report \
+    -H 'Content-Type: application/json' -d '[]'
+done   # expect: 400 400 400 400 400 429 429
+curl -sS -D - -o /dev/null -X POST ... | grep -i '^retry-after'
+```
+
+Verified this way on improvebayarea 2026-08-25: `5×400 → 429`, `retry-after: 32`,
+and **zero bug reports created**. If you *cannot* construct a probe that stops short
+of the side effect, that itself is the finding — the guard is sitting after the
+irreversible step and buys less than it appears to. Move it, then verify.
 
 ### 4.1.0 — ARTIFACT-FIRST RULE (BLOCKING, read before any browser check — added 2026-07-10)
 
@@ -125,7 +153,7 @@ printf "%s" "$HTML" | grep -oP '(og|twitter):image" content="\K[^"]+'
 agent-browser open "https://www.opengraph.xyz"
 sleep 2
 agent-browser snapshot -i -c
-agent-browser fill "@eN" "https://aivaclaims.com"
+agent-browser fill "@eN" "https://example.com"
 agent-browser press Enter
 sleep 5
 agent-browser screenshot --path /tmp/og-preview-twitter.png
@@ -133,12 +161,12 @@ agent-browser scroll down 500
 agent-browser screenshot --path /tmp/og-preview-full.png
 
 # Also screenshot direct OG image
-agent-browser open "https://aivaclaims.com/images/og-social-card.png?v=20260306"
+agent-browser open "https://example.com/images/og-social-card.png?v=20260306"
 sleep 2
 agent-browser screenshot --path /tmp/og-image-direct.png
 
 # Trigger Twitter re-scrape
-agent-browser open "https://x.com/intent/tweet?text=https://aivaclaims.com"
+agent-browser open "https://x.com/intent/tweet?text=https://example.com"
 sleep 3
 ```
 
@@ -151,7 +179,7 @@ sleep 3
 # Download Twitter's cached card image
 curl -s -o /tmp/twitter-cached.jpg "https://pbs.twimg.com/card_img/XXXXX/XXXXX?format=jpg&name=medium"
 # Download what our server actually serves
-curl -s -H "User-Agent: Twitterbot/1.0" -o /tmp/served.png "$(curl -s -H 'User-Agent: Twitterbot/1.0' https://aivaclaims.com/ | grep -oP 'twitter:image" content="\K[^"]+')"
+curl -s -H "User-Agent: Twitterbot/1.0" -o /tmp/served.png "$(curl -s -H 'User-Agent: Twitterbot/1.0' https://example.com/ | grep -oP 'twitter:image" content="\K[^"]+')"
 # Compare: if different = cache issue (add ?v=), if same = image file needs updating
 ```
 
@@ -164,7 +192,7 @@ curl -s -H "User-Agent: Twitterbot/1.0" -o /tmp/served.png "$(curl -s -H 'User-A
 ### Production Integration Tests (replaces CI `test-production` job)
 ```bash
 # Run the same integration tests the CI ran against live production
-timeout 60 TEST_BASE_URL=https://aivaclaims.com npx vitest run tests/worker-integration.test.ts 2>&1
+timeout 60 TEST_BASE_URL=https://example.com npx vitest run tests/worker-integration.test.ts 2>&1
 pkill -f vitest 2>/dev/null
 # If fails: WARN (already deployed) — flag for investigation, do not auto-rollback
 ```
@@ -291,7 +319,7 @@ fi
 ```
 
 > ⚠️ **A version-id mismatch is NOT evidence of a clobber, and on its own must never
-> justify a rollback.** Verified on aivaclaims 2026-08-03: `wrangler deploy` printed
+> justify a rollback.** Verified on example 2026-08-03: `wrangler deploy` printed
 > `Current Version ID: b0e60e43` (21:23:05Z) and **29 s later** `587279b3` (21:23:34Z)
 > became the live version. The step-3 comparison therefore reports a clobber on a
 > completely normal, successful deploy. Versions land in pairs/triples with irregular
@@ -325,7 +353,7 @@ Expect the live chunk's **hash to differ** from your local build even when the d
 yours: a rebuild that changes one chunk's content hash cascades into every importer,
 because the import specifier is part of the importing file's bytes. Diff the two and
 confirm the only differences are sibling-chunk filenames — if the application code is
-identical, it is your build. On aivaclaims the live and local admin chunks were both
+identical, it is your build. On example the live and local admin chunks were both
 100,283 B and differed solely in `index-BqvIB0ze.js` vs `index-CybPCm53.js` and
 `jszip.min-CjCcE8IK.js` vs `jszip.min-DHek5_FY.js`.
 
@@ -467,7 +495,7 @@ Launch 3 Agent tools in parallel (single message):
 
 **Execution**:
 ```bash
-PROD_URL="https://aivaclaims.com"
+PROD_URL="https://example.com"
 
 # HTML must be freshly fetched and contain no retired auth-provider fingerprint.
 curl -sS "${PROD_URL}/?ship_cb=$(date +%s)" > /tmp/ship-live.html
@@ -489,7 +517,7 @@ npm run test:integration:prod
 ```
 
 **Decision logic**:
-- BLOCK if AIVA live HTML or CSP contains any Clerk host/key/SDK/JWKS fingerprint; absence of `clerk.aivaclaims.com` is expected
+- BLOCK if AIVA live HTML or CSP contains any Clerk host/key/SDK/JWKS fingerprint; absence of `clerk.example.com` is expected
 - BLOCK if `/api/auth/ok` is not 200 or wrong-password sign-in is not 401
 - BLOCK if a sensitive Worker binding is still a plaintext var instead of `secret_text`
 - BLOCK if production integration fails
