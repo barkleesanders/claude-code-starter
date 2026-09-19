@@ -38,8 +38,9 @@
 set -euo pipefail
 
 APPLY=0
-# 2026-08-15 user directive: public contact is the org address, never gmail.
-CONTACT="mailto:security@example.org"
+# Default Contact is security@<this-zone>. A hardcoded inbox on another zone
+# (example.org, gmail) is the 2026-09-01 miss. --contact still overrides.
+CONTACT=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --apply) APPLY=1 ;;
@@ -92,9 +93,29 @@ while IFS=' ' read -r ZID NAME; do
   # ab/al columns are now REPORT-ONLY (never written).
   ab="report"; al="report"
   if [ $APPLY -eq 1 ]; then
-    st=$(cf -X PUT "https://api.cloudflare.com/client/v4/zones/$ZID/security-center/securitytxt" \
-         --data "{\"enabled\":true,\"contact\":[\"$CONTACT\"],\"preferred_languages\":\"en\",\"expires\":\"$EXPIRES\"}" \
-         | python3 -c "import json,sys;print('OK' if json.load(sys.stdin).get('success') else 'ERR')" 2>/dev/null || echo ERR)
+    # Per-zone mailbox: security@improvecortland.com on that zone, never a sibling.
+    ZCONTACT="$CONTACT"
+    [ -z "$ZCONTACT" ] && ZCONTACT="mailto:security@$NAME"
+    # MERGE, never overwrite: a zone can advertise several mailboxes (example.org
+    # also carries security@car.example.org for the Worker on that subdomain, which
+    # cannot serve its own security.txt because the zone-level one wins at the
+    # edge). Overwriting here erased it on 2026-09-18 — rediscovered by the
+    # tesla-fleet ship. Union the existing contact list with this zone's own
+    # mailbox; the PUT only happens when the union adds something.
+    CONTACTS_JSON=$(cf "https://api.cloudflare.com/client/v4/zones/$ZID/security-center/securitytxt" \
+      | python3 -c "
+import json,sys
+cur=(json.load(sys.stdin).get('result') or {}).get('contact') or []
+want='$ZCONTACT'
+merged=list(dict.fromkeys([*cur, want]))
+print(json.dumps(merged) if merged!=cur or not cur else '')" 2>/dev/null)
+    if [ -z "$CONTACTS_JSON" ]; then
+      st="OK(kept)"
+    else
+      st=$(cf -X PUT "https://api.cloudflare.com/client/v4/zones/$ZID/security-center/securitytxt" \
+           --data "{\"enabled\":true,\"contact\":$CONTACTS_JSON,\"preferred_languages\":\"en\",\"expires\":\"$EXPIRES\"}" \
+           | python3 -c "import json,sys;print('OK' if json.load(sys.stdin).get('success') else 'ERR')" 2>/dev/null || echo ERR)
+    fi
   else
     st="would-set"
   fi

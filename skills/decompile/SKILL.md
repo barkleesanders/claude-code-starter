@@ -55,7 +55,7 @@ The routing table is the centerpiece of this skill. Match the artifact to a row,
 | `Java archive` / `.jar` / `.war` | JVM bytecode | `cfr-decompiler` | `jadx` (Kotlin-friendly) | [JVM](#jvm) |
 | Android `.apk` / `.aab` / xapk bundle | Android | `jadx --no-res -d out app.apk` | `apktool d` (resources), `apkeep` (download from store) | [Android](#android) |
 | `.dex` standalone | Dalvik bytecode | `jadx` | Ghidra DEX loader | [Android](#android) |
-| iOS `.ipa` | Mach-O Fat/Slim inside zip | `ipsw extract`, `ipsw class-dump` | `otool`, `lipo`, radare2, Ghidra | [iOS](#ios) |
+| iOS `.ipa` | Mach-O Fat/Slim inside zip | `ipatool` (App Store acquire) → `unzip` → `ipsw class-dump` | `otool`, `lipo`, radare2, Ghidra. **FairPlay `cryptid=1` until decrypted** | [iOS](#ios) |
 | `.framework` / `.dylib` | Mach-O lib | `otool -L`, `radare2` | Ghidra | [Native Mach-O](#native-mach-o) |
 | `.crx` / Chrome store URL / extension ID | Zipped JS+JSON | Strip CRX header → `unzip` | `prettier`, `terser`, `webcrack` | [Browser extension](#browser-extension) |
 | `.xpi` / Firefox extension | Zip JS+JSON | `unzip foo.xpi` | same JS toolkit | [Browser extension](#browser-extension) |
@@ -90,6 +90,7 @@ The routing table is the centerpiece of this skill. Match the artifact to a row,
 | `jadx` | `/opt/homebrew/bin/jadx` | Java/Kotlin/DEX → readable Java |
 | `apktool` | `/opt/homebrew/bin/apktool` | APK resource decode + smali, repack |
 | `apkeep` | `~/.cargo/bin/apkeep` | Pull APKs from APKPure / Google Play / F-Droid / Huawei |
+| `ipatool` | `~/.local/bin/ipatool` (majd/ipatool **2.6.0**, GitHub release installed 2026-09-13, sha256-verified) | Pull **encrypted** IPAs from the App Store (iOS analog of `apkeep`). Platforms on this binary: `iphone` / `ipad` / `appletv` / `visionos` / `macos`; has `list-purchases`. `/opt/homebrew/bin/ipatool` is a stale 2.5.0 shadowed on PATH — believe `ipatool --help`, not the GitHub README. Output is FairPlay-encrypted (`cryptid=1`): unzip resources, do not Ghidra `__TEXT` until decrypted. Not piracy — only apps the Apple ID owns. FAQ: https://github.com/majd/ipatool/wiki/FAQ |
 | `cfr-decompiler` | `/opt/homebrew/bin/cfr-decompiler` | Java decompiler — catches things jadx misses |
 | `ipsw` | `/opt/homebrew/bin/ipsw` | iOS firmware, IPA class-dump, dyld_shared_cache extract |
 | `lldb` | `/usr/bin/lldb` (Xcode CLT, `lldb-2100.0.17.203`) | **Dynamic native debugging** — breakpoints, watchpoints, memory dump, attach-to-PID, core dumps, `gdb-remote` to QEMU. The runtime counterpart to Ghidra's static view. ⚠️ Pass `--no-lldbinit` in scripts (`~/.lldbinit` here registers phantom breakpoints) and scope name-breakpoints with `--shlib` (a bare `--name` collides with system libs). Hardened-runtime apps refuse attach — see [lldb-dynamic.md](references/lldb-dynamic.md). |
@@ -188,6 +189,16 @@ ls "$HOME/Library/Application Support/Google/Chrome/Default/Extensions"   # inst
 ```
 Match the id by name in each `manifest.json`, or read it off `chrome://extensions`
 (Developer mode on).
+
+**App Store IPA (you already own the app) → `ipatool`, not Chrome.**
+Same job `apkeep` does for Android. Auth is `ipatool auth login -e <apple-id>` (interactive 2FA; app-specific passwords are **not** supported). Then `ipatool download -b <bundle-id>`. The file is FairPlay-encrypted — see [iOS](#ios) before opening it in a decompiler.
+
+**Artifact behind a CLOUDFLARE challenge → `~/tools/cfget`, not a browser.**
+```bash
+~/tools/cfget --refresh <domain>          # once, after a human clears the interstitial in real Chrome
+~/tools/cfget "<url>" -o artifact --expect-title "<substr the real page has>"
+```
+Replays the real profile's `cf_clearance` + exact UA over plain HTTP. Same command latency as fcdp (both ~0.19s, measured), but fcdp needs an 8-14s settle wait after `open` and cannot enumerate at all on a site that re-challenges every new URL. Exit **3** = blocked/rate-limited, **4** = no cf_clearance yet — never read either as "the page is empty".
 
 **Artifact behind a login (store / vendor portal / private build) → capture the real URL.**
 ```bash
@@ -407,11 +418,36 @@ objection -g com.example.app explore -c 'android sslpinning disable'   # if TLS-
 
 ### iOS
 
+`ipatool` is the App Store downloader (`apkeep` for Android). `ipsw` is the Mach-O / class-dump / firmware tool. They are not interchangeable. `ipatool download` writes a **FairPlay-encrypted** IPA (`cryptid=1`); unzipping still yields `Info.plist` / assets / JS, but Ghidra / r2 / `ipsw class-dump` of `__TEXT` is garbage until the Mach-O is decrypted on a device the user owns.
+
+Flags below are from the **on-PATH binary** (`ipatool --version` → **2.6.0**, `ipatool --help` 2026-09-13; previous 2.3.1 kept at `~/.local/bin/ipatool-2.3.1.bak`). A stale Homebrew 2.5.0 sits at `/opt/homebrew/bin/ipatool` behind it on PATH.
+
 ```bash
+# 1) Acquire (encrypted). Agent runs: --format json --non-interactive
+ipatool auth info --format json --non-interactive          # must already be logged in
+# first time (interactive 2FA; app-specific passwords NOT supported — FAQ):
+#   ipatool auth login -e <apple-id>
+ipatool search "App Name" --platform iphone -l 10 --format json
+# platforms on 2.6.0: iphone | ipad | appletv | visionos | macos
+ipatool list-purchases --platform iphone -l 50 -p 1 --format json   # apps the Apple ID already owns
+ipatool download -b com.example.app -o ~/re/example/app.ipa --purchase --format json --non-interactive
+# older version:
+#   ipatool list-versions -b com.example.app --format json
+#   ipatool get-version-metadata -b com.example.app --external-version-id <id> --format json
+#   ipatool download -b com.example.app --external-version-id <id> -o app.ipa
+
+# 2) Unpack (zip). Resources are readable even when the Mach-O is encrypted.
 unzip foo.ipa -d ipa-extracted/
 ls ipa-extracted/Payload/*.app/                      # executable is here
 
-# class-dump replacement using ipsw
+# 3) FairPlay gate — same idea as "don't Ghidra a packed binary"
+otool -l ipa-extracted/Payload/Foo.app/Foo | rg -A5 'cryptid|cryptoff|LC_ENCRYPTION'
+# cryptid 1 → STOP on the Mach-O. strings / Info.plist / assets / JS bundles are still fair game.
+# Decrypt is a device step, not a Mac CLI: londek/ipadecrypt or ChiChou/dumpster (both wrap ipatool
+# + a jailbroken/TrollStore device). ChiChou/bagbak is deprecated by its author — don't start there.
+# Enterprise / TestFlight / ad-hoc IPAs are often cryptid 0 — always check, don't assume.
+
+# 4) class-dump (only useful at cryptid=0). class-dump(1) is uninstallable; use ipsw.
 ipsw class-dump ipa-extracted/Payload/Foo.app/Foo > classes.h
 
 # Fat binary? slim first
@@ -419,7 +455,7 @@ lipo -info ipa-extracted/Payload/Foo.app/Foo
 lipo ipa-extracted/Payload/Foo.app/Foo -thin arm64 -output Foo.arm64
 # → otool / nm / r2 / Ghidra on Foo.arm64
 
-# Strings reveal endpoints + keys
+# Strings reveal endpoints + keys (works on encrypted binaries too, noisier)
 strings ipa-extracted/Payload/Foo.app/Foo | rg -iE 'https?://|api\.|sk_|AIza'
 ```
 
@@ -720,3 +756,19 @@ When reporting RE findings, include:
 - `scripts/dump_strings_imports.py` — Ghidra post-script: strings + imports + exports → JSON
 - `/carmack` skill — calls into this skill for RE tasks; for a website use `fcdp`/`fhar` first, then a logged-in browser CLI if that fits
 - `~/.beads/AGENTS.md` — task tracking conventions (use `bd` for multi-session RE projects)
+
+
+## ASC: targeted Android extraction and cross references
+
+Upstream: https://github.com/MG1937/ASC (Apache-2.0). Installed source: `~/tools/asc`; isolated dependencies in `.venv`. Wrapper: `~/.local/bin/droid-asc` (distinct from Apple App Store Connect's `asc`).
+
+Use ASC on APKs for targeted class decompilation or direct bytecode reference searches before paying for a whole-app JADX export. ASC rebuilds a minimal DEX and uses Androguard's decompiler; it does not recover original Kotlin or replace resource/native-library analysis. Keep JADX as a complementary full export and cross-check difficult classes.
+
+```sh
+droid-asc --help
+droid-asc getclass app.apk com.example.MainActivity -o MainActivity.java
+droid-asc findrefs app.apk string token -o token-refs.txt
+droid-asc findrefs app.apk method onCreate --class com.example.MainActivity
+```
+
+Always preserve the input APK and record its hash. Benchmark identical APK/class/query inputs, wall time and peak RSS; inspect actual method bodies and errors before claiming higher quality. An empty result or faster run alone is not proof of better recovery. The upstream README's timings are author claims, not local measurements. Use the stable python.org interpreter on the Mac mini; do not change its TCC interpreter or PATH.

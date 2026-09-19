@@ -151,15 +151,45 @@ Use this skeleton. Edit content; keep structure. Tailwind via CDN keeps the file
 
 <!-- Styles LAST. CSS is order-agnostic for matching; trailing position keeps the file content-first. -->
 <style>
-  body { font-family: ui-sans-serif, -apple-system, system-ui, sans-serif; }
+  /* color-scheme:light (never "light dark") — a page that opts into dark
+     support without shipping dark tokens gets Chrome's UA dark default
+     (color:white) forced onto html + any element with no explicit
+     text-color class, while an explicit background stays light: white
+     text on a light card. Confirmed live 2026-09-07 under real system
+     dark mode (goalzero reports) — <td> cells measured color:rgb(255,255,255)
+     on a white table until color-scheme was pinned to light. These are
+     static, standalone deliverables, not theme-adaptive Artifacts — they
+     must render identically regardless of the viewer's OS/browser theme. */
+  :root { color-scheme: light; }
+  html { background: #fafafa; color: #18181b; }
+  body { font-family: ui-sans-serif, -apple-system, system-ui, sans-serif; background: #fafafa; color: #18181b; }
   @media print {
     body { background: white; }
     .no-print { display: none; }
-    section { break-inside: avoid; page-break-inside: avoid; }
+    /* Every visual container gets BOTH the modern and legacy break property.
+       Chrome's headless printToPDF (what report-pdf drives) silently ignores
+       break-inside:avoid on a bare `section` selector when the box has a
+       background/border-radius — it splits the box mid-content instead of
+       pushing the whole thing to the next page, leaving an orphaned dark
+       fragment floating alone at the top of a blank page. This happened for
+       real (2026-09-07): a `bg-stone-900` "Bottom line" callout rendered
+       correctly on page 3, but its last bullet spilled onto page 4 as an
+       isolated black pill on white — unreadable, looked broken. Targeting
+       every card/callout class (not just `section`) and setting `orphans`/
+       `widows` fixes it. */
+    section, li, .rounded-xl, .rounded-lg, .rounded-full,
+    [class*="bg-"], [class*="border"] {
+      break-inside: avoid-page;
+      page-break-inside: avoid;
+      orphans: 3;
+      widows: 3;
+    }
   }
 </style>
 </html>
 ```
+
+**Colored/dark callout boxes (the "Bottom line", "TL;DR", warning banners) are the highest-risk element for this failure** — keep them to 5 lines or fewer of content. A long one is more likely to exceed the remaining space on the current page, and `avoid-page` can only push the *whole* box to the next page if the whole box actually fits there — an oversized box still gets split with no warning. If a callout is unavoidably long, split it into two shorter boxes rather than one tall one.
 
 ## Component palette (mix and match)
 
@@ -211,7 +241,9 @@ curl -sSL -o /tmp/a.pdf -w '%{http_code} %{size_download}\n' "https://drive.goog
 - Heavy gradients, drop shadows, or animation flourish — clean and scannable beats decorated.
 - **Omitting `<meta charset="utf-8">`** — silently mojibakes every em-dash, `·`, `§`, `×`, `→` in the PDF and in Drive's preview. The template has it; keep it.
 - **Delivering only the `.html`** — then handing over a Drive link the recipient can't read. Run `~/tools/report-pdf` and share the PDF.
-- **Verifying a PDF by eye alone.** Render a page or two (`pdftoppm -r 70 -png -f 1 -l 1 x.pdf /tmp/pg`) and actually look at it. Tag-balance checks and a 200 status do not catch corrupted glyphs or a table overflowing the page box.
+- **Verifying a PDF by eye alone.** Render a page or two and actually look at it. Tag-balance checks and a 200 status do not catch corrupted glyphs or a table overflowing the page box.
+- **Ever writing `color-scheme: light dark` (or `dark`) in a report's `<style>` block, even in a hand-written deviation from this template.** The template's `:root{color-scheme:light}` exists specifically to prevent this. Declaring dark support without shipping real dark tokens makes Chrome force `color:white` onto `html` and any element lacking an explicit Tailwind `text-*` class — while an explicit `background` stays light — producing invisible white-on-white/cream text for any viewer whose OS is in dark mode. Confirmed live 2026-09-07 (`<td>` cells measured `color:rgb(255,255,255)` on a white table) across 4 hand-written Goal Zero reports that added this line without dark overrides. These are static, portable deliverables, not theme-adaptive Artifacts — always pin `color-scheme: light`.
+- **Trusting `report-pdf`'s page/byte/char summary as proof the PDF is readable.** It proves the file rendered and has a text layer — it does NOT prove no box got split across a page break. Render **every page** to PNG and look at each one before calling the report done: `pdftoppm -r 100 -png x.pdf /tmp/pg` then `Read` each `/tmp/pg-N.png`. Specifically check the top and bottom few lines of every page — an orphaned fragment of a colored callout box (its background/border survives the split, its content doesn't) is the most common defect and reads as "broken, unreadable text" to the recipient even though the HTML source and on-screen render both look fine. This exact defect shipped 2026-09-07: a `bg-stone-900` "Bottom line" box rendered correctly on page 3 but spilled one bullet onto page 4 as an isolated dark fragment on an otherwise blank page. It was invisible in the light-mode screenshot and invisible in `report-pdf`'s summary — only caught by opening the actual PDF pages one at a time.
 
 ## Relationship to other skills
 

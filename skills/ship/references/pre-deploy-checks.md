@@ -1,5 +1,10 @@
 # Pre-Deploy Checks
 
+> Apply `../SKILL.md` RELEASE AUTHORITY before any command in this reference.
+> Git-only restrictions use its committed-candidate/local-bundle path; broader
+> deployment restrictions still block. Never run prohibited Git operations through
+> wrappers, hooks, APIs, backups, or another host. All quality gates remain required.
+
 Covers Phase -1 (repository context verification), Phase -0 (merge conflict resolution), and Phase 0.5 (deployment rate limit check).
 
 ---

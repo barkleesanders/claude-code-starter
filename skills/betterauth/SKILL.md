@@ -24,6 +24,27 @@ broke."
 **Read the traps before writing code.** Every one below cost at least one deploy
 cycle, and each carries the command that proves it rather than an assertion.
 
+## Mandatory security baseline for every site and every ship
+
+Load `~/.claude/skills/shared/betterauth-security-baseline.md` before implementation.
+Every Better Auth site must propagate authentication email failures through the actual HTTP
+handler, explicitly protect OTP storage, hash magic-link tokens when enabled, and enforce
+second-factor challenges for enrolled users across every enabled primary sign-in path without
+leaking provisional sessions or bearer tokens. A throwing email helper alone is insufficient
+on SDK versions whose `runInBackgroundOrAwait` catches the rejection.
+
+New sites must include real-SDK regression tests and `betterauth.security.json`, wire the full
+security gate into every deploy entrypoint, and release via `/ship`. Existing sites run the
+same gate on **every ship**, even on a non-auth diff:
+
+```sh
+node "$HOME/tools/betterauth/betterauth" security --repo "$PWD" --json
+```
+
+Only exit 0 permits release; missing/unmeasured/failed tests block. Static configuration
+checks and health routes do not replace behavior tests. Read the shared reference and CLI
+README for the mutation contract, transition behavior, and scope limitations.
+
 ## Current state (verify, don't trust this table — it is a cache)
 
 Verified 2026-08-05.
@@ -226,6 +247,19 @@ Never echo it into the transcript. Verify shape only: `wrangler secret list` sho
 Console: `https://console.cloud.google.com/apis/credentials?authuser=1`
 (**`authuser=1` matters** — `authuser=0` can land on an MFA-enrollment gate.)
 
+**Creating the CLIENT is still browser-only** (no API — see the enumeration below). But the
+**consent screen** around it is now scriptable: `gauth-console` (in **`/gcli`**) drives it
+through the real logged-in Chrome. Prefer it over hand-clicking:
+
+```bash
+gauth-console status  <gcp-project>            # read-only: publish state + branding fields
+gauth-console set     <gcp-project> privacy|homepage|terms|contact <value>
+gauth-console publish <gcp-project> --confirm  # refuses unless genuinely ready
+```
+This is the Google analogue of what `siwa` does for Apple. Note the asymmetry and do not
+generalise: Apple's Services ID + Return URLs remain genuinely browser-only, so
+`siwa portal` printing those two steps is still correct.
+
 - Web client → Authorized redirect URI `https://<site>/api/auth/callback/google`.
 - iOS client → bind to the bundle id + team id. Its **reversed** id is the
   `CFBundleURLScheme` (Trap 3). Put both ids in one shared module so the shell-side
@@ -350,6 +384,46 @@ about which system is in charge.
 >    then removing them breaks no mail.
 
 ---
+
+## Trap 0 — Interpret Google audience restrictions using the actual scopes
+
+**Corrected 2026-09-09 against Google's current primary documentation.** Testing normally
+restricts authorization to up to 100 listed test users, with seven-day authorization expiry.
+However, requests limited to `openid`, email, and profile (including Sign in with Google)
+are exempt from the test-user-list, warning, and seven-day-expiry behavior. Any additional
+scope removes that exception. The lifetime cap for unapproved sensitive/restricted scopes
+is a separate rule. Never claim a login-only site cannot sign in its 101st user from the
+Testing label alone; inspect the actual outgoing scopes.
+
+Source: https://support.google.com/cloud/answer/15549945?hl=en (fetched 2026-09-09).
+Provider status is still separate from secrets/schema/route health; a green local check
+does not establish the console policy or end-to-end sign-in.
+
+```bash
+gauth-console status <gcp-project>     # read-only; prints publish state + what is blocking it
+```
+
+**The publish gate is NOT what the form's `required` flags say.** On
+`console.cloud.google.com/auth/branding` the fields render:
+
+| Field | form says | actually gates publish? |
+|---|---|---|
+| App name | `required=true` | yes |
+| Authorized domain | `required=true` | yes |
+| Email addresses (dev contact) | `required=true` | yes |
+| **Application home page** | `required=false` | **YES** |
+| **Application privacy policy** | `required=false` | **YES** |
+| Application terms of service | `required=false` | no |
+
+Those `required=false` flags are *Testing-mode* validation. "Publish app" on `/auth/audience`
+stays `aria-disabled="true"` until home page **and** privacy policy are also set — proven by
+elimination (contact email → still blocked; + home page → still blocked; + privacy → ready).
+So **shipping a privacy policy page is an auth dependency, not a legal nicety.**
+
+Two reading traps if you check this by hand instead of with `gauth-console`: the button
+reports `disabled === false` while visually greyed (read `aria-disabled`), and the form's
+inputs live in **shadow DOM**, so `document.querySelectorAll('input')` returns `[]` and a
+naive probe concludes the fields do not exist. Full trap list: **`/gcli`**.
 
 ## Trap 1 — Native iOS social sign-in: the id token audience is NOT your web client
 
@@ -853,6 +927,8 @@ betterauth secrets            # required/missing, stale (CLERK_*), expiry via se
 betterauth schema             # remote D1 PRAGMA vs the INSTALLED plugin schemas
 betterauth health             # /api/auth/ok + per-plugin route probe (correct verb per route)
 betterauth portal             # Apple capabilities via asc API + the 2 genuinely-no-API recipes
+betterauth consent            # Google audience/publish state; interpret with requested scopes
+betterauth security --repo "$PWD" --json  # required full behavior + mutation gate before every ship
 ```
 
 **Two CLIs, one boundary — do not blur it.** `betterauth` DIAGNOSES (read-only:
@@ -865,6 +941,7 @@ must never grow a write path.
 | Question | Tool |
 |---|---|
 | Is Apple configured / expiring / drifted? | `betterauth secrets` · `betterauth portal` |
+| Do the audience and requested scopes permit intended users? | `betterauth consent` plus actual OAuth scopes (Trap 0) |
 | Is the *credential chain* actually valid to Apple? | **`siwa probe <site>`** (`invalid_grant` = PASS) |
 | Make it work / rotate it | **`siwa secret`** · **`siwa rotate`** |
 | Is it live end-to-end right now? | **`siwa verify <site>`** (or `betterauth health` for all routes) |
@@ -876,8 +953,25 @@ Developer-Portal capability it reaches via web session is `PRIVATE_CLOUD_COMPUTE
 and `bundleIdCapabilities` is the only API-backed signing surface. Probing the
 plausible internal endpoints with an owner token also fails:
 `oauthconfig.googleapis.com/v1/projects/<p>/clients` → **404**,
-`clientauthconfig.googleapis.com/...` → **404**, `iap.googleapis.com` brands → 403
-(API disabled, and IAP-created clients carry fixed redirect URIs anyway). So a
+`clientauthconfig.googleapis.com/...` → **404**, `iap.googleapis.com` brands → 403.
+
+🛑 **That 403 proves NOTHING and must not be cited as evidence (corrected 2026-08-31).**
+A 403 from a `*.googleapis.com` endpoint is almost always `SERVICE_DISABLED` — "this API
+is not enabled on your project" — which is a *project-config* state, not a statement about
+whether the endpoint exists. Reading it as absence cost a wrong diagnosis on 2026-08-31.
+Three probes are a **sample** anyway; the claim needs the denominator:
+
+**ENUMERATED, not sampled** — the full Google discovery corpus (528 items,
+`https://www.googleapis.com/discovery/v1/apis`) contains **no** `clientauthconfig`, **no**
+`oauthconfig`, **no** `consentscreen`. `oauth2 v2` exists but has exactly three methods
+(`tokeninfo`, `userinfo`, `userinfo/v2/me`) — it CONSUMES tokens and cannot create clients.
+The only client-admin API Google ever shipped was the IAP OAuth Admin API, and `gcloud`'s
+own `--help` says it was **permanently shut down 2026-03-19** ("New projects will not be
+able to use these APIs"). Terraform `google_iap_brand`/`google_iap_client` wrap that same
+dead API. Google's migration doc states it verbatim: *"If your application requires a custom
+Client ID for branding or external access, use the Google Cloud console to create the Client
+ID."* — https://docs.cloud.google.com/iap/docs/deprecations/migrate-oauth-client
+See **`/gcli`** for the enumeration command and the rest of the Google-side tooling. So a
 "fully automated Apple setup" is not buildable — `siwa portal` printing the two
 browser steps IS the correct design, not a shortcoming. Don't try to generate an
 API-wrapper CLI for it (the CLI-printing-press route dead-ends here for exactly

@@ -197,10 +197,15 @@ Examples:
 
 | Original (anti-pattern) | Redacted (correct) |
 |---|---|
-| `lin_api_<48-char-key>` | `<REDACTED:linear-api-key:lin_a...0456:48ch>` |
+| `lin_api_a1b2c3d4e5f6...0456` | `<REDACTED:linear-api-key:lin_a...0456:N-ch>` |
 | `<32-hex-chars>-us6` | `<REDACTED:mailchimp-api-key:22eb...-us6:36ch>` |
-| `ghp_<36-char-token>` | `<REDACTED:github-pat:ghp_a...tu90:40ch>` |
+| `ghp_abc123def456...stu90` | `<REDACTED:github-pat:ghp_a...tu90:N-ch>` |
 | `sk_live_<account><random>` | `<REDACTED:stripe-live-key:sk_li...XyZ:N-ch>` |
+
+> The `lin_api_`, `ghp_`, and `sk_live_` rows above are elided with `...` on purpose.
+> A doc that prints a full-length, correctly-shaped key trips both `gitleaks` and
+> GitHub push protection on every commit that touches it — the anti-pattern column
+> only needs to convey the *vendor prefix and shape*, never a complete token.
 
 The first4 + last4 + length fragment preserves enough shape information for a
 maintainer to recognize the vendor pattern (and to confirm the same key isn't

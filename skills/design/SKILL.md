@@ -9,7 +9,8 @@ user-invocable: true
 You are a Design Systems Lead. Every `/design` invocation runs in **two phases**:
 
 1. **Phase 0 — Lock the aesthetic direction.** No exceptions, no skipping.
-2. **Phase 1 — Route to the right engine.** **Hallmark is the default design engine.** Stitch is opt-in, only when the user explicitly asks for it.
+2. **Phase 0.5 — Apple HIG gate.** Load `references/apple-hig.md`; it is BINDING on any Apple-platform surface and the accessibility/layout/motion/writing BASELINE everywhere else.
+3. **Phase 1 — Route to the right engine.** **Hallmark is the default design engine.** Stitch is opt-in, only when the user explicitly asks for it.
 
 The direction picked in Phase 0 is the single source of truth for whatever runs in Phase 1 — it becomes the *brief* handed to Hallmark.
 
@@ -32,6 +33,33 @@ The aesthetic-core also carries:
 - The vague → professional vocabulary table
 
 If the user gave you a fuzzy brief, **stop and ask them to pick a direction** from the menu before continuing. Don't guess.
+
+---
+
+## Phase 0.5 — Apple Human Interface Guidelines gate (ALWAYS load; BINDING on Apple surfaces)
+
+**Load `references/apple-hig.md` on every invocation.** It is the distilled, cited form of
+https://developer.apple.com/design/ (Human Interface Guidelines + Liquid Glass design system,
+retrieved 2026-09-14). Added 2026-09-14 at the user's instruction: designs must follow what Apple
+recommends.
+
+- **Native iOS / iPadOS / macOS / watchOS / tvOS / visionOS, Capacitor / WKWebView, `/ios` work →
+  BINDING.** Text ≥ platform minimum (iOS 11 pt, body 17 pt), contrast ≥ 4.5:1 in both appearances,
+  controls ≥ 44×44 pt (iOS), Dynamic Type survives AX5, Reduce Motion honoured, no in-app light/dark
+  toggle, semantic system colors, safe areas, Liquid Glass only in the control layer and sparingly,
+  system fonts + text styles, system components first, branding defers to content. Phase 0's
+  direction may *style* within these; it may not override them.
+- **Web / everything else → BASELINE.** The platform-agnostic sections (accessibility numbers,
+  layout, color, dark mode, motion, writing, branding) are mandatory minimums under
+  `aesthetic-core.md` and Hallmark's gates.
+- **Precedence:** strictest rule wins; on an Apple platform the HIG *is* the strictest — e.g.
+  `aesthetic-core.md`'s "no default fonts" yields to the HIG's "use the system font, don't embed it".
+- **Decay rule applies:** the HIG has per-page change logs. For any pattern (Onboarding, Modality,
+  Settings, Searching…) or component the design uses, re-read that HIG page live this session
+  (`mcp__sosumi__fetchAppleDocumentation` or Apple's page JSON — recipe in the reference) and cite
+  slug + date in the hand-off.
+- **Before declaring an Apple-surface design done, print the 13-line gate checklist** at the end of
+  `apple-hig.md` with ✅/❌/N-A per line. A ❌ on a BINDING surface blocks.
 
 ---
 
@@ -92,6 +120,7 @@ Why preview at all (2026-07-02, ecobee dashboard): restyling directly in code pr
   - Where they overlap, take the stricter reading. Neither list is a ceiling.
 - **Hallmark's honest-copy discipline is non-negotiable and matches this account's global rules.** Never invent a metric, testimonial, logo, or case-study count to fill a stat-led layout — use a real number, a labelled placeholder, or a different macrostructure. This is the same fabrication ban as CLAUDE.md's Document Fabrication Prevention; a landing page is not exempt because it's "just design."
 - **Hallmark's implementation safety rail is binding in existing repos.** It must state the exact files it will modify/create/delete before editing; deletions need explicit confirmation. Never let a redesign bulldoze route trees, component directories, or an existing site.
+- **Apple HIG (Phase 0.5) is additive to every banlist.** Hallmark's 57 gates + `aesthetic-core.md` bans + `references/apple-hig.md` — take the strictest reading of all three. On Apple surfaces the HIG numbers (44 pt targets, 4.5:1 contrast, 11 pt floor, Reduce Motion, safe areas, no in-app appearance toggle) are non-negotiable regardless of engine or direction.
 - **Color uses OKLCH, neutrals tinted.** No raw `#000`/`#fff`. Pick a color strategy (Restrained / Committed / Full palette / Drenched) before picking colors. See `aesthetic-core.md` → Color & Theme.
 - **Theme by scene, not category.** Write a one-sentence physical scene before choosing dark vs light. See `aesthetic-core.md` → Color & Theme.
 - **Code mode runs `npx impeccable detect`** before declaring done. 27 deterministic anti-pattern checks, no API key. See `code-implementation.md` → Deterministic Anti-Pattern Scan.
@@ -107,7 +136,8 @@ Why preview at all (2026-07-02, ecobee dashboard): restyling directly in code pr
   - `apple-design` — Apple-style fluid physical motion for the web: springs,
     gesture-driven sheets/drags, interruptible transitions, translucency,
     optical typography, reduced-motion. Load for any iOS-flavored web UI,
-    Capacitor app surface, or /ios webview work that should feel native.
+    Capacitor app surface, or /ios webview work that should feel native. It covers
+    motion physics only — the HIG rules themselves live in `references/apple-hig.md`.
   - `review-animations` — high-bar motion code review (default to flagging);
     run before declaring animation work done.
   - `animation-vocabulary` — name a vaguely-described motion effect before
@@ -134,6 +164,7 @@ Why preview at all (2026-07-02, ecobee dashboard): restyling directly in code pr
 | File | When loaded |
 |---|---|
 | `references/aesthetic-core.md` | **Always** — Phase 0 |
+| `references/apple-hig.md` | **Always** — Phase 0.5. Apple HIG + Liquid Glass, cited from developer.apple.com/design (2026-09-14). BINDING on Apple surfaces, baseline elsewhere; ends with the 13-line gate checklist |
 | `Skill(hallmark)` → its own `references/` (20 themes, 21 macrostructures, 57 slop gates, component archetypes) | **Default** — every design/build/redesign/audit/study |
 | `references/code-implementation.md` | Repo plumbing, design-system wiring, or porting an approved design into the framework |
 | `references/stitch-workflows.md` | Only when the user explicitly names Stitch |
@@ -150,4 +181,5 @@ This skill follows the progressive-disclosure pattern (same as `/carmack`): the 
 - `/design here's a site I love: https://…` → **Hallmark `study`** (extract DNA — never copies pixels; refuses template-marketplace URLs)
 - `/design create a design system for example.org` → Phase 0 → **Hallmark** for the DNA + `design.md` → `code-implementation.md` to wire the tokens
 - `/design generate a hospital ledger landing page **in Stitch**` → Phase 0 → Stitch mode (explicit opt-in) → `generate_screen_from_text`
+- `/design a settings screen for the AIVA iOS app` → Phase 0 → **Phase 0.5 BINDING** (re-read HIG *Settings* + *Modality* live) → Hallmark, then print the HIG gate checklist
 - `/design` (no context) → ask what they're designing, then route (almost always Hallmark)

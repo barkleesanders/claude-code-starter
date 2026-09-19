@@ -1,5 +1,10 @@
 # Deployment
 
+> Apply `../SKILL.md` RELEASE AUTHORITY before any command in this reference.
+> Git-only restrictions use its committed-candidate/local-bundle path; broader
+> deployment restrictions still block. Never run prohibited Git operations through
+> wrappers, hooks, APIs, backups, or another host. All quality gates remain required.
+
 Covers Phase 2 (manual override), Phase 3 (GitHub deployment), Phase 3.5 (README/changelog auto-update), and Phase 4 (downstream deployments to Vercel, Cloudflare, Docker).
 
 ---

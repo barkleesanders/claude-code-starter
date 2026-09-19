@@ -111,6 +111,91 @@ app routes are absent — for those, enumerate the app's own nav per `/chrome`);
 to normal search); large sites use a **sitemap index** that you must follow one level down.
 `robots.txt` also tells you what the owner asks crawlers to avoid — respect it.
 
+### Phase 1.6 — Clinical topic? Hit the federal primary sources FIRST (conditional)
+
+**Fires when the topic is clinical, pharmacological, coverage-, trial-, or
+provider-related.** Skip it otherwise.
+
+Same rationale as Phase 1.5: a search engine returns *what it indexed*; these nine
+federal APIs return *the record itself*. Running them before fan-out means Phase 4
+verification already has its primary source in hand instead of a health-news
+paraphrase. All are keyless — no NPI, no key, no account.
+
+Load the **`/healthdata`** skill and use the `healthdata` CLI (or its MCP tools):
+
+| Topic contains | Command |
+|---|---|
+| a drug / medication | `healthdata dailymed search-labels --drug-name X` · `healthdata openfda drug-label --search openfda.generic_name:X` |
+| drug safety / side effects / recall | `healthdata openfda drug-event` · `healthdata openfda drug-enforcement` |
+| "trial", "study", eligibility | `healthdata trials search --query-cond X` · `healthdata trials get NCT…` |
+| "does Medicare cover…", LCD, policy | `healthdata coverage final-lcds` · `healthdata coverage lcd-articles` |
+| a named clinician / provider / practice | `healthdata npi --version 2.1 --last-name X --state ST` |
+| "evidence", "research shows", a study claim | `healthdata pubmed search --db pubmed --term Q --retmode json` |
+| hospital / SNF / home-health quality | `healthdata carecompare` |
+| utilization, spending, enrollment | `healthdata cmsdata` |
+
+A DailyMed SPL version, an NCT eligibility block, or an LCD document id **is** the
+primary source — cite it directly, with its retrieved-date.
+
+**Do NOT add these to the `websearch` provider stack.** They are structured query
+APIs, not general web search: they return nothing for ordinary queries and would
+pollute the quota-failover chain. They are a *source tier*, used deliberately.
+
+**Two traps carried over from `/healthdata`** (full list in that skill): the CLI's
+`sync`/`search`/`sql` subcommands do not work against these APIs — always query live;
+and a non-JSON response reports *"not authenticated or session expired"*, which is a
+generic handler misfiring, **not** an auth problem (there is no auth).
+
+### Phase 1.7 — Building a CONTACT LIST? Enumerate the roster; never construct an address (conditional)
+
+**Fires when the deliverable is people, not prose** — "who do I send this to", a press list, an
+agency distribution ladder, an oversight roster. Skip it for ordinary topic research.
+
+Load **`~/.claude/skills/shared/verified-contact-network.md`** before searching. A contact list is
+the one artifact where a fabrication is invisible until it matters: `jsmith@cityofx.gov` looks
+exactly like a verified address, and "I notified the City" becomes false in a filing.
+
+The short form:
+1. **Resolve the domain first** — read `curl -w '%{url_effective}'`, not just the status. Orgs move
+   and squatters follow the abandoned domain (measured: `cortlandstandard.net` now serves
+   `mainsuper33.com`; `cortland.org` → `cortlandny.gov`). When two live domains publish the same
+   person, send to **both**.
+2. **Enumerate from the org's own inventory** (sitemap, Phase 1.5) — and prefer a structured staff
+   directory over prose pages. ⚠️ On CivicPlus-style municipal CMSes the slug is **not validated
+   against the numeric id**, so a guessed path returns **200 with the wrong department**.
+3. **A parser returning zero rows is an instrument failure until positive-controlled** — grep for a
+   name you already know is on the page before recording "no staff published."
+4. **Three outcomes, never two:** `verified` / `blocked-could-not-measure` / `genuinely-absent`. A
+   `.gov` WAF 403 is a bot block, not an absence.
+5. **Ship a "Blocked / could not verify" list.** That is a finding; a silent omission is not.
+
+Also: **the Decay Rule bites contact lists hardest** — re-verify every row on every ship,
+unconditioned on the diff, and never collapse two role-holders who share a surname into one person.
+
+### Phase 1.8 — Buying something? Check the Exchange (shopmyexchange.com) FIRST (conditional)
+
+**Fires whenever the research is about purchasing a product** — "best X to buy", "where's the
+cheapest Y", price comparisons, "should I get A or B", any deliverable that ends in a cart.
+Skip for non-purchase research.
+
+the user is an eligible Exchange shopper (veteran). **The Army & Air Force Exchange
+(`https://www.shopmyexchange.com`) charges NO sales tax and ships free** — the site declares
+both (`noSalesTax`, `freeShipping`) — so a listing there beats an equal or slightly lower
+sticker price elsewhere once tax is added. Reference the user gave:
+`https://www.shopmyexchange.com/product/3965987` (verified HTTP 200, 2026-09-13).
+
+1. Search the Exchange for the item alongside Amazon/B&H/etc. — never omit it from a price table.
+   The product pages are a JS SPA: `curl` returns no product data. Use Exa crawl / `WebFetch`
+   on the search URL, or `/chrome` (`~/tools/fcdp/fcdp open`) for the rendered price.
+2. Compare **landed price**: sticker + sales tax + shipping. Put a "Tax" column in the table;
+   the Exchange row is $0 tax by design.
+3. Also check **Exchange price-match** ("We'll match it") and MILITARY STAR promos before
+   concluding a competitor is cheaper.
+4. Same logic for other veteran-eligible tax-advantaged channels when relevant
+   (NEX `mynavyexchange.com`, VA Canteen `shopvcs.va.gov`) — enumerate them; don't assume.
+5. Three outcomes for the Exchange row: `found @ $` / `not stocked (searched, 0 results)` /
+   `could not measure (bot-block / JS not rendered)` — never collapse the last two.
+
 ### Phase 2 — Fan-out search (breadth, parallel)
 For each sub-question, issue **2–3 query variations** through the stacked CLI — it walks the stack in order (searxng first, unmetered) and fails over on quota automatically:
 
@@ -139,8 +224,65 @@ Snippets lie and truncate. For every source that will back a claim, **read the r
 - `WebFetch <url> "<question>"` — when you need one specific answer from a known page.
 - `websearch "<url>" -p jina --json` — Jina reader fallback for a stubborn page.
 - `tinyfish fetch content get <url> [url…]` — optional TinyFish content extract when Jina/Exa crawl are thin (still prefer Exa crawl as primary depth).
-- **⚠️ WebFetch `403 Forbidden` / "response body not retrieved" / auth-required is usually a WAF bot-block, NOT a dead page (verified 2026-07-07 on health.ny.gov).** The page renders fine in a real browser — datacenter/fetcher IPs get blocked, so `.gov`/`.state`/enterprise sites 403 the tool while a human sees it load. **Do NOT treat this as "couldn't get it" and stall — fall through to `/chrome`** (real logged-in Chrome, bypasses the WAF): `~/tools/fcdp/fcdp open "<url>"` → `~/tools/fcdp/fcdp js "<extraction JS>"` (full path — fcdp isn't on PATH in the agent shell). fcdp also runs the page's JS, so it reads interactive/JS-rendered tools a raw fetch can't (e.g. selecting a county in NYSDOH's "Find A Health Home By County" map to pull the result). Try `websearch -p jina`/Exa crawl first (cheaper), but a 403/bot-block is a legitimate reason to jump straight to `/chrome`. Distinguish it from a real `404`/`410` (page genuinely gone — don't browser-retry that).
-- Escalation ladder (global rule): `WebSearch`/`WebFetch` → `websearch`/Exa crawl (`mcp__exa__web_search_advanced_exa` + `mcp__exa__crawling_exa`) → (**on a 403/bot-block or JS-rendered page →** `/chrome` via `~/tools/fcdp/fcdp`, per the note above) → captured-API replay via `~/tools/fcdp-api/fapi` / `fhar` → **STOP and ask** before driving a live browser for anything auth-walled or interactive-with-side-effects. Don't jump to a browser for an ordinary readable page. The unbrowse MCP is UNINSTALLED — do not route through it.
+- **⚠️ WebFetch `403 Forbidden` / "response body not retrieved" / auth-required is usually a WAF bot-block, NOT a dead page (verified 2026-07-07 on health.ny.gov).** The page renders fine in a real browser — datacenter/fetcher IPs get blocked, so `.gov`/`.state`/enterprise sites 403 the tool while a human sees it load. **Do NOT treat this as "couldn't get it" and stall.** If the block is **Cloudflare** (body contains "Just a moment" / "security verification"), try **`~/tools/cfget`** FIRST — browserless, at the network floor, parallelisable, and it works on sites that re-challenge every new URL where `/chrome` cannot at any speed (see the cfget rung below). Otherwise **fall through to `/chrome`** (real logged-in Chrome, bypasses the WAF): `~/tools/fcdp/fcdp open "<url>"` → `~/tools/fcdp/fcdp js "<extraction JS>"` (full path — fcdp isn't on PATH in the agent shell). fcdp also runs the page's JS, so it reads interactive/JS-rendered tools a raw fetch can't (e.g. selecting a county in NYSDOH's "Find A Health Home By County" map to pull the result). Try `websearch -p jina`/Exa crawl first (cheaper), but a 403/bot-block is a legitimate reason to jump straight to `/chrome`. Distinguish it from a real `404`/`410` (page genuinely gone — don't browser-retry that).
+- **⚡ A 403 on a Cloudflare-protected site — try `~/tools/cfget` BEFORE escalating to `/chrome`.** Once a human has cleared the interstitial *once* in real Chrome, Chrome holds a `cf_clearance` cookie. That cookie + the **exact** User-Agent that earned it + the same egress IP is all Cloudflare needs — so you can go back to plain HTTP and skip the browser entirely. `cfget` does the whole thing:
+  ```bash
+  ~/tools/cfget --refresh <domain>            # once, after the user clears the challenge in Chrome
+  ~/tools/cfget "<url>" -o out.html --expect-title "<substring the real page must have>"
+  ```
+  Exit codes: **0** ok · **3** blocked/rate-limited · **4** no `cf_clearance` (ask the user to clear it once) · **5** empty. Why this rung exists: **the win is CAPABILITY, not raw speed** — measured 2026-09-02, cfget 0.19s vs `fcdp open`+`js` 0.19s, identical command latency, because fcdp returns before the page loads. What differs is that fcdp then needs an 8-14s settle wait, and on a site that **re-challenges every new URL** (congress.gov does) a multi-query enumeration is impossible at any speed. cfget's 0.19s is one HTTPS round-trip — i.e. at the floor, no headroom left.
+
+  **⚠️ THREE OUTCOMES, NEVER TWO — a throttle can render as a normal page.** congress.gov answers HTTP **429** with its **homepage**, 343 KB, a normal `<title>`, and zero results. That is byte-for-byte indistinguishable from "your search found nothing" unless you check. This is the Negative-Result Rule applied to a WAF: `ok` / `blocked-or-throttled` / `genuinely-empty`. Always pass `--expect-title` so `cfget` can catch the silent-throttle case and back off instead of handing you a false zero. Verified 2026-09-02: a phrase search that returned 16 results returned "0" eight seconds later, purely from rate-limiting.
+
+  Two things that silently break it: a **guessed User-Agent** (`cf_clearance` is bound to the exact UA — `cfget` refuses to guess rather than 403 mysteriously), and **firing queries back-to-back** (space them ~8-10s; `cfget` retries with exponential backoff).
+
+- Escalation ladder (global rule): `WebSearch`/`WebFetch` → `websearch`/Exa crawl (`mcp__exa__web_search_advanced_exa` + `mcp__exa__crawling_exa`) → (**on a 403/bot-block or JS-rendered page →** `/chrome` via `~/tools/fcdp/fcdp`, per the note above) → captured-API replay via `~/tools/fcdp-api/fapi` / `fhar` → (**walled/structured data none of those return →** `monid discover`, Phase 3.4 — paid, gap-filler only) → **STOP and ask** before driving a live browser for anything auth-walled or interactive-with-side-effects. Don't jump to a browser for an ordinary readable page. The unbrowse MCP is UNINSTALLED — do not route through it.
+
+### Phase 3.4 — Walled / structured data? `monid discover` BEFORE declaring it inaccessible (conditional)
+
+**Fires when a sub-question needs data the search+crawl ladder can't return as text** — social
+posts/profiles (X/Twitter, LinkedIn, Instagram, TikTok, Reddit at volume), Google Maps
+listings/reviews, marketplace prices, company/people enrichment, ad libraries, app-store
+data, anything a JS wall or login hides from `websearch`/Exa crawl. Skip it for ordinary
+readable pages — the free ladder above already handles those.
+
+**Monid** (`/monid` skill, `monid` CLI — installed 2026-09-17, v0.1.7) is a catalog of
+hundreds of hosted scrapers/APIs (Apify actors and others) behind one `discover → inspect →
+run → poll` interface. Runs are **paid per result from the user's Monid balance**, so it is a
+*gap-filler*, never the default — Monid's own precedence rule, which we keep:
+
+1. **the user's own tools first, at $0** — `/chrome` (`~/tools/fcdp/fcdp`, real logged-in
+   Chrome reads X/LinkedIn/Instagram directly), a logged-in browser CLI / `/chromeapi` (captured-API
+   replay), dedicated MCPs (`capitoltrades`, `robinhood`, `healthdata`, Exa), the ten
+   `websearch` providers. If one of these can do it, do NOT spend Monid balance.
+2. **Then Monid**, and only for what those genuinely can't reach or can't reach at the needed
+   volume — say so in the report ("via Monid/<provider>/<endpoint>, $cost").
+
+```bash
+NO_COLOR=1 monid discover -q "linkedin posts" -l 5          # noun phrases; -s <score> to filter
+monid inspect -p <provider> -e <endpoint>                   # NEVER guess params — body→-i, queryParams→--query, pathParams→--path
+monid run -p <provider> -e <endpoint> -i '{"...":"...","maxItems":5}'   # ONE query per call, small limit first
+monid runs get -r <runId> -o out.json                       # poll 5-10s; COMPLETED is UPPERCASE
+monid balance                                               # report cost.value from the run when it matters
+```
+
+Traps (from the upstream skill, re-verified 2026-09-17): **limits are per query, not per
+call** — 3 search terms × `maxItems:10` = 30 billable results, so pass one term; **`discover`
+itself needs an active key** (`monid keys add -k <key> -l main`; keys come from
+`https://app.monid.ai/access/api-keys` — the user creates the account, never the agent);
+a `BLOCKED` run is terminal (workspace budget/run cap — tell the user, don't retry); use the
+`Health` column only to break ties (`unknown` is common, not a warning); read the **Hints**
+block before your next command; the CLI version and this skill's frontmatter `version` must
+match — `npm install -g @monid-ai/cli@latest` + re-save `https://monid.ai/SKILL.md` to
+`~/.claude/skills/monid/SKILL.md` **and** `~/.agents/skills/monid/SKILL.md` when they drift.
+
+**Do NOT add Monid to the `websearch` provider stack** — same reasoning as the `/healthdata`
+tier: it is a structured-endpoint marketplace, not general web search, and every call costs
+money. It is a deliberate *source tier*, reached by name.
+
+Three outcomes for a Monid attempt, never two: `retrieved (provider/endpoint, n results,
+$cost)` / `no endpoint in catalog (discover returned nothing relevant)` / `could not run
+(no key / BLOCKED / FAILED — state which)`.
 
 ### Phase 4 — Adversarial verification (the trust step)
 For **each load-bearing claim** (any number, date, capability, price, quote, "X is the best/first/only"):
@@ -189,6 +331,8 @@ websearch "<query>" -p exa --json           # force one provider
 websearch "<query>" --order brave,exa,tavily,tinyfish --json
 tinyfish auth status                        # TinyFish key present? (auto-read by websearch)
 tinyfish fetch content get "<url>"          # optional page extract (not via websearch)
+# Walled/structured data (social, maps, enrichment) the free ladder can't reach — PAID, Phase 3.4:
+NO_COLOR=1 monid discover -q "<noun phrase>" -l 5   # then: monid inspect -p X -e Y · monid run … -i '{…,"maxItems":5}' · monid runs get -r <id> -o out.json
 # Exa MCP (richer): web_search_advanced_exa (filters) · crawling_exa (read pages) ·
 #   get_code_context_exa (code). The retired Research/agentic pair is 410 — do not call it.
 ```

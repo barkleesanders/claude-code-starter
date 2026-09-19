@@ -1,0 +1,16 @@
+:root {
+  color-scheme: dark light;
+}
+html {
+  background: var(--faq-bg);
+}
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}

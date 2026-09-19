@@ -1,0 +1,23 @@
+{
+  "name": "infinite-faq-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync-template": "cp ../template/faq-section.tsx ../template/faq-island.tsx ../template/faq-route.ts src/faq/ && cp ../template/faq.css public/faq.css",
+    "check-template": "diff -q ../template/faq-section.tsx src/faq/faq-section.tsx && diff -q ../template/faq-island.tsx src/faq/faq-island.tsx && diff -q ../template/faq-route.ts src/faq/faq-route.ts && diff -q ../template/faq.css public/faq.css",
+    "build:island": "esbuild src/faq/faq-island.tsx --bundle --format=esm --minify --target=es2022 --jsx=automatic --jsx-import-source=hono/jsx/dom --outfile=public/faq-island.js",
+    "typecheck": "tsc --noEmit",
+    "dev": "npm run build:island && wrangler dev --remote",
+    "dev:local": "npm run build:island && wrangler dev"
+  },
+  "dependencies": {
+    "hono": "^4.13.5",
+    "zod": "^4.6.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260831.1",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.0",
+    "wrangler": "^4.134.0"
+  }
+}
