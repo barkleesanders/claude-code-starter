@@ -4,15 +4,6 @@ Covers Phase 1 (build verification, smart test execution, targeted test suites) 
 
 ---
 
-## Better Auth release contract (every Better Auth deploy)
-
-Load `~/.claude/skills/shared/betterauth-security-baseline.md`. Run
-`node "$HOME/tools/betterauth/betterauth" security --repo "$PWD" --json` as a separate
-blocking command. This runs the real-SDK baseline and isolated negative controls for delivery
-errors, protected OTP/magic-link storage, and complete enrolled-user 2FA enforcement.
-Require exit 0; `--static` or unavailable tests never pass. Review production imports and
-method coverage as well. Repeat after changing source, dependency versions, or the contract.
-
 ## Phase 1: BUILD & TEST (BLOCKING)
 
 ### 100% PRODUCTION CODE COVERAGE (MANDATORY)
@@ -106,7 +97,7 @@ fi
 **Post-deploy production tests** (run in Phase 4.1 after wrangler deploy):
 ```bash
 # 5. Production integration tests — verifies live endpoints
-timeout 60 TEST_BASE_URL=https://example.com npx vitest run tests/worker-integration.test.ts 2>&1
+timeout 60 TEST_BASE_URL=https://aivaclaims.com npx vitest run tests/worker-integration.test.ts 2>&1
 pkill -f vitest 2>/dev/null
 # WARN if fails (don't block — already deployed, but flag for investigation)
 ```
@@ -180,7 +171,7 @@ if warnings:
     print(f'\nWARNINGS:')
     for w in warnings:
         print(w)
-    print(f'\nFix playbook: ~/.claude/skills/carmack/references/lighthouse-optimization.md #6')
+    print(f'\nFix playbook: ~/.claude/skills/code/references/lighthouse-optimization.md #6')
     print(f'Pattern: lazy-load components that chain in the heavy dep.')
     print(f'Example: const AdminRoute = lazy(() => import("@/components/AdminRoute"))')
 else:

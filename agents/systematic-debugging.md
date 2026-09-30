@@ -393,7 +393,7 @@ Is this the correct root cause? What edge cases remain?" | codex exec \
 **Execute immediately before starting investigation:**
 
 ```bash
-~/.factory/droids/carmack-mode-engineer/resources/tmux-debug-launcher.sh \
+~/.factory/droids/code-mode-engineer/resources/tmux-debug-launcher.sh \
   {issue-name} {binary-path} {args}
 ```
 

@@ -168,7 +168,7 @@ bd done <id>                           # Complete a task
 
 ## TEST SAFETY RULES (CRITICAL)
 
-Same rules as /carmack — Vitest fork workers leak ~5GB memory each:
+Same rules as /code — Vitest fork workers leak ~5GB memory each:
 
 1. **ALWAYS use timeout**: `timeout 120 npx vitest run src/specific/test.ts 2>&1`
 2. **NEVER run full test suite**: Always target specific test files
@@ -183,9 +183,9 @@ When this skill is invoked:
 2. Run the 5-step Elon Algorithm IN ORDER against it
 3. Push past the first "no" — when something seems impossible, spend one more round thinking
 4. Produce a concrete action plan with deletions, simplifications, and the paradigm-shift option
-5. Use the Task tool with `subagent_type: carmack-mode-engineer` for implementation (the engine is the same — the philosophy wrapper is what changes)
+5. Use the Task tool with `subagent_type: code-mode-engineer` for implementation (the engine is the same — the philosophy wrapper is what changes)
 6. Present the "hot-staging option" — the bold move that sounds insane but might work first shot
 
 ```
-Launch carmack-mode-engineer agent with Elon Algorithm framing applied to the user's problem.
+Launch code-mode-engineer agent with Elon Algorithm framing applied to the user's problem.
 ```

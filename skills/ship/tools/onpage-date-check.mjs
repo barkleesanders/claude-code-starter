@@ -5,7 +5,7 @@
  * Repo-agnostic. Discovers date claims in source rather than taking a
  * hardcoded page map, so it works on a repo it has never seen.
  *
- * WHY (example, 2026-08-25): a site has TWO "last updated" facts and they go
+ * WHY (aivaclaims, 2026-08-25): a site has TWO "last updated" facts and they go
  * stale independently. The sitemap <lastmod> is a crawler hint and /ship
  * already gated it. The on-page line is a sentence a HUMAN uses to decide
  * whether a contract changed since they last read it, and nothing gated it —

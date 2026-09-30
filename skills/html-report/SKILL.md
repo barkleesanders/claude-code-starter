@@ -39,7 +39,7 @@ If unsure: ask the user where the output is going. Notion / Slack / "send to my 
 
 1. **Single self-contained `.html` file.** No external CSS files, no separate JS, no asset folders. Tailwind via CDN is allowed and encouraged.
 2. **Document order: `<body>` → `<script>` → `<style>`** (NOT the traditional `<head><style><script></head><body>`). Body content first, then scripts, then styles last. See the template below — this dramatically improves generation quality by forcing content-first output. Do not "correct" it back to standard head layout.
-3. **Save to `~/Claude-Reports/` by default**, named `<slug>-<YYYY-MM-DD>.html`, unless the user specifies a path. `~/Claude-Reports` is a symlink to the Google-Drive-synced folder `My Drive/Claude Reports` (Drive-for-Desktop mount `~/Library/CloudStorage/GoogleDrive-you@example.com/My Drive/Claude Reports`), so every report auto-syncs to Drive. Use the clean symlink path (no spaces) in `Write`/`open` commands. If the symlink is missing (e.g. a machine without the mount), fall back to `~/Downloads/`.
+3. **Save to `~/Claude-Reports/` by default**, named `<slug>-<YYYY-MM-DD>.html`, unless the user specifies a path. `~/Claude-Reports` is a symlink to the Google-Drive-synced folder `My Drive/Claude Reports` (Drive-for-Desktop mount `~/Library/CloudStorage/GoogleDrive-barkleesanders@gmail.com/My Drive/Claude Reports`), so every report auto-syncs to Drive. Use the clean symlink path (no spaces) in `Write`/`open` commands. If the symlink is missing (e.g. a machine without the mount), fall back to `~/Downloads/`.
 4. **`<meta charset="utf-8">` MUST be the first line of the file.** Non-negotiable. Without it Chrome falls back to a Latin-1 guess and every `—`, `·`, `§`, `×`, `→` renders as mojibake (`â€"`, `Â·`, `Â§`, `Ã—`, `â†'`) — in the PDF, in Drive's preview, and in any browser that doesn't guess right. It is in the template below; do not omit it when hand-writing a file. (Burned 2026-07-29: a full 12-page report rendered with corrupted punctuation on every page.)
 5. **Always emit a PDF sibling, not just the HTML** — run `~/tools/report-pdf <file.html>`. Google Drive, email, and most share targets **cannot render `.html`**; a Drive link to an HTML report is a download, not a document. The PDF is the shareable artifact. `report-pdf` serves the file over localhost, drives real Chrome via `fcdp` so Tailwind-via-CDN actually applies, then verifies page count, text-layer extractability, and zero mojibake. It **refuses** (exit 2) if rule 4 was violated. Never hand the user a Drive/share link to the `.html` when a PDF exists.
 6. **Open it after writing**: run `open <file>` so the user sees the result immediately. Don't require them to ask.
@@ -151,45 +151,15 @@ Use this skeleton. Edit content; keep structure. Tailwind via CDN keeps the file
 
 <!-- Styles LAST. CSS is order-agnostic for matching; trailing position keeps the file content-first. -->
 <style>
-  /* color-scheme:light (never "light dark") — a page that opts into dark
-     support without shipping dark tokens gets Chrome's UA dark default
-     (color:white) forced onto html + any element with no explicit
-     text-color class, while an explicit background stays light: white
-     text on a light card. Confirmed live 2026-09-07 under real system
-     dark mode (goalzero reports) — <td> cells measured color:rgb(255,255,255)
-     on a white table until color-scheme was pinned to light. These are
-     static, standalone deliverables, not theme-adaptive Artifacts — they
-     must render identically regardless of the viewer's OS/browser theme. */
-  :root { color-scheme: light; }
-  html { background: #fafafa; color: #18181b; }
-  body { font-family: ui-sans-serif, -apple-system, system-ui, sans-serif; background: #fafafa; color: #18181b; }
+  body { font-family: ui-sans-serif, -apple-system, system-ui, sans-serif; }
   @media print {
     body { background: white; }
     .no-print { display: none; }
-    /* Every visual container gets BOTH the modern and legacy break property.
-       Chrome's headless printToPDF (what report-pdf drives) silently ignores
-       break-inside:avoid on a bare `section` selector when the box has a
-       background/border-radius — it splits the box mid-content instead of
-       pushing the whole thing to the next page, leaving an orphaned dark
-       fragment floating alone at the top of a blank page. This happened for
-       real (2026-09-07): a `bg-stone-900` "Bottom line" callout rendered
-       correctly on page 3, but its last bullet spilled onto page 4 as an
-       isolated black pill on white — unreadable, looked broken. Targeting
-       every card/callout class (not just `section`) and setting `orphans`/
-       `widows` fixes it. */
-    section, li, .rounded-xl, .rounded-lg, .rounded-full,
-    [class*="bg-"], [class*="border"] {
-      break-inside: avoid-page;
-      page-break-inside: avoid;
-      orphans: 3;
-      widows: 3;
-    }
+    section { break-inside: avoid; page-break-inside: avoid; }
   }
 </style>
 </html>
 ```
-
-**Colored/dark callout boxes (the "Bottom line", "TL;DR", warning banners) are the highest-risk element for this failure** — keep them to 5 lines or fewer of content. A long one is more likely to exceed the remaining space on the current page, and `avoid-page` can only push the *whole* box to the next page if the whole box actually fits there — an oversized box still gets split with no warning. If a callout is unavoidably long, split it into two shorter boxes rather than one tall one.
 
 ## Component palette (mix and match)
 
@@ -225,7 +195,7 @@ Share the **PDF**, never the `.html` — Drive renders PDFs inline and cannot re
 # synced folder — that creates a duplicate instead of versioning)
 #   -> mcp__claude_ai_Google_Drive__search_files:
 #      title contains '<slug>' and mimeType = 'application/pdf'
-gog -a you@example.com drive share <fileId> --to=anyone --role=reader --force
+gog -a barkleesanders@gmail.com drive share <fileId> --to=anyone --role=reader --force
 # then PROVE it works with no session:
 curl -sSL -o /tmp/a.pdf -w '%{http_code} %{size_download}\n' "https://drive.google.com/uc?export=download&id=<fileId>"
 ```
@@ -241,9 +211,7 @@ curl -sSL -o /tmp/a.pdf -w '%{http_code} %{size_download}\n' "https://drive.goog
 - Heavy gradients, drop shadows, or animation flourish — clean and scannable beats decorated.
 - **Omitting `<meta charset="utf-8">`** — silently mojibakes every em-dash, `·`, `§`, `×`, `→` in the PDF and in Drive's preview. The template has it; keep it.
 - **Delivering only the `.html`** — then handing over a Drive link the recipient can't read. Run `~/tools/report-pdf` and share the PDF.
-- **Verifying a PDF by eye alone.** Render a page or two and actually look at it. Tag-balance checks and a 200 status do not catch corrupted glyphs or a table overflowing the page box.
-- **Ever writing `color-scheme: light dark` (or `dark`) in a report's `<style>` block, even in a hand-written deviation from this template.** The template's `:root{color-scheme:light}` exists specifically to prevent this. Declaring dark support without shipping real dark tokens makes Chrome force `color:white` onto `html` and any element lacking an explicit Tailwind `text-*` class — while an explicit `background` stays light — producing invisible white-on-white/cream text for any viewer whose OS is in dark mode. Confirmed live 2026-09-07 (`<td>` cells measured `color:rgb(255,255,255)` on a white table) across 4 hand-written Goal Zero reports that added this line without dark overrides. These are static, portable deliverables, not theme-adaptive Artifacts — always pin `color-scheme: light`.
-- **Trusting `report-pdf`'s page/byte/char summary as proof the PDF is readable.** It proves the file rendered and has a text layer — it does NOT prove no box got split across a page break. Render **every page** to PNG and look at each one before calling the report done: `pdftoppm -r 100 -png x.pdf /tmp/pg` then `Read` each `/tmp/pg-N.png`. Specifically check the top and bottom few lines of every page — an orphaned fragment of a colored callout box (its background/border survives the split, its content doesn't) is the most common defect and reads as "broken, unreadable text" to the recipient even though the HTML source and on-screen render both look fine. This exact defect shipped 2026-09-07: a `bg-stone-900` "Bottom line" box rendered correctly on page 3 but spilled one bullet onto page 4 as an isolated dark fragment on an otherwise blank page. It was invisible in the light-mode screenshot and invisible in `report-pdf`'s summary — only caught by opening the actual PDF pages one at a time.
+- **Verifying a PDF by eye alone.** Render a page or two (`pdftoppm -r 70 -png -f 1 -l 1 x.pdf /tmp/pg`) and actually look at it. Tag-balance checks and a 200 status do not catch corrupted glyphs or a table overflowing the page box.
 
 ## Relationship to other skills
 
