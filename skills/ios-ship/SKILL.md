@@ -12,8 +12,8 @@ description: >
 # /ios-ship → merged into /ios + /ship
 
 This skill's content moved on 2026-06-12 (user-requested consolidation so the
-major skills mirror each other: /code ↔ /ship, with /ios as the Apple
-counterpart of /code):
+major skills mirror each other: /carmack ↔ /ship, with /ios as the Apple
+counterpart of /carmack):
 
 - **Developing, building, debugging, reviewing, testing, store assets** →
   invoke **/ios** (`~/.claude/skills/ios/SKILL.md`). It routes to

@@ -4,30 +4,29 @@
 
 | Use case | Tool |
 |----------|------|
-| **Live page debugging** (logged-in, real data, current state) | **chrome-cdp** ← prefer |
+| **Live page debugging** (logged-in, real data, current state) | **fcdp** (`/chrome`) ← prefer |
 | **E2E / headless testing** (fresh session, no login needed) | agent-browser |
-| **Performance tracing** (Core Web Vitals, traces) | chrome-devtools-mcp |
+| **Performance tracing** (Core Web Vitals, traces) | `fcdp trace` / `fcdp throttle` (real profile) or chrome-devtools-mcp on a disposable browser |
 
-### chrome-cdp — Live Chrome Session (Preferred)
+### fcdp — your REAL logged-in Chrome (Preferred; full recipe in `/chrome`)
 
-Connects to your running Chrome. Tabs already open, cookies intact, no re-login.
+Drives the actual Default profile through our own extension + bridge: tabs already open,
+cookies intact, no re-login, no clone. The old `chrome-cdp` (`cdp.mjs`, `:9222`) was REMOVED
+2026-07-14 — do not use it.
 
 ```bash
-CDP="node ~/.claude/skills/chrome-cdp/scripts/cdp.mjs"
-
-$CDP list                          # List all open tabs (shows targetId prefixes)
-$CDP snap <prefix>                 # Accessibility tree (best for structure)
-$CDP shot <prefix>                 # Screenshot → /tmp/screenshot.png
-$CDP eval <prefix> "expr"          # Run JS in page context
-$CDP html <prefix> ".selector"     # Get element HTML
-$CDP click <prefix> ".selector"    # Click by CSS selector
-$CDP type <prefix> "text"          # Type at focused element
-$CDP nav <prefix> <url>            # Navigate and wait for load
-$CDP net <prefix>                  # Network resource timing
-$CDP stop                          # Stop all daemons
+F=~/tools/fcdp/fcdp                # NOT on PATH in the agent shell — full path
+$F tabs                            # list tabs -> tabId,url,title
+$F open <url> [--reuse]            # new tab (cached active); --reuse re-navigates an existing one
+$F read | text | find "<css|text>" | shot [file.png]
+$F click "<css|text|x,y>" | type "<text>" | fill "<css>" "<v>" | key Enter | nav <url>
+$F js "<code>" | wait "<jsExpr>" [ms]
+$F console --secs 8 --reload | network --secs 8 --reload
+$F pdf | intercept --secs 5 | throttle | trace | raw <CDP.Method> '<json>'
 ```
 
-**Prereq:** `chrome://inspect/#remote-debugging` toggle ON. "Allow debugging" modal fires once per tab.
+**Prereq:** the launchd bridge `com.barklee.fcdp-bridge` running (`bridge socket not found` →
+see `/chrome` Step 0). Unattended/concurrent runs use `fcdp-job <url> <cmd…>` for an isolated tab.
 
 ---
 

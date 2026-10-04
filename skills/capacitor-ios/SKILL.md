@@ -7,7 +7,7 @@ description: >-
   improvebayarea to the App Store", add camera/geolocation/push to a web app, set up
   live web updates without App Store resubmission, build/run/test the app on the iOS
   Simulator, or asks how the web↔app update loop works. Detects the active phase and
-  loads only that phase's reference file, the way /code loads only the relevant
+  loads only that phase's reference file, the way /carmack loads only the relevant
   mode. Orchestrates the installed Capgo 48 capacitor-skills, awesome-ionic-mcp,
   XcodeBuildMCP + /xcode-test, /ios-ship (greenlight + privacy manifest), context7,
   sosumi, app-store-screenshots and aso-audit. Triggers: "capacitor", "wrap web app",
@@ -17,7 +17,7 @@ description: >-
 # capacitor-ios — web app → store-ready iOS app (phased super-skill)
 
 The one skill for taking a web app to the App Store with Capacitor. It does **not**
-reinvent Capacitor knowledge — like `/code`, it **detects the phase, loads only
+reinvent Capacitor knowledge — like `/carmack`, it **detects the phase, loads only
 that phase's reference file**, routes to the specialized skills/MCP that hold the
 detail, and enforces two non-negotiable gates.
 
@@ -82,6 +82,7 @@ For an existing site, the Capacitor-vs-Expo decision is settled: **Capacitor** (
 
 ## Hard rules
 
+- **A WebView must not feel like a website (Apple 4.2 is the policy version of this; the user's thumb is the real judge).** Before Phase D's smoke test, apply `Skill(mobile-native)`'s Baseline to the web layer — `-webkit-tap-highlight-color: transparent`, hover rules behind `@media (hover: hover) and (pointer: fine)`, `100dvh`/`100svh` not `100vh`, 16px inputs (never `maximum-scale=1`), `touch-action: manipulation` + `user-select: none` on controls, `viewport-fit=cover` + `env(safe-area-inset-*)`, `overscroll-behavior`, `theme-color` per color scheme. It is a web-layer change (GATE 1: OTA path). Sheets, drags, and springs that should feel native: `Skill(apple-design)`; motion review before done: `Skill(review-animations)`. None of these tells reproduce in desktop emulation — confirm on the device in Phase D.
 - **No outward Apple/Capgo action without explicit chat approval** — submit, TestFlight, signing change, OTA push. Show exactly what will happen first.
 - **Accounts are the user's** — the agent never creates an Apple Developer or Capgo account. Prompt the user to sign in (`asc auth login`, Capgo) at the relevant phase.
 - **Ground-truth gate:** before asserting an Apple/Capgo policy fact or taking an outward action, verify against a primary source fetched now (sosumi / capgo skill / context7), never a remembered value. Full standard: `~/.claude/skills/shared/ground-truth-standard.md`.

@@ -10,7 +10,7 @@ push, or overwrite unrelated work without explicit approval.
 
 ## Engineering workflow
 
-- Use `/code` for implementation and evidence-based debugging.
+- Use `/carmack` for implementation and evidence-based debugging.
 - Use `/debug` for a structured root-cause investigation.
 - Use `/ship` only when the user authorizes deployment.
 - Keep fixes minimal and add regression coverage for corrected behavior.

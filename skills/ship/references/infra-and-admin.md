@@ -168,7 +168,7 @@ BLOCK until:
 - Catalog schema change bumped the KV cache key.
 - Post-deploy: cache-busted `GET /api/categories` matches those counts. `hurl --test` is a valid structural-test form.
 
-`/code` must not have been the deployer — this gate runs only under `/ship`.
+`/carmack` must not have been the deployer — this gate runs only under `/ship`.
 
 **CSP Lesson (DocuSeal)**: Third-party embeds often load assets from CDNs/cloud storage, not their main domain. Trace actual resource URLs in browser network tab. DocuSeal serves document images from `*.s3.amazonaws.com`, not `docuseal.com`.
 
@@ -270,6 +270,32 @@ done
 grep -rn "onClick.*async\|onClick.*void" --include="*.tsx" src/react-app/ | grep -v "disabled="
 ```
 - If async onClick without `disabled` state on same element: WARN — double-click causes duplicate requests
+
+**7b. One-shot persist/queue/filing lock (BLOCKING when touched) — Phase 1.45h:**
+
+Trigger when the diff touches a UI control that persists, queues, or files (submit, checkout, send, save-and-queue, `submitReport`, `beginSubmitAttempt`, IndexedDB queue write from a click). Full class: Pattern #42.
+
+BLOCK until:
+- The click path takes a **synchronous** lock before any `await`.
+- Tests **count** persist/queue calls on the shipped path: two rapid taps → 1 persist.
+- Success stays locked until explicit new-report / edit-and-resubmit; persist failure may unlock for retry.
+- A cooldown helper with zero call sites is not accepted as the lock.
+
+`disabled={isLoading}` + `finally` re-enable is the weaker WARN above and does **not** clear this gate.
+
+**7c. Silent outcome on a primary action (BLOCKING, every ship) — Phase 1.45i:**
+Pattern 43 (`~/.claude/skills/debug/references/error-handling-patterns.md`). Run
+`~/.claude/skills/ship/tools/silent-outcome-check.sh <repo>` pre-deploy and with
+`--live <url>` post-deploy. BLOCK on a newly added native `alert/confirm/prompt`
+in client code; run the repo's `probe:constrained` (headless, no WebGL, no
+geolocation, dialogs dismissed, every `POST /api/*` intercepted; asserts per tap
+posted OR visible hold, zero dialogs, no canvas leak). exit 2 = UNMEASURED, never
+a pass: a submit/file/send control with no probe must gain one before the ship
+is green. When the diff touches the handler: every early `return` routes through
+the hold funnel (adjacent, `role=alert`, focused, `data-*-hold` on the control) or
+files; no fallback reads the previous placement's accuracy/state; a reset clears
+the notice and aborts any open in-page question. Reference incident 2026-09-18
+(improvebayarea, Worker `024db873`).
 
 **8. Admin Route Error Code Check**:
 ```bash

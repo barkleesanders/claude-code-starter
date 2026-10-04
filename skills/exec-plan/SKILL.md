@@ -246,7 +246,11 @@ Verdict format — append after the sprint contract:
 
 When context fills or session ends, write handoff.md BEFORE compaction.
 
-The PreCompact hook (`scripts/pre-compact-sync.sh`) auto-reminds you. Also write proactively when context usage exceeds ~70%.
+The PreCompact hook (`scripts/pre-compact-sync.sh`) preserves existing handoffs and
+replaces one bounded checkpoint for plans whose latest sprint remains open. It
+cannot reconstruct model-only progress. Keep the relevant Beads issue and handoff
+current as work advances. After compaction, continue the next unfinished action;
+read supporting files only when needed to resolve missing context.
 
 ### Handoff template (write to handoff.md)
 

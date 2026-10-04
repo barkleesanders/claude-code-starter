@@ -18,8 +18,8 @@
 #
 # WHAT IT WILL NOT DO — and this is the important part
 #   It NEVER invents a URL. A plausible-looking slug is a fabrication with a
-#   valid shape: verified 2026-08-24, `linkedin.com/company/esbe-incorporated`
-#   404s while `linkedin.com/company/aivaclaims` is real. The only safe sources
+#   valid shape: verified 2026-08-24, `linkedin.com/company/example-nonprofit`
+#   404s while `linkedin.com/company/example` is real. The only safe sources
 #   for a candidate are (a) links the site already publishes, (b) an
 #   authoritative registry looked up by a real identifier (EIN, UEI), or
 #   (c) the user telling you. This script reports what is MISSING; a human or
@@ -32,15 +32,15 @@
 #
 # ENTITY-CONFUSION GUARD (the failure that matters more than a missing link)
 #   Pass --forbid to assert that a URL pattern must NOT appear. Use it to keep
-#   one legal entity's identifiers off another's site. Real example: ESBE
-#   Incorporated (a 501(c)(3), EIN 87-1218291) and ESBE Tech / ESBE LLC (a
+#   one legal entity's identifiers off another's site. Real example: Example Org
+#   Incorporated (a 501(c)(3), EIN 00-0000000) and Example Tech / Example LLC (a
 #   for-profit) share a brand. Putting the nonprofit's IRS/ProPublica/Candid
 #   links on the consulting site would assert tax-exempt status for a business
 #   that does not have it — a misrepresentation, not an SEO tweak.
 #
 # USAGE
 #   entity-sameas-check.sh https://example.com
-#   entity-sameas-check.sh https://esbe.tech --forbid 'propublica|candid|every\.org'
+#   entity-sameas-check.sh https://example.org --forbid 'propublica|candid|every\.org'
 #   entity-sameas-check.sh https://example.com --min 3
 #   entity-sameas-check.sh https://solo.example --allow-types WebSite,Person
 #

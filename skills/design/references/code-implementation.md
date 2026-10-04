@@ -110,24 +110,72 @@ Rules:
 
 ## Motion Implementation
 
-From `aesthetic-core.md`: **one orchestrated page load > scattered micro-interactions.**
+From `aesthetic-core.md`: **one orchestrated page load > scattered micro-interactions**, and every animation passes the four-question gate first (frequency → purpose → tool → curve/duration). The full build sequence with ready-to-copy recipes is `Skill(animate)` + its `RECIPES.md`; the strict reviewer is `Skill(review-animations)`.
 
-### React
-- **Motion** (formerly Framer Motion): `import { motion } from "motion/react"`. Use `initial`/`animate`/`transition` for page-load staggering, `whileHover`/`whileTap` for interaction.
-- **GSAP**: for sequence-heavy work, scroll-driven storytelling, or anything Motion struggles with.
-- **View Transitions API**: for route-change animations in Next 15+ / React Router 7.
+### Tool ladder — stop at the first rung that fits
+
+| Need | Tool |
+|---|---|
+| Hover, press, color, a state toggle driven by a class/attribute | **CSS transition** (interruptible — retargets from the current value) |
+| Entry on mount with no JS state | **CSS `@starting-style`** (fallback: `useEffect(() => setMounted(true), [])` + `data-mounted`) |
+| Predetermined motion that must stay smooth while the page is busy | **CSS animation** — runs off the main thread; rAF-driven JS drops frames during load/paint |
+| Programmatic control with CSS performance, no library | **WAAPI** `element.animate([...], { duration, easing, fill: 'forwards' })` |
+| Springs, layout animations, exit animations, gesture-driven values | **Motion** (`import { motion, useSpring } from "motion/react"`) |
+| Scroll-driven storytelling, long timelines | **GSAP** (vanilla or React) |
+| Route-change transitions in Next 15+ / React Router 7 | **View Transitions API** |
+
+If the task is really a *component* (toast, drawer, ⌘K menu, dropdown, OTP input) stop and run `Skill(pick-ui-library)` — hand-rolling those is how you get a `<div>` dropdown with no focus management.
+
+### React specifics
+- **Motion shorthands are NOT hardware-accelerated.** `animate={{ x: 100 }}` / `y` / `scale` run on the main thread via rAF and drop frames under load. Use the full string: `animate={{ transform: "translateX(100px)" }}`. (Vercel's dashboard tab animation dropped frames on page load for exactly this reason; CSS fixed it.)
+- Spring config, Apple-style: `{ type: "spring", duration: 0.5, bounce: 0.2 }` — easier to reason about than mass/stiffness/damping. Keep bounce 0.1–0.3 and only after a momentum gesture.
+- `AnimatePresence initial={false}` so default-state elements don't animate in on first render.
+- Decorative mouse-tracking: interpolate through `useSpring`, never bind the value 1:1 to the pointer.
+- Write per-frame values to `ref.current.style`, not state — a React re-render per frame is a jank source.
 
 ### Vanilla / Vue / Svelte
-- **CSS keyframes + `animation-delay`** for staggered reveals on page load. One `.reveal` class with `nth-child` delays gets you 80% of the way.
-- **CSS scroll-driven animations** (`animation-timeline: scroll()`) for scroll-triggered work — natively supported in Chrome/Safari/Edge.
-- **GSAP** is fine in vanilla too. Don't pull in a whole framework just for motion.
+- **CSS keyframes + `animation-delay`** for the page-load stagger. One `.reveal` class with `--i` / `nth-child` delays (30–80 ms apart, ≤ 500 ms total) gets you 80% of the way.
+- **CSS scroll-driven animations** (`animation-timeline: scroll()`) or `IntersectionObserver` (`{ once: true, margin: "-100px" }`) for reveal-on-scroll. Never a `scroll` event listener. No parallax by default.
+- `clip-path: inset()` is the sanctioned fourth animatable property — image reveals, hold-to-delete overlays, seamless tab-color transitions (duplicate the list, clip the "active" copy), comparison sliders. Pure CSS, GPU-composited.
+- `translate()` percentages are relative to the element's own size: `translateY(100%)` hides a drawer/toast whatever its height. Prefer over px.
+
+### Performance cheatsheet (emilkowalski/skills)
+
+| Problem | Solution |
+|---|---|
+| Animation stutters | Animate `transform`/`opacity`, not `width`/`top` |
+| Long list scrolls slowly | Virtualize — only render what's visible (`Skill(pick-ui-library)` → Virtuoso) |
+| Blur causes perf issues | Keep animated `blur()` under 20px (Safari especially) |
+| Motion's `x`/`y` drops frames | Animate the full `transform` string instead |
+| Random properties animate | Never `transition: all`; list exact properties |
+| React re-renders every frame | Write to `ref.current.style`, not state |
+| Element shifts 1px as motion starts | `will-change: transform` — only once you see it |
+| Drawer with many children janks on drag | Set `transform` on the element, never a CSS variable on the parent (style recalc on every child) |
+
+### Mobile-facing output — ship the `mobile-native` Baseline first
+Any page that will be opened on a phone (all of them, plus every Capacitor / PWA surface) gets this floor **before the first component** — none of these reproduce in desktop device emulation, and each is one declaration:
+
+```html
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="<top-of-page color>" />
+<meta name="theme-color" media="(prefers-color-scheme: dark)"  content="<top-of-page color>" />
+```
+```css
+html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; overscroll-behavior: none; }
+input, textarea, select { font-size: 16px; }                   /* iOS zooms into anything smaller — never fix it with maximum-scale=1 */
+button, a, [role="button"] { touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+@media (hover: hover) and (pointer: fine) { /* every :hover rule lives here — touch fakes hover and leaves it stuck */ }
+.app { height: 100dvh; }  .hero { min-height: 100svh; }         /* never 100vh for an app shell or bottom-pinned UI */
+.bottom-bar { padding-bottom: env(safe-area-inset-bottom, 0px); } /* needs viewport-fit=cover or it's 0 */
+```
+Full symptom table (`Hover state stuck after tap` → …) and the *Never Ship* list: `Skill(mobile-native)`. Verify on real hardware — connect the phone, dev server on `0.0.0.0`, Safari → Develop / `chrome://inspect`.
 
 ### Don't
-- Animate `width` / `height` / `top` / `left`. Use `transform` (`translate`, `scale`) and `opacity` only. Everything else triggers layout.
+- Animate `width` / `height` / `top` / `left` / `margin` / `padding`. Use `transform` and `opacity` only (`height` tolerated for accordions where no transform equivalent exists).
 - Animate everything. Contrast is the point.
 - Use `transition: all`. Name the properties explicitly.
-
----
+- Use `ease-in` on UI, enter from `scale(0)`, animate a keyboard-initiated action, or exceed 300 ms on a UI element without a stated reason.
+- Ship motion without `prefers-reduced-motion` (gentler, not zero) and hover gating.
 
 ## Spatial Composition Implementation
 

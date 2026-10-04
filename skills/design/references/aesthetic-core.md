@@ -60,10 +60,17 @@ Once direction is locked, every decision below must serve it.
 - **Dark vs light is never a default.** Not dark "because tools look cool dark." Not light "to be safe." Before choosing, write **one sentence of physical scene**: who uses this, where, under what ambient light, in what mood. If the sentence doesn't force the answer, it's not concrete enough — add detail until it does. *"Observability dashboard"* does not force an answer. *"SRE glancing at incident severity on a 27-inch monitor at 2am in a dim room"* does. Run the sentence, not the category.
 
 ### 3. Motion
-- **One well-orchestrated page load with staggered reveals** beats twenty scattered micro-interactions.
-- CSS-first for HTML/Vue/Svelte. Motion (formerly Framer Motion) for React. GSAP for sequence-heavy work.
-- Use scroll-triggering and hover states that **surprise** — magnetic buttons, text-mask-on-hover, scrambling type.
-- Don't animate everything. The point of motion is contrast: things that move feel important *because* most things don't.
+- **One well-orchestrated page load with staggered reveals** beats twenty scattered micro-interactions. Stagger 30–80 ms between items, total ≤ ~500 ms; stagger is decorative — never block interaction while it plays.
+- **Gate every animation with four questions, in order** (Emil Kowalski, `Skill(animate)` has the full tables):
+  1. *Frequency* — 100+/day or keyboard-initiated (⌘K, shortcuts) → **no animation, ever**; tens/day (hover, list nav) → near-imperceptible or none; occasional (modal, drawer, toast) → standard; rare/first-time (onboarding, success) → the only place delight lives.
+  2. *Purpose* — name one: feedback · spatial consistency · state indication · preventing a jarring change · explanation (marketing only) · delight (rare tier only). Can't name it → don't build it.
+  3. *Tool* — cheapest that works: CSS transition → `@starting-style` → CSS animation (off main thread, survives page load) → WAAPI → Motion (`motion.dev`) only for springs, layout/exit animations, gestures. GSAP for sequence-heavy storytelling. Never install a library for a fade.
+  4. *Curve + duration* — enter/exit `ease-out`; on-screen move `ease-in-out`; hover/color `ease`; constant motion `linear`. **Never `ease-in` on UI** — it delays the moment the user is watching. Built-in curves are too weak: use the project's tokens if they exist (Hallmark: `cubic-bezier(0.16, 1, 0.3, 1)`), else `cubic-bezier(0.23, 1, 0.32, 1)`. Budgets: press 100–160 ms · tooltip 125–200 · dropdown 150–250 · modal/drawer 200–500 · **UI stays under 300 ms**. Exits ≈ 75 % of the enter.
+- **Physicality:** pressables get `transform: scale(0.97)` on `:active` (feedback on pointer-*down*, never only on release). Never enter from `scale(0)` — `scale(0.95)` + `opacity: 0`. Popovers/menus/tooltips scale from their trigger (`transform-origin`), modals stay centered. Exit along the entry path. Slow where the user is deciding (hold-to-confirm 2 s linear), snappy where the system responds (release 200 ms ease-out).
+- **Springs only where a gesture carried momentum** — drag, flick, sheet release, interruptible motion. Default critically damped (`bounce: 0`); a little bounce (`damping ≈ 0.8`) is earned by a flick, never by a menu fading in. Physics + velocity handoff: `Skill(apple-design)`.
+- **Interruptible by construction:** transitions or springs for anything a user can trigger twice a second (toasts, toggles); keyframes restart from zero and are wrong there. `transform`/`opacity` only (`clip-path` is the sanctioned exception); never `transition: all`; `prefers-reduced-motion` = gentler (keep opacity/color, drop movement), not zero; hover motion gated by `@media (hover: hover) and (pointer: fine)`.
+- Surprise belongs on the **rare tier** and the hero moment — magnetic buttons, text-mask-on-hover, scrambling type — not on the thing the user clicks forty times an hour. The point of motion is contrast: things that move feel important *because* most things don't.
+- **Before declaring motion done:** `Skill(review-animations)` (Before/After/Why table, Block/Approve). A Block is a block.
 
 ### 4. Spatial Composition
 - Unexpected layouts beat predictable ones. **Asymmetry, overlap, diagonal flow.**

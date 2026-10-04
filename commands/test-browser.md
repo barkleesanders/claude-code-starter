@@ -11,7 +11,7 @@ argument-hint: "[PR number, branch name, or 'current' for current branch]"
 ## Tool Selection
 
 **For inspecting a live local dev page** (already open in Chrome, logged in):
-→ Use **chrome-cdp** first: `node ~/.claude/skills/chrome-cdp/scripts/cdp.mjs snap <tabPrefix>`
+→ Use **fcdp** first (`/chrome`): `~/tools/fcdp/fcdp tabs` then `~/tools/fcdp/fcdp read [tabId]` / `text` / `shot` (the old `chrome-cdp`/`cdp.mjs` was removed 2026-07-14)
 
 **For headless E2E testing** (fresh session, no login state needed):
 → Use **agent-browser** CLI

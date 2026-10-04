@@ -11,42 +11,101 @@
 # Incomplete signals:
 #   - TaskCreate/TaskUpdate tool calls in transcript with pending/in_progress status
 #   - Recent tool errors (is_error=true)
-#   - Beads issues with status=in_progress updated within the last BEADS_WINDOW_MIN
-#     minutes (default 120) — i.e., issues claimed in this working session.
+#   - In-progress Beads issues explicitly scoped by TASKMASTER_ISSUE_IDS.
+#     Global recent activity is advisory; updated_at never establishes ownership.
 #
 # Env:
 #   TASKMASTER_MAX       Max continuations (default: 3, 0 = infinite)
-#   BEADS_WINDOW_MIN     Lookback window for in_progress beads issues (default: 120)
+#   TASKMASTER_ISSUE_IDS Literal session-owned IDs, comma/whitespace-separated
+#   BEADS_WINDOW_MIN     Advisory lookback for global in_progress issues (default: 120)
 #   TASKMASTER_NO_BEADS  If set to "1", skip beads check entirely
 #
 set -euo pipefail
 
 INPUT=$(cat)
-SESSION_ID=$(echo "$INPUT" | jq -r '.session_id')
-TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path')
-STOP_HOOK_ACTIVE=$(echo "$INPUT" | jq -r '.stop_hook_active // false')
+NORMALIZED=$(printf '%s' "$INPUT" | python3 -c '
+import hashlib, json, sys
+try:
+    payload = json.load(sys.stdin)
+    if not isinstance(payload, dict):
+        sys.exit(1)
+    grok = any(key in payload for key in ("sessionId", "transcriptPath", "stopHookActive", "hookEventName"))
+    session = payload.get("sessionId") or payload.get("session_id")
+    transcript = payload.get("transcript_path") or payload.get("transcriptPath") or ""
+    # Hash before shell extraction: slashes, literal "null", and embedded NULs
+    # remain distinct; missing/invalid IDs never share an anonymous counter.
+    key = hashlib.sha256(json.dumps(["grok" if grok else "claude", session]).encode()).hexdigest() \
+        if isinstance(session, str) and session else ""
+    json.dump({"session_key": key,
+               "transcript": transcript if isinstance(transcript, str) and "\0" not in transcript else "",
+               "active": payload.get("stop_hook_active") is True or payload.get("stopHookActive") is True}, sys.stdout)
+except (ValueError, TypeError):
+    sys.exit(1)
+') || exit 0
+SESSION_KEY=$(printf '%s' "$NORMALIZED" | jq -r '.session_key')
+TRANSCRIPT=$(printf '%s' "$NORMALIZED" | jq -r '.transcript')
+STOP_HOOK_ACTIVE=$(printf '%s' "$NORMALIZED" | jq -r '.active')
+
+COUNTER_DIR="${TMPDIR:-/tmp}/taskmaster"
+# Only access the hashed file for this runtime/session. No legacy raw-ID files,
+# symlinks, hardlinks, or other users' files are read, overwritten, or removed.
+counter() {
+  python3 - "$COUNTER_DIR" "$SESSION_KEY" "$@" <<'PY' 2>/dev/null || true
+import os, re, stat, sys
+root, key, action = sys.argv[1:4]
+count = 0
+try:
+    if re.fullmatch(r"[0-9a-f]{64}", key):
+        if action == "write":
+            try:
+                os.mkdir(root, 0o700)
+            except FileExistsError:
+                pass
+        directory = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        try:
+            if os.fstat(directory).st_uid != os.getuid():
+                raise OSError("foreign counter directory")
+            flags = os.O_RDWR | os.O_CREAT if action == "write" else os.O_RDONLY
+            fd = os.open(key, flags | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600, dir_fd=directory)
+            with os.fdopen(fd, "r+" if action == "write" else "r", encoding="utf-8") as handle:
+                info = os.fstat(handle.fileno())
+                if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_nlink != 1:
+                    raise OSError("unsafe counter file")
+                if action == "read":
+                    text = handle.read(32).strip()
+                    count = int(text) if re.fullmatch(r"[0-9]{1,6}", text) else 0
+                elif action == "write":
+                    os.fchmod(handle.fileno(), 0o600)
+                    handle.write(str(int(sys.argv[4])) + "\n")
+                    handle.truncate()
+                elif action == "clear":
+                    os.unlink(key, dir_fd=directory)
+        finally:
+            os.close(directory)
+except (OSError, ValueError):
+    pass
+if action == "read":
+    print(count)
+PY
+}
 
 # --- If the hook already fired and the agent still wants to stop, let it. ---
 if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
-  COUNTER_DIR="${TMPDIR:-/tmp}/taskmaster"
-  COUNTER_FILE="${COUNTER_DIR}/${SESSION_ID}"
-  rm -f "$COUNTER_FILE"
+  counter clear
   exit 0
 fi
 
 # --- loop guard ---
-COUNTER_DIR="${TMPDIR:-/tmp}/taskmaster"
-mkdir -p "$COUNTER_DIR"
-COUNTER_FILE="${COUNTER_DIR}/${SESSION_ID}"
 MAX=${TASKMASTER_MAX:-3}
+case "$MAX" in
+  ''|*[!0-9]*) MAX=3 ;;
+esac
 
-COUNT=0
-if [ -f "$COUNTER_FILE" ]; then
-  COUNT=$(cat "$COUNTER_FILE")
-fi
+COUNT=$(counter read)
+COUNT=${COUNT:-0}
 
 if [ "$MAX" -gt 0 ] && [ "$COUNT" -ge "$MAX" ]; then
-  rm -f "$COUNTER_FILE"
+  counter clear
   exit 0
 fi
 
@@ -64,7 +123,7 @@ if [ -f "$TRANSCRIPT" ]; then
   fi
 fi
 
-# --- beads analysis (in_progress issues touched in this session) ---
+# --- beads analysis (explicit ownership only; global recency is advisory) ---
 BEADS_BLOCK=""
 BEADS_INFO=""
 WINDOW_MIN=${BEADS_WINDOW_MIN:-120}
@@ -90,45 +149,56 @@ if [ "${TASKMASTER_NO_BEADS:-0}" != "1" ] && command -v bd >/dev/null 2>&1; then
 import sys, json
 from datetime import datetime, timezone, timedelta
 
-window_min = int(sys.argv[1])
+import re
+try:
+    window_min = max(0, int(sys.argv[1]))
+except ValueError:
+    window_min = 120
 cutoff = datetime.now(timezone.utc) - timedelta(minutes=window_min)
+owned_ids = set(re.split(r"[\s,]+", sys.argv[2].strip())) - {""}
 
 try:
     raw = sys.stdin.read()
     items = json.loads(raw) if raw.strip() else []
 except Exception:
     items = []
+if not isinstance(items, list):
+    items = []
 
-fresh, stale_count = [], 0
+owned, recent, seen_ids = [], [], set()
 for it in items:
-    ts = (it.get("updated_at") or "").strip()
-    if not ts:
+    if not isinstance(it, dict) or it.get("status") != "in_progress":
         continue
+    issue_id = it.get("id")
+    if not isinstance(issue_id, str) or issue_id in seen_ids:
+        continue
+    seen_ids.add(issue_id)
+    label = "  - " + issue_id + ": " + str(it.get("title", ""))
+    if issue_id in owned_ids:
+        # Explicit ownership does not expire with updated_at.
+        owned.append(label)
+        continue
+    ts = it.get("updated_at") or ""
     try:
         dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
-    except ValueError:
+        if dt.astimezone(timezone.utc) >= cutoff:
+            recent.append(label)
+    except (AttributeError, ValueError):
         continue
-    if dt.astimezone(timezone.utc) >= cutoff:
-        fresh.append("  - " + str(it.get("id", "?")) + ": " + str(it.get("title", "")))
-    else:
-        stale_count += 1
 
-print("FRESH_START")
-print("\n".join(fresh))
-print("FRESH_END")
-print(f"STALE_COUNT={stale_count}")
-' "$WINDOW_MIN")
-  FRESH=$(echo "$BEADS_RESULT" | sed -n '/FRESH_START/,/FRESH_END/p' | sed '1d;$d')
-  STALE_COUNT=$(echo "$BEADS_RESULT" | sed -n 's/^STALE_COUNT=//p')
-  STALE_COUNT=${STALE_COUNT:-0}
+print(json.dumps({"owned": "\n".join(owned), "recent": "\n".join(recent)}))
+' "$WINDOW_MIN" "${TASKMASTER_ISSUE_IDS:-}")
+  OWNED=$(printf '%s' "$BEADS_RESULT" | jq -r '.owned')
+  RECENT=$(printf '%s' "$BEADS_RESULT" | jq -r '.recent')
 
-  if [ -n "$FRESH" ]; then
+  if [ -n "$OWNED" ]; then
     HAS_INCOMPLETE_SIGNALS=true
-    BEADS_BLOCK=$'\n\nBeads issues still in_progress (touched in last '"$WINDOW_MIN"$' min):\n'"$FRESH"$'\n\nResolve options:\n  bd close <id>                       — mark complete\n  bd update <id> --status=open        — unclaim (put back on ready queue)\n  bd defer <id>                       — park for later (restore with bd undefer)\n  bd update <id> --status=blocked     — mark blocked'
+    BEADS_BLOCK=$'\n\nSession-scoped Beads issues still in_progress (TASKMASTER_ISSUE_IDS):\n'"$OWNED"$'\n\nFinish the owned work before closing it. If ownership has changed, remove its\nID from TASKMASTER_ISSUE_IDS. Do not close unrelated global issues.'
   fi
 
-  if [ "$STALE_COUNT" -gt 0 ]; then
-    BEADS_INFO=$'\n\nNote: '"$STALE_COUNT"$' older in_progress beads issue(s) from prior sessions (run `bd list --status=in_progress` to review).'
+  if [ -n "$RECENT" ]; then
+    BEADS_INFO=$'TASKMASTER advisory only: recent global Beads activity does not establish\nsession ownership and does not block stopping. No task changes required:\n'"$RECENT"
+    printf '%s\n' "$BEADS_INFO" >&2
   fi
 fi
 
@@ -277,12 +347,12 @@ fi
 
 # --- decide ---
 if [ "$HAS_INCOMPLETE_SIGNALS" = false ]; then
-  rm -f "$COUNTER_FILE"
+  counter clear
   exit 0
 fi
 
 NEXT=$((COUNT + 1))
-echo "$NEXT" > "$COUNTER_FILE"
+counter write "$NEXT"
 
 if [ "$MAX" -gt 0 ]; then
   LABEL="TASKMASTER (${NEXT}/${MAX})"
@@ -307,6 +377,6 @@ Before stopping, quickly check:
    systemctl status, version string, log errors in last 2 min.
 5. Did surfaced issues get fixed, not just reported? (fix-all-issues rule)
 
-If everything is done, confirm completion briefly.${WORKTREE_REASON}${AI_VERIFY_BLOCK}${BEADS_BLOCK}${BEADS_INFO}"
+If everything is done, confirm completion briefly.${WORKTREE_REASON}${AI_VERIFY_BLOCK}${BEADS_BLOCK}"
 
 jq -n --arg reason "$REASON" '{ decision: "block", reason: $reason }'

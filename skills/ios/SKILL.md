@@ -14,7 +14,7 @@ description: >
 
 # /ios — Master iOS Skill (develop · debug · review · test · store assets)
 
-**Division of labor (mirrors /code ↔ /ship):** everything up to "put it in
+**Division of labor (mirrors /carmack ↔ /ship):** everything up to "put it in
 users' hands" lives HERE. Production release — archive, sign, TestFlight,
 App Store submit, OTA publish — is **/ship**'s iOS phase
 (`~/.claude/skills/ship/references/ios-release.md`). When the user says
@@ -33,18 +33,40 @@ For iOS-version/API questions NEVER answer from memory — `axiom:axiom-apple-do
 `axiom:axiom-swiftui`, or sosumi MCP. iOS 26 / Xcode 26 are current (Apple
 skipped 19-25); newer may exist — check, don't assume.
 
-**Design/motion craft (installed 2026-07-10, emilkowalski/skills):** when the
-work is how the UI *feels* — springs, gestures, sheets, transitions, polish —
-load `apple-design` (Apple's fluid-motion approach translated for web/webview;
-ideal for Capacitor surfaces that should feel native), `emil-design-eng`
-(UI-polish philosophy), and run `review-animations` on motion code before
-declaring done. `animation-vocabulary` names a vaguely-described effect.
-Full routing lives in the `/design` skill's Cross-Mode Rules.
+**Design/motion craft (emilkowalski/skills — installed 2026-09-20, upstream
+`85e8e23`, in `~/.claude/skills/<name>/` and `~/.agents/skills/<name>/`; the old
+"installed 2026-07-10" note was false, nothing was on disk):** route by app shape —
+- **Capacitor / WKWebView** → `Skill(mobile-native)` Baseline is a ship gate
+  (tap-highlight flash, sticky hover, `100vh`, 16px inputs, `viewport-fit=cover`
+  + `env(safe-area-inset-*)`, `theme-color` per scheme — none reproduce in the
+  Simulator's web inspector alone; verify on the device) + `Skill(apple-design)`
+  for sheets/drags/springs that should feel native + `Skill(animate)` recipes.
+- **Native Swift/SwiftUI** → `Skill(write-swift)` (value types, Swift 6
+  concurrency, `some` vs `any`, Swift Testing, Swift 6 migration) alongside the
+  axiom/sosumi doc lookups — it is a style bar, not an API reference.
+- **Expo/React Native** → `Skill(animate-expo)` (Reanimated / Gesture Handler /
+  expo-haptics, motion off the JS thread, 120 fps), never the web `animate`.
+- Any of them: `Skill(emil-design-eng)` when the ask is how the UI *feels*;
+  `Skill(review-animations)` on motion code **before declaring done** (a Block
+  is a block); `Skill(animation-vocabulary)` to name a vaguely-described effect.
+Full routing table lives in the `/design` skill's Cross-Mode Rules; the HIG
+itself is `/design` → `references/apple-hig.md` (Phase 0.5, BINDING here).
+
+**SwiftUI agent guidance (2026-10-01, twostraws/swiftui-agent-skill):** for
+native SwiftUI work, run Paul Hudson's open-source agent skill (`npx skills
+add https://github.com/twostraws/swiftui-agent-skill --skill swiftui-pro`)
+before declaring the code done — it reviews AI-written SwiftUI for deprecated
+API usage (e.g. `foregroundColor()`, `Text` concatenation with `+`, stray
+`ObservableObject`), performance anti-patterns (view work in initializers or
+`body`, view breakup for the `@Observable` macro), accessibility (labeled
+controls, touch-target sizes, dynamic type), and Swift hygiene. Sibling repo
+`twostraws/swift-agent-skills` adds SwiftData, Swift Concurrency, and Swift
+Testing coverage.
 
 ## Dev loop (xcodebuildmcp — preferred over raw xcodebuild)
 
 1. `session_show_defaults` once per session; set projectPath/scheme/simulatorId/
-   bundleId (AIVA: `ios/App/App.xcodeproj`, scheme `App`, `com.aivaclaims.app`).
+   bundleId (AIVA: `ios/App/App.xcodeproj`, scheme `App`, `com.example.app`).
 2. `build_run_sim` — build+install+launch in one call; the returned runtime
    log captures the app/webview console — **read it instead of guessing**.
 3. Iterate: edit → (Capacitor: `npx vite build && npx cap sync ios`) →
@@ -70,27 +92,25 @@ Full routing lives in the `/design` skill's Cross-Mode Rules.
   Testing patterns: `all-ios-skills:swift-testing`.
 - Live a11y/VoiceOver: `xcui assert` / `xcui voiceover traverse` (axiom bin);
   deep audit: `axiom:accessibility-auditor` agent.
-- **Simulator streaming + agent eyes: `/serve-sim` skill** (installed
-  2026-07-10, `~/.claude/skills/serve-sim` → `~/.agents/skills/serve-sim`;
-  EvanBacon/serve-sim, verified live on iPhone 17 Pro). Start daemon:
-  `npx serve-sim --detach -q` → JSON with MJPEG `streamUrl` (:3100) + ws.
-  **Eyes**: grab a frame — `curl -s --max-time 6 <streamUrl> | python3`
-  (slice first `\xff\xd8`…`\xff\xd9`) → Read the JPEG. **Semantic eyes**:
-  `curl :3100/ax` = labeled a11y tree with point frames (native views only —
-  webview content still needs coordinates). **Hands**: `npx serve-sim tap
-  <x> <y>` takes NORMALIZED 0..1 coords (pt/402, pt/874 on iPhone 17 Pro) —
-  prefer `tap` over `gesture` for plain taps (two `gesture` calls =
-  long-press). **Scroll/drag: the `gesture` CLI can NOT do it** (sends ONE
-  event per call; array payload = silent no-op — verified vs AIVA webview
-  2026-07-10): use `node ~/.agents/skills/serve-sim/scripts/drag.mjs
-  <x1> <y1> <x2> <y2> [ms]` (one-socket timed 0x03 frames).
-  `button home|lock|app_switcher`, `rotate`, `type`,
-  `camera --file/--webcam` injection, `permissions grant/revoke`,
-  `ca-debug` overlays, `memory-warning`. Stream in browser: :3200 preview,
-  tunnel it for remote review. Stop: `npx serve-sim --kill`. Complements
-  xcodebuildmcp `screenshot`/`snapshot_ui` — use serve-sim when you need
-  continuous video, camera injection, permissions, CA debug, or a
-  shareable live stream.
+- **Simulator eyes + hands for agents: `baguette` (default) + `serve-sim`** —
+  full routing table, verified command sequence and traps in
+  `~/.claude/skills/shared/ios-sim-agent-control.md` (both live-verified 2026-09-20, Xcode 27).
+  **baguette** (`brew install baguette`, 0.1.99): `boot --udid U` headless (no
+  Simulator.app), `describe-ui` = a11y tree with pt frames, `tap/swipe/pinch/
+  pan/press/key/type` in absolute pt (`--width 402 --height 874` on iPhone 17
+  Pro), `screenshot`, `logs`, `location/motion/network/status-bar`, `serve` UI
+  at `127.0.0.1:8421/simulators`. **serve-sim** (`npm i -g serve-sim`, 0.1.46,
+  skill `/serve-sim`): attach to a booted sim, `--detach -q` → MJPEG `:3100`
+  60 fps stream + `:3100/ax`, `tap` in NORMALIZED 0..1 coords, **camera
+  injection** (`camera <bundle> --webcam|--file`), `ca-debug` overlays,
+  `memory-warning`, `:3200` preview to tunnel to a reviewer. Both are
+  SIMULATOR-ONLY — neither can reach the real iPhone. For the PHYSICAL phone use
+  `/controlphone` (`controlphone screenshot` via go-ios, `iphonectl-setup wda` then
+  `tap/swipe/type`) — mobile-mcp's screenshot/tap time out on iOS 27. `devicectl` and
+  xcodebuildmcp device tools also reach the real phone, so pass a sim UDID to those
+  when you mean the simulator. Launch crash on iOS 27 only? Run
+  `ship/tools/ios-scene-lifecycle-check.sh` — see `shared/ios-app-dev-release-traps.md`.
+  Complements xcodebuildmcp `screenshot`/`snapshot_ui`.
 
 ## Debug routing
 
@@ -101,7 +121,7 @@ Full routing lives in the `/design` skill's Cross-Mode Rules.
 | Perf/jank/launch time | `axiom:performance-profiler` (xcprof); SwiftUI: `axiom:swiftui-performance-analyzer` |
 | Memory/leaks | `axiom:memory-auditor` |
 | Webview JS errors (Capacitor) | runtime log from build_run_sim; temp console probe in native bootstrap → rebuild → read log → REMOVE probe |
-| Web-layer bug in Capacitor app | /debug + /code — it's web code |
+| Web-layer bug in Capacitor app | /debug + /carmack — it's web code |
 | Any framework question (HealthKit, StoreKit, MapKit, …) | matching `all-ios-skills:*` / `axiom:axiom-*` skill |
 
 ## Review & compliance (development-time)

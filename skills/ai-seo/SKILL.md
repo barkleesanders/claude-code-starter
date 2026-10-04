@@ -238,12 +238,12 @@ Add these machine-readable files to your site root:
 # Pricing — [Your Product Name]
 
 ## Free
-- Price: $0/month
+- Price: \$0/month
 - Limits: 100 emails/month, 1 user
 - Features: Basic templates, API access
 
 ## Pro
-- Price: $29/month (billed annually) | $35/month (billed monthly)
+- Price: \$29/month (billed annually) | \$35/month (billed monthly)
 - Limits: 10,000 emails/month, 5 users
 - Features: Custom domains, analytics, priority support
 

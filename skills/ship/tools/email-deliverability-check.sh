@@ -3,7 +3,7 @@
 #
 # Catches the 2026-07-13 diy-fax class: email "works" (send() resolves) but the
 # message lands in SPAM because the From domain is misaligned — e.g. an APEX
-# sender (fax@aivaclaims.com) delivered into a Google-Workspace mailbox on that
+# sender (sender@example.com) delivered into a Google-Workspace mailbox on that
 # same strictly-DMARC'd domain. Code review, tests, and even a resolved send()
 # cannot see mailbox placement; only reading the destination mailbox can.
 #
@@ -52,9 +52,14 @@ echo "Email deliverability gate — $REPO"
 
 # ---- S1: apex-sender-into-hosted-mailbox detection --------------------------
 echo "1. Static: sender From-domains"
+# Test files and fixtures are excluded: a From literal in *.test.ts is a fixture,
+# not a production sender (2026-09-14 false BLOCK on reports@example.test in
+# improvecortland's src/report_email.test.ts). RFC 2606 reserved TLDs are also
+# skipped — .test/.example/.invalid/.localhost can never be a live sender.
 FROMS=$(grep -rhoE '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}' \
+          --exclude='*.test.*' --exclude='*.spec.*' --exclude-dir='__fixtures__' --exclude-dir='__tests__' \
           src/ wrangler.toml wrangler.json wrangler.jsonc 2>/dev/null \
-        | grep -viE 'example\.(com|org)|@types|\.png|\.jpg' | sort -u)
+        | grep -viE 'example\.(com|org)|\.(test|example|invalid|localhost)$|@types|\.png|\.jpg' | sort -u)
 SENDER_DOMAINS=""
 if [ -z "$FROMS" ]; then
   ok "no email literals found in src/ or wrangler config"

@@ -202,7 +202,7 @@ grep -l 'dependencies: \[\]' todos/*-ready-p1-*.md
 ls todos/*-pending-*.md
 
 # Find next issue ID
-ls todos/ | grep -o '^[0-9]\+' | sort -n | tail -1 | awk '{printf "%03d", $1+1}'
+ls todos/ | grep -o '^[0-9]\+' | sort -n | tail -1 | awk '{printf "%03d", \$1+1}'
 
 # Count by status
 for status in pending ready complete; do

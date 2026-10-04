@@ -5,7 +5,13 @@
 #
 # Per URL it reports: HTTP status · Cache-Control · cf-cache-status · HSTS ·
 # CSP · rendered-DOM literals (undefined/NaN/[object Object]/Invalid Date) ·
-# STATIC h1 count · og:image · security.txt status.
+# STATIC h1 count · og:image · security.txt status · favicon verdict.
+#
+# fav= column (added 2026-09-20): favicon-check.sh DECODES the declared icon and
+# validates it the way a browser does (well-formed SVG / image magic bytes /
+# remote 2xx image). ok|bad|unmeasured — never the two-valued "link present".
+# `bad` emits FAIL:favicon. Born from car.example.org shipping 3× with a
+# malformed data-URI SVG that every presence grep passed.
 #
 # Usage:
 #   fleet-verify.sh <name> <url>            # one site
@@ -46,13 +52,26 @@ probe() {
   local base sectxt
   base=$(printf '%s' "$url" | grep -oE "https?://[^/]+")
   sectxt=$(curl -s -o /dev/null -w "%{http_code}" --max-time 12 "$base/.well-known/security.txt")
+  # favicon: validate the SAME served body (auth-gated 401/302 pages still carry the head).
+  # Three outcomes: ok / bad / unmeasured (non-HTML, no head, tool missing) — never fold the
+  # third into either of the first two. --strict (2026-09-20, HOME-d75go): /favicon.ico must
+  # be a 2xx image and an apple-touch-icon must resolve, else `bad` — the advisory ico=404
+  # warn had been ignored on 8 services for months.
+  local fav="unmeasured"
+  local fvc; fvc="$(dirname "${BASH_SOURCE[0]}")/favicon-check.sh"
+  if [ -x "$fvc" ] && [ "$ct" = "text/html" ]; then
+    fav=$(bash "$fvc" --strict --html "$body" "$base" 2>/dev/null | grep -oE "verdict=[a-z]+" | head -1 | cut -d= -f2)
+    fav=${fav:-unmeasured}
+  fi
   rm -f "$body"
-  # FAIL markers the caller can grep: non-200, or rendered DOM literals present
+  # FAIL markers the caller can grep: non-200, rendered DOM literals, or a favicon that
+  # a browser would not render
   local flag=""
   [ "$code" != "200" ] && flag="$flag FAIL:status"
   [ "${lit:-0}" -gt 0 ] && flag="$flag FAIL:dom-literal"
-  printf "%-26s | %s | cc=%-34s | cfs=%-4s | hsts=%s csp=%s | lit=%s h1=%s og=%s | sectxt=%s%s\n" \
-    "$name" "${code:-ERR}" "${cc:0:34}" "${ccs:--}" "$hsts" "$csp" "$lit" "$h1" "$og" "$sectxt" "$flag"
+  [ "$fav" = "bad" ] && flag="$flag FAIL:favicon"
+  printf "%-26s | %s | cc=%-34s | cfs=%-4s | hsts=%s csp=%s | lit=%s h1=%s og=%s | sectxt=%s fav=%s%s\n" \
+    "$name" "${code:-ERR}" "${cc:0:34}" "${ccs:--}" "$hsts" "$csp" "$lit" "$h1" "$og" "$sectxt" "$fav" "$flag"
 }
 
 if [ "${1:-}" = "--list" ]; then

@@ -80,7 +80,10 @@ if [ "$PREVIEWS" = "true" ]; then
   echo "     un-securable) and WILL trip CF Security Insights (TLS/HSTS/Always-HTTPS/security.txt)."
   WANT_PREVIEWS=false; RC=1
 fi
-if [ "$HASROUTES" = "y" ] && [ "$ENABLED" = "true" ]; then
+OPTIN="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/../.." && pwd)/shared/workers-dev-optin.txt"
+if [ "$HASROUTES" = "y" ] && [ "$ENABLED" = "true" ] && [ -f "$OPTIN" ] && sed 's/#.*//' "$OPTIN" | grep -qwx "[[:space:]]*$NAME[[:space:]]*"; then
+  echo "  ℹ️  workers.dev left ENABLED: $NAME is on the deliberate opt-in list ($OPTIN)."
+elif [ "$HASROUTES" = "y" ] && [ "$ENABLED" = "true" ]; then
   echo "  ⚠️  FINDING: custom-domain worker with workers.dev ENABLED → <$NAME>.<acct>.workers.dev serves"
   echo "     an unprotected duplicate of prod (bypasses zone security, splits SEO). Disable it."
   WANT_ENABLED=false; RC=1

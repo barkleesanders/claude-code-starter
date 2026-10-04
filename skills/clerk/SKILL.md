@@ -106,7 +106,7 @@ If `clerk skill --help` reports a newer CLI than the skill you're reading, run `
 | **Backend API (default)**       | Runtime data: users, orgs, sessions, invitations, JWT templates, webhooks                    | `clerk api <path>`                                             |
 | **Platform API (`--platform`)** | Account-level: applications, instances, billing                                              | `clerk api --platform <path>`                                  |
 
-A project is "linked" to an application via `clerk link`. Once linked, most commands auto-resolve the target app and dev instance from the repo's git remote. To target something else, pass `--app <id>` and/or `--instance dev|prod|<instance_id>`. See [references/auth.md](references/auth.md) for the full resolution order.
+A project is "linked" to an application via `clerk link`. Once linked, most commands auto-resolve the target app and dev instance from the repo's git remote. To target something else, pass `--app <id>` and/or `--instance dev|prod|<instance_id>`. See the shared [authentication and targeting reference](../clerk-cli/references/auth.md) for the full resolution order.
 
 ## Discover endpoints — don't memorize them
 
@@ -161,7 +161,7 @@ For instance config, prefer the dedicated `clerk config ...` commands over raw P
 
 **Endpoint paths may be given with or without `/v1/` prefix** — both work for Backend API calls. The CLI normalizes.
 
-See [references/recipes.md](references/recipes.md) for concrete patterns: listing/filtering users, creating orgs, impersonation sessions, etc.
+See the shared [CLI recipes](../clerk-cli/references/recipes.md) for concrete patterns: listing/filtering users, creating orgs, impersonation sessions, etc.
 
 ## Core commands at a glance
 
@@ -204,7 +204,7 @@ The CLI auto-detects agent mode when stdout is not a TTY, or when `--mode agent`
 - **`apps list` and `apps create` default to JSON** when piped.
 - **`clerk init --prompt`** prints a short agent-oriented handoff telling the agent to run `clerk init -y` (it is NOT a framework-specific integration guide; use the runtime `clerk init` output itself for that).
 
-Full matrix and sandbox details in [references/agent-mode.md](references/agent-mode.md).
+Full matrix and sandbox details are in the shared [agent-mode reference](../clerk-cli/references/agent-mode.md).
 
 ## Output format and errors
 
@@ -222,9 +222,12 @@ Full matrix and sandbox details in [references/agent-mode.md](references/agent-m
 
 ## References
 
-- [references/auth.md](references/auth.md) — auth flow, key resolution order, host-vs-sandbox behavior, `--app`/`--instance` targeting, Backend vs Platform API.
-- [references/recipes.md](references/recipes.md) — copy-pasteable recipes for common Clerk tasks.
-- [references/agent-mode.md](references/agent-mode.md) — agent-mode behavior matrix, sandbox warning semantics, exit codes, error format.
+These references are maintained in the installed sibling `clerk-cli` skill. Check
+the selected CLI's `--help` before using recipe flags, as described above.
+
+- [Authentication and targeting](../clerk-cli/references/auth.md) — auth flow, key resolution order, host-vs-sandbox behavior, `--app`/`--instance` targeting, Backend vs Platform API.
+- [CLI recipes](../clerk-cli/references/recipes.md) — copy-pasteable recipes for common Clerk tasks.
+- [Agent-mode behavior](../clerk-cli/references/agent-mode.md) — agent-mode behavior matrix, sandbox warning semantics, exit codes, error format.
 
 
 ## Ground-truth gate (MANDATORY)

@@ -43,7 +43,7 @@ grep -oP '<loc>\K[^<]+' public/sitemap.xml src/worker/index.ts 2>/dev/null | gre
 
 ## Phase 1.4a: OG / SOCIAL PREVIEW METADATA (PUBLIC SITES)
 
-**Purpose**: Every shipped public site should look intentional when pasted into email, Slack, iMessage, LinkedIn, X, Discord, or procurement notes. A live site without OG/Twitter metadata or a preview image looks unfinished even if the app works.
+**Purpose**: Every shipped public site should look intentional when pasted into email, Slack, Apple Messages, LinkedIn, X, Discord, or procurement notes. A live site without OG/Twitter metadata or a preview image looks unfinished even if the app works.
 
 **Trigger**: Run for every public website, landing page, app, dashboard, or Cloudflare Worker returning HTML. Skip only for private APIs with no HTML surface.
 
@@ -72,6 +72,20 @@ curl -sI "$OG_URL" | rg -i '^(HTTP|content-type)'
 - If metadata is missing: **BLOCK** — add it before deployment.
 - If the image URL is relative, 404s, or does not return `image/*`: **BLOCK**.
 - If `twitter:*` uses `property=` instead of `name=`: WARN and fix before reporting success.
+
+**improvebayarea.com — city-count surfaces (EVERY ship of this repo):**
+The OG JPEG is a static `public/og.jpg` rebuilt by `scripts/build-og.sh`. HTML tags interpolate `cityNames().length`; the pixels do not. After adding a city, if the script is not re-run, Slack/Messages still show the old count (2026-08-23: tags said 25, JPEG still said 21).
+
+BLOCK unless:
+```bash
+cd <improvebayarea-repo>
+timeout 120 ./node_modules/.bin/vitest run src/ui_cities.test.ts src/cities.test.ts
+```
+That suite (a) asserts every city name appears in homepage HTML, (b) OCRs `public/og.jpg` and requires `One tap. N cities.` to equal `CITIES.length`, (c) requires `og.jpg?v=${OG_IMAGE_VERSION}` on homepage + trust pages.
+
+If OCR reports a different N: run `bash scripts/build-og.sh`, bump `OG_IMAGE_VERSION` in `src/brand.ts` to today (`YYYY-MM-DD`), commit all of `public/og.{jpg,png,webp}`. Do not ship a cache-buster bump without new pixels, or crawlers keep the old 21.
+
+Post-deploy: cache-busted `curl` of live `og:title` AND OCR of live `/og.jpg?v=…` must both show the same N.
 
 ---
 

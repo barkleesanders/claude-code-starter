@@ -131,7 +131,7 @@ fi
 # With cache.enabled, the cache front-layer presents http:// in request.url for
 # HTTPS visitors (cf-visitor stays https). Any middleware that sniffs the
 # REQUEST url's protocol to force https will 301 every request to itself —
-# sitewide infinite redirect loop (aivaclaims down 21:44Z-22:10Z). Detection:
+# sitewide infinite redirect loop (example down 21:44Z-22:10Z). Detection:
 # a file that builds a URL from the request AND checks protocol === "http".
 # Input-URL validators (new URL(userString) + protocol check) are fine.
 loopfiles=$(grep -rlE "new URL\((c\.req\.url|request\.url)\)" "$SRC" --include='*.ts' --include='*.tsx' --include='*.js' 2>/dev/null | grep -viE 'node_modules|/dist/|\.test\.')
