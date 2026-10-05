@@ -191,7 +191,7 @@ Why preview at all (2026-07-02, ecobee dashboard): restyling directly in code pr
 | `references/stitch-workflows.md` | Only when the user explicitly names Stitch |
 | `Skill(emil-design-eng)` · `Skill(animate)` · `Skill(review-animations)` · `Skill(apple-design)` · `Skill(mobile-native)` · `Skill(pick-ui-library)` · `Skill(prototype)` · `Skill(ask-sonner)` · `Skill(find-animation-opportunities)` · `Skill(improve-animations)` · `Skill(animation-vocabulary)` · `Skill(animate-expo)` · `Skill(write-swift)` | Emil Kowalski skills — loaded at the moments listed in Cross-Mode Rules. `review-animations` is mandatory before any motion work is declared done; `mobile-native` Baseline is mandatory for any mobile-facing web output |
 
-This skill follows the progressive-disclosure pattern (same as `/carmack`): the entry-point `SKILL.md` stays lean and routes to references that load only when their mode fires. Hallmark is itself progressive — its SKILL.md pulls only the theme / macrostructure / component files the brief actually needs.
+This skill follows the progressive-disclosure pattern (same as `/code`): the entry-point `SKILL.md` stays lean and routes to references that load only when their mode fires. Hallmark is itself progressive — its SKILL.md pulls only the theme / macrostructure / component files the brief actually needs.
 
 ---
 

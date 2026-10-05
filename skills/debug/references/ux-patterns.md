@@ -2,7 +2,7 @@
 
 ## UX Pre-Investigation Quick Checks
 
-Before diving into deep Carmack-mode investigation of a UI issue, run these 5-minute scans first. These catch the most common bugs without needing a full reproduction harness.
+Before diving into deep Code-mode investigation of a UI issue, run these 5-minute scans first. These catch the most common bugs without needing a full reproduction harness.
 
 ### Quick Scan Commands
 

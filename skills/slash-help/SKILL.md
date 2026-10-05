@@ -9,7 +9,7 @@ description: Reference for all slash commands and CLI tools available in the use
 
 ## Skills (Slash Commands)
 
-- `/carmack [issue]` - Universal engineering: build features, fix bugs, deep debugging
+- `/code [issue]` - Universal engineering: build features, fix bugs, deep debugging
 - `/ship` - Safe production deployment with quality gates and safety audits
 - `/browser` - Browser automation docs
 - `/ralph [feature]` - Autonomous feature implementation

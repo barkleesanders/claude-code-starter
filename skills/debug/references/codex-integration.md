@@ -6,7 +6,7 @@ Use the Codex plugin for structured code review, adversarial security analysis, 
 
 Run `/codex:review` for structured review with JSON findings (severity, file, line, confidence, recommendation).
 
-**When carmack triggers it:**
+**When code triggers it:**
 - **Phase 4 (Implementation & Verification):** Before presenting a fix to the user, run:
   `/codex:review --wait --scope working-tree`
   Present findings alongside the fix. Never auto-apply Codex recommendations.
@@ -36,7 +36,7 @@ Run `/codex:adversarial-review` when changes touch security-sensitive code. Alwa
 
 ## Codex Rescue (Escalation)
 
-Use `/codex:rescue` when carmack is stuck. Delegates substantial work to a Codex subagent.
+Use `/codex:rescue` when code is stuck. Delegates substantial work to a Codex subagent.
 
 **Escalation triggers (offer, never auto-trigger):**
 1. **3-failure limit:** After 3 failed fix attempts, offer: "Delegate to Codex rescue for independent investigation?"

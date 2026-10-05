@@ -139,7 +139,7 @@ git push -u origin HEAD                       # always
 
 **Re-verify against LIVE docs (do not trust the cached assumptions in the script)**: `WebFetch https://developers.cloudflare.com/workers/cache/configuration/` and confirm the min wrangler version, the "no-Cache-Control ⇒ heuristically cached" rule, and the allowed `cache` keys still hold. The config surface is new (shipped 2026-07) and may change.
 
-**Full pattern + safe-enable recipe:** `~/.claude/skills/shared/workers-cache-safety.md` (shared with /carmack and /debug).
+**Full pattern + safe-enable recipe:** `~/.claude/skills/shared/workers-cache-safety.md` (shared with /code and /debug).
 
 **BLOCK on exit 2.** Override only with explicit user acknowledgement that no cookie-authed route can return an uncacheable-but-unmarked `200`.
 

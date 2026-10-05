@@ -16,7 +16,7 @@ grep -rn "{[a-z][a-zA-Z]*\." --include="*.tsx" | grep -v "\?."
 - Pass the variable as a prop, or move the component outside the parent
 - Add `?.` optional chaining for all nullable access
 
-Full guide: `/carmack` React-Specific Checks section
+Full guide: `/code` React-Specific Checks section
 
 ---
 
@@ -39,7 +39,7 @@ grep -Bn5 "export default function\|export function App" src/react-app/App.tsx |
 ### Fix
 Pass fallbacks to `validateClientEnv()` for vars with hardcoded defaults.
 
-Full guide: `/carmack` Silent React Startup Failure section
+Full guide: `/code` Silent React Startup Failure section
 
 ---
 
@@ -85,7 +85,7 @@ grep -B2 -A2 "useEffect.*data" --include="*.tsx" src/react-app/ | grep "set[A-Z]
 - `document.title` update
 - `localStorage` read on mount (App.tsx root only)
 
-Full guide: `/carmack` useEffect Abuse section
+Full guide: `/code` useEffect Abuse section
 
 ---
 
@@ -174,7 +174,6 @@ grep -rn "document.documentElement.style" --include="*.tsx" src/react-app/ | gre
 - **Quick Detection**: `grep -rn "onClick.*async" --include="*.tsx" src/ | grep -v "disabled="`
 - **Fix**: Add `isLoading` state, `disabled={isLoading}`, spinner, try/finally reset
 - **Incident (2026-03-15)**: Dashboard "Complete Step" buttons had no disabled state during async
-- **Persist/queue/filing is a stronger class.** Disable-while-await + `finally` re-enable is **not** enough when a second tap must not file until explicit edit/resubmit. Load `error-handling-patterns.md` Pattern #42.
 
 ---
 

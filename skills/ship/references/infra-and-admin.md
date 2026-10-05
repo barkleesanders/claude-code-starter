@@ -168,7 +168,7 @@ BLOCK until:
 - Catalog schema change bumped the KV cache key.
 - Post-deploy: cache-busted `GET /api/categories` matches those counts. `hurl --test` is a valid structural-test form.
 
-`/carmack` must not have been the deployer — this gate runs only under `/ship`.
+`/code` must not have been the deployer — this gate runs only under `/ship`.
 
 **CSP Lesson (DocuSeal)**: Third-party embeds often load assets from CDNs/cloud storage, not their main domain. Trace actual resource URLs in browser network tab. DocuSeal serves document images from `*.s3.amazonaws.com`, not `docuseal.com`.
 

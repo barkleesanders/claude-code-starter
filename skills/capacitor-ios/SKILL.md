@@ -7,7 +7,7 @@ description: >-
   improvebayarea to the App Store", add camera/geolocation/push to a web app, set up
   live web updates without App Store resubmission, build/run/test the app on the iOS
   Simulator, or asks how the web↔app update loop works. Detects the active phase and
-  loads only that phase's reference file, the way /carmack loads only the relevant
+  loads only that phase's reference file, the way /code loads only the relevant
   mode. Orchestrates the installed Capgo 48 capacitor-skills, awesome-ionic-mcp,
   XcodeBuildMCP + /xcode-test, /ios-ship (greenlight + privacy manifest), context7,
   sosumi, app-store-screenshots and aso-audit. Triggers: "capacitor", "wrap web app",
@@ -17,7 +17,7 @@ description: >-
 # capacitor-ios — web app → store-ready iOS app (phased super-skill)
 
 The one skill for taking a web app to the App Store with Capacitor. It does **not**
-reinvent Capacitor knowledge — like `/carmack`, it **detects the phase, loads only
+reinvent Capacitor knowledge — like `/code`, it **detects the phase, loads only
 that phase's reference file**, routes to the specialized skills/MCP that hold the
 detail, and enforces two non-negotiable gates.
 

@@ -23,7 +23,7 @@ description: "Deep multi-source research on a topic across a 10-provider search 
 
 ❌ **Don't use when:**
 - A single fact lookup will do → use the built-in `WebSearch` tool (faster, one round-trip)
-- A more specific skill owns the domain → `/seo-audit`, `gov` (gov accountability), `get_code_context_exa` for pure code questions
+- A more specific skill owns the domain → `/seo-audit`, `doge-service` (gov accountability), `get_code_context_exa` for pure code questions
 - The user wants action taken (filing, emailing), not information
 
 ## Available providers (the user's keys — verified configured)

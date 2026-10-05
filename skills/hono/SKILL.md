@@ -119,7 +119,7 @@ Any page a human reads must reach the browser via `c.html(<Page/>)`. `ASSETS.fet
 
 **Reference incident (2026-08-31, improvecortland).** Built the Worker in Hono, wrote the portal
 as `public/index.html`, and reported the site as built on Hono. The user asked *"did you build
-this on hono framework btw like /carmack says to"* — the honest answer was *partially*. The
+this on hono framework btw like /code says to"* — the honest answer was *partially*. The
 conversion afterwards was ~30 minutes and had one non-obvious constraint worth stealing:
 
 **Converting static-HTML → SSR when tests execute the shipped page.** The harnesses regex-

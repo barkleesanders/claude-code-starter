@@ -76,7 +76,7 @@ redirect + presence of the **"Logged in as <email>"** banner / authenticated app
 class as the third-party-signal-fixtures rule: capture a real authed vs. dead response and anchor
 on a distinguishing feature, not a substring present in both.)
 
-## 7. Government-accountability framing (gov overlap)
+## 7. Government-accountability framing (doge-service overlap)
 SF311 marking a case "Transferred - Caltrans" with **no Caltrans tracking number** is the
 accountability gap → file a **direct** Caltrans CSR for an independent ticket, then a **CPRA** for
 the paper trail. Post-2023 CPRA cites: `Gov. Code §7920.000 et seq.`, **§7922.530** (records
@@ -88,7 +88,7 @@ non-interactive-PATH trap in `blind-spots.md`. Short version:
 - **Pin the interpreter absolute path** (`/opt/homebrew/bin/node`) in the shim + launchd plist —
   `ssh host 'cmd'` / `bash -lc` / launchd run with a **bare PATH** (`which node` false-negatives).
 - Split work by the cron-routing rule: deterministic ping (keepalive) → **launchd** LaunchAgent;
-  interpret-and-notify (status tracker) → **`hermes cron create --monitor-script … --deliver telegram`** (agent mode; do not pass `--no-agent`)
+  interpret-and-notify (status tracker) → **`hermes cron create --no-agent --deliver origin`**
   (jobs in `~/.hermes/cron/jobs.json`, scripts in `~/.hermes/scripts/`, gateway = `ai.hermes.gateway`).
 - Verify on the runner via the **real invocation path** (`PATH=$HOME/.local/bin:/opt/homebrew/bin:$PATH hermes cron list`,
   `launchctl list | grep <job>`, run the actual tracker script), not an interactive shell.

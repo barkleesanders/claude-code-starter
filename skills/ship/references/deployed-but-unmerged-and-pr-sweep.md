@@ -24,7 +24,7 @@ from production**, with a green build and no error anywhere.
 | #286 hidden sourcemaps | 5cc34865 → 16f4a84e on 2026-09-20 | 2026-09-20, same day | hours — caught by this gate's first run: `REGRESSION-RISK 5cc34865 (origin/fix/hidden-sourcemaps-no-map-serving)` |
 
 **Why the old rule produced it.** `/ship` Phase 6 said *"NEVER merge a remote PR
-automatically"* and the carmack policy said *"merge to main only when NO
+automatically"* and the code policy said *"merge to main only when NO
 auto-deploy is detected"* — so on exactly the repos where an unmerged deploy is
 dangerous (auto-deploy-on-main), the agent was told to deploy the branch and
 walk away. The two rules composed into the failure.

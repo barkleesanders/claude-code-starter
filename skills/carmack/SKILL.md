@@ -100,21 +100,6 @@ mutation or deployment to `/ship`.
 6. Know what NOT to build — use existing tools over custom implementations
 7. Ship, measure, iterate — perfection is the enemy of validation
 
-## Default Web Stack — Hono (2026-09-29)
-
-When the work involves building a web frontend, UI, or HTTP API and the user
-has not named a stack, build it in **Hono (TypeScript)**. This is the default,
-not one option among equals.
-
-- New web UIs/APIs: a Hono app (`hono` npm package). Server-rendered pages
-  via `hono/jsx` + `c.html()` where the design calls for document-like pages.
-- Every Hono-served HTML page MUST include the defensive CSS rules in
-  `references/ux-patterns.md` ("Hono / Cloudflare Workers HTML — Text Overflow
-  Prevention").
-- Deviate only when the user explicitly names another framework, or the
-  target repo already has an established stack. Adopting the repo's existing
-  stack beats imposing Hono on it.
-
 ## Model-the-Real-System Gate (MANDATORY — 2026-07-03)
 
 **Before you write, label, or estimate anything that describes a real system — a device's capabilities, an API's config, an equipment/hardware layout, a rate/limit/tier, "what channel carries X", any physical or account fact the code then models — you MUST read that system's OWN state live first. Never infer the ground truth from a name, a code comment, a variable label, a prior "Verified" note, a UI string, or plausibility.** This is the Ground-Truth Standard applied to *modeling*, not just to final reports: the model is a claim, and a claim isn't a fact until fetched from the primary source now.
@@ -808,89 +793,6 @@ When using the Agent tool to delegate work:
 5. **Use parallel agents when work is independent** — launch multiple Agent calls in a single message
 
 ---
-
-## Search-Indexing Build Gate (public web properties — 2026-09-28)
-
-When the work touches a public web property (Cloudflare Worker/Pages, any
-served-HTML site), the build is not done until the indexing artifacts are
-correct IN SOURCE — so that `/ship`'s Phase 4.10 post-deploy gate has
-something true to verify. Check before reporting done:
-
-1. **sitemap.xml exists and is valid.** Every `<loc>` absolute on the
-   canonical domain; routes this change touched carry `lastmod` = today
-   (or the generator computes it at build time — never a stale hardcoded
-   date).
-2. **robots.txt exists and points at the sitemap.** Contains
-   `Sitemap: https://<domain>/sitemap.xml`. No crawl-wide `Disallow: /`
-   on a public site. Preview/staging builds are the exception — and they
-   must carry `X-Robots-Tag: noindex` (or equivalent) instead of shipping
-   the public robots.txt.
-3. **IndexNow key file present, byte-exact.** `<key>.txt` at the web root
-   matches the domain's registered key (registry: the indexing goal's
-   `hidden_files/evidence-table.md`). The key is NEVER regenerated per
-   deploy — rotating it breaks verification.
-4. **Redirect landers get nothing.** If the property only 301/302s to
-   another domain, it gets no sitemap, no robots indexing lines, no GSC
-   property, no IndexNow submission. Verify with no-follow status +
-   `Location` probes — never by reading through the redirect (2026-09-28:
-   eleven landers were mis-audited as live sites because checks followed
-   their 301s).
-5. **New domains get flagged, not silently shipped.** A domain with no GSC
-   property and no entry in the indexing ledger is reported as a Phase
-   4.10 action item — never deployed as "done" while undiscoverable.
-
-Fast-lane note: for a small fix on an already-indexed site, this is a
-60-second grep + curl of the three artifacts, not a research project.
-
-## E2E verification layer — tester.army e2e (2026-10-01)
-
-For user-facing web flows, E2E proof beats narration. `e2e`
-(https://tester.army/e2e, npm `e2e`, open source) is the standing E2E layer:
-
-- **Goals, not scripts.** `agent.act('file a streetlight report')` drives the
-  UI; `agent.assert` judges the screen. Mix with deterministic locators +
-  `expect` where exactness matters.
-- **Cheap reruns.** Verified `act` steps replay from cache with zero model
-  calls; CI mode is read-only cache + one retry. Green on unchanged flows
-  costs ~nothing.
-- **Evidence, not prose.** Every run writes `.e2e/report.json` (+ screenshots,
-  traces, recordings). Cite the report as the deliverable proof — it is what
-  "verified live" means for a flow.
-- **Web + mobile, one API.** `@e2e-dev/web` drives Chromium via Playwright
-  (runs on the VM — Playwright browsers already live in
-  `~/.cache/ms-playwright`); `@e2e-dev/mobile` drives iOS simulators via
-  agent-device (Mini-only: simulators need macOS).
-- **No model, no agent steps.** Deterministic-only tests (locators + `expect`)
-  need no model at all — the correct bootstrap when no model key is wired.
-
-When to reach for it:
-
-1. `/code` fixed a user-facing flow → add or run the goal-test covering it.
-   The passing run IS the No-Lie gate's "narrowest test that proves the
-   requested behavior".
-2. `/debug` captured a repro → encode it as a goal-test so the regression can
-   never return silently. (Blind-window lesson: an issue that appears and
-   resolves between observations is missed forever — a goal-test is the
-   backfill.)
-3. `/ship` pre-deploy → run the suite. Green = proceed, red = fix. Silent
-   when green, per the standing notification rule.
-
-Reference harness: `~/workspace/e2e-framework/` — Hono demo app +
-`e2e.config.ts` + `tests/*.e2e.ts`; run with `npx e2e`. Per-project adoption:
-copy the harness's `e2e.config.ts` + `tests/` shape into the repo and point
-the web target at the dev server. The framework ships its own skill at
-`node_modules/e2e/skills/e2e/` (vendored copy: `~/workspace/skills/e2e/`);
-load it for config/test authoring details.
-
-Model wiring (agent steps only): `npx e2e login
-openai|github-copilot|spacexai` (uses an existing subscription — no key), or
-`OPENROUTER_API_KEY` (request via the Secure Vault API-access flow; never in
-chat or files). Test secrets stay in env vars; the runner redacts them from
-model input.
-
-Fast-lane note: reaching for e2e on a one-line copy fix is overkill — unit
-tests + a curl are the narrowest test there. e2e earns its keep on flows
-(multi-step, auth, forms, checkout, mobile).
 
 ## Reference Files Index
 

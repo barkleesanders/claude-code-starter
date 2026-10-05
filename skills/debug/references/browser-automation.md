@@ -16,10 +16,10 @@ Chrome extension, curated subset) is the fallback when fcdp's bridge is down. Pe
 | **fcdp bridge down, or a second tab needs driving concurrently** | **`ccb`** (`~/tools/claude-browser/ccb`) |
 | **Page never reaches "network idle" / DOM re-renders mid-action** (MCP `navigate`/`evaluate_script` time out; `fill` says *"element no longer exists"*; perpetual spinner; ASP.NET WebForms / RentCafe / SecureCafe) | **`cdp-fill`** (raw CDP — see below) |
 | **Testing a fresh URL** (headless, no session needed) | agent-browser |
-| **Unauthenticated/WAF-gated fetch → clean markdown** | unbrowse (`unbrowse fetch <url>`) |
+| **Public page inspection / clean fetch** | `a logged-in browser CLI inspect/fetch` |
 | **Performance tracing** (Core Web Vitals, traces) | `fcdp trace`, or chrome-devtools-mcp |
 
-**Hard rails (all browser tools):** never bypass Cloudflare/CAPTCHA/bot-detection; never auto-fill **SSN / government-ID / payment / signature**; never auto-**submit** a form on the user's behalf — show content + get approval first. unbrowse spawns its OWN browser (hits Cloudflare on gated sites) — for an already-open, already-past-Cloudflare tab, use `fcdp`/`ccb` or `cdp-fill`, NOT unbrowse.
+**Hard rails (all browser tools):** never bypass Cloudflare/CAPTCHA/bot-detection; never auto-fill **SSN / government-ID / payment / signature**; never auto-**submit** a form on the user's behalf — show content + get approval first. For an already-open, already-past-Cloudflare tab, use `fcdp`/`ccb` or `cdp-fill` instead of starting an isolated browser.
 
 **fcdp connects to your actual running Chrome session** -- tabs already open, cookies intact, no re-login. Use it first when debugging or inspecting real pages.
 
@@ -48,7 +48,7 @@ cdp-fill eval  --match <url-substring> --expr "<js returning a string>"   # e.g.
 - It's `.mjs` (use `import`, not `require`). Probe first to get the real `name=` attributes (visual labels lie — e.g. a field labelled "Apartment Community" was actually `name=ManagementCompany` = "Landlord Email").
 - **Never** put SSN/ID/payment/signature through it; never auto-submit.
 
-Reference incident (2026-06-01): Mission Rock/Verde RentCafe leasing app blocked chrome-devtools MCP (eval/navigate timeout; `fill` stale-handle even back-to-back) and unbrowse (its own browser hit Cloudflare). `cdp-fill` filled + readback-verified the current-residence block in one shot. Full write-up: `~/tools/cdp-fill/README.md`, memory `reference_cdp_fill_tool.md`.
+Reference incident (2026-06-01): Mission Rock/Verde RentCafe blocked chrome-devtools MCP (eval/navigate timeout; `fill` stale-handle even back-to-back), while an isolated browser hit Cloudflare. `cdp-fill` filled + readback-verified the current-residence block in one shot. Full write-up: `~/tools/cdp-fill/README.md`, memory `reference_cdp_fill_tool.md`.
 
 ## fcdp (Live Chrome Session -- Preferred for Debugging)
 

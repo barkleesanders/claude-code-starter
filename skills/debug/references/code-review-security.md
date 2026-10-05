@@ -21,7 +21,7 @@ await db.query(query, [userId]);
 
 #### 1a. COMPREHENSIVE XSS AUDIT (MANDATORY — 10 VECTORS)
 
-**Run this audit on EVERY security-related task.** The 2026-03-21 incident proved that partial XSS scanning misses critical vectors. A first-pass Carmack audit caught 1 of 8 XSS issues; a second comprehensive pass found the remaining 7. This checklist ensures 100% coverage on the first pass.
+**Run this audit on EVERY security-related task.** The 2026-03-21 incident proved that partial XSS scanning misses critical vectors. A first-pass Code audit caught 1 of 8 XSS issues; a second comprehensive pass found the remaining 7. This checklist ensures 100% coverage on the first pass.
 
 **Detection Commands (run ALL 10):**
 
@@ -144,4 +144,4 @@ function escapeHtml(text: string): string {
 ```
 
 **Incident that drove this (2026-03-21):**
-First Carmack pass on your-app found only 1 XSS issue (JSON.stringify without `<` escaping in render-html.ts). Second comprehensive audit found 7 more: unescaped URL interpolation in HTML attributes (HIGH), incomplete JSON-LD escaping missing 4 of 5 required chars (HIGH), benefit.link href without javascript: URI blocking (MEDIUM), overly permissive structuredData type (LOW), missing backtick in escapeHtml (LOW). Total: 8 vulnerabilities, only 1 caught on first pass (12.5% detection rate). This checklist ensures 100% detection on the first pass.
+First Code pass on your-app found only 1 XSS issue (JSON.stringify without `<` escaping in render-html.ts). Second comprehensive audit found 7 more: unescaped URL interpolation in HTML attributes (HIGH), incomplete JSON-LD escaping missing 4 of 5 required chars (HIGH), benefit.link href without javascript: URI blocking (MEDIUM), overly permissive structuredData type (LOW), missing backtick in escapeHtml (LOW). Total: 8 vulnerabilities, only 1 caught on first pass (12.5% detection rate). This checklist ensures 100% detection on the first pass.

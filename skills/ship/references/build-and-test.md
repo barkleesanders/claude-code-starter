@@ -180,7 +180,7 @@ if warnings:
     print(f'\nWARNINGS:')
     for w in warnings:
         print(w)
-    print(f'\nFix playbook: ~/.claude/skills/carmack/references/lighthouse-optimization.md #6')
+    print(f'\nFix playbook: ~/.claude/skills/code/references/lighthouse-optimization.md #6')
     print(f'Pattern: lazy-load components that chain in the heavy dep.')
     print(f'Example: const AdminRoute = lazy(() => import("@/components/AdminRoute"))')
 else:

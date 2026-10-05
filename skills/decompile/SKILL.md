@@ -771,12 +771,12 @@ mitmproxy --mode regular@8080
 
 ---
 
-## Integration with /carmack
+## Integration with /code
 
-`/carmack` invokes this skill when its mode detection matches RE patterns:
+`/code` invokes this skill when its mode detection matches RE patterns:
 - "decompile that APK", "open this .so in Ghidra", "what's inside this firmware blob", "RE this browser extension to port it to a CLI"
-- carmack-mode-engineer **loads this SKILL.md** when the task involves any artifact in the routing table.
-- After RE phase completes, carmack returns to its normal flow (closed-loop verification, fix-all-issues rule, no-suppression rule). RE outputs (decompiled source, extracted strings, BLE UUIDs, etc.) feed the engineering work.
+- code-mode-engineer **loads this SKILL.md** when the task involves any artifact in the routing table.
+- After RE phase completes, code returns to its normal flow (closed-loop verification, fix-all-issues rule, no-suppression rule). RE outputs (decompiled source, extracted strings, BLE UUIDs, etc.) feed the engineering work.
 
 **Reference incident (Whoop RE, 2026-05-28):** /goal kicked off "find software on a Whoop watch + decompile + probe my watch". The skill correctly routed to `jadx` (not Ghidra) because Whoop's app is Java/Kotlin, not native. Result in ~22 min: 3 GATT service families found in `~/re/whoop/jadx-out/sources/zo0/p.java`, including a previously-undocumented Whoop 5.0/MG family (`11500001-6215-11ee-8c99-0242ac120002`). This skill rename + reorg captures the lesson: **default to the routing table, not to Ghidra.** See `~/Downloads/whoop-re-findings-2026-05-28.html` for the worked example.
 
@@ -800,7 +800,7 @@ When reporting RE findings, include:
   **But** *reverse-engineering a site's private API into a client or MCP server* **is in scope** — `fcdp`/`fhar` first, a logged-in browser CLI when inspect/fetch/replay fits, then [Session capture](#session-capture--typed-client--mcp-server).
 - **Pentesting / attacking a site you don't control** → out of scope. `fhar` / `fcdp` / a logged-in browser CLI drive *your own* logged-in session against services you already have an account on, for interoperability.
 - **Network captures from a non-mobile app** → `tshark`/`dumpcap` (installed, Wireshark 4.6.7 CLI — GUI is the separate `wireshark-app` cask), or `mitmproxy` for HTTP(S).
-- **Source-code review of available source** → ripgrep + `/carmack` review mode.
+- **Source-code review of available source** → ripgrep + `/code` review mode.
 
 ---
 
@@ -813,7 +813,7 @@ When reporting RE findings, include:
 - `references/android-re.md` — Android deep-dive: **mandatory dynamic-capture playbook** (emulator + mitmproxy CA + frida unpinning + btsnoop), APK-acquisition + ABI gotchas
 - `scripts/decompile_all.py` — Ghidra post-script: dump all decompiled functions
 - `scripts/dump_strings_imports.py` — Ghidra post-script: strings + imports + exports → JSON
-- `/carmack` skill — calls into this skill for RE tasks; for a website use `fcdp`/`fhar` first, then a logged-in browser CLI if that fits
+- `/code` skill — calls into this skill for RE tasks; for a website use `fcdp`/`fhar` first, then a logged-in browser CLI if that fits
 - `~/.beads/AGENTS.md` — task tracking conventions (use `bd` for multi-session RE projects)
 
 

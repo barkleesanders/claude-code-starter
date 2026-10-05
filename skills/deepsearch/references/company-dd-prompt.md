@@ -1,6 +1,6 @@
 # Company Due-Diligence Prompt (`company-dd`)
 
-**What this is:** a reusable investigation prompt that drives `/deepsearch` (multi-provider research + adversarial verification) and `/gov` (authority mapping + exact reporting URLs), escalating to `/chrome` (fcdp) for bot-walled sources. Built 2026-07-10 from the Roundtable Ventures investigation; grounded in how professionals do it: GIJN's corporate-research methodology, the ILPA DDQ domains LPs use on fund managers, ACFE fraud red-flag framing, and the FinCEN CDD beneficial-ownership standard (identify 25%+ owners + one control person).
+**What this is:** a reusable investigation prompt that drives `/deepsearch` (multi-provider research + adversarial verification) and `/doge-service` (authority mapping + exact reporting URLs), escalating to `/chrome` (fcdp) for bot-walled sources. Built 2026-07-10 from the Roundtable Ventures investigation; grounded in how professionals do it: GIJN's corporate-research methodology, the ILPA DDQ domains LPs use on fund managers, ACFE fraud red-flag framing, and the FinCEN CDD beneficial-ownership standard (identify 25%+ owners + one control person).
 
 **How to invoke:** `/deepsearch run company-dd on <company name or URL>` — or paste the prompt block below with TARGET filled in. Works on VC firms, startups, agencies, "investment clubs," coaching outfits — any company whose legitimacy/claims need checking.
 
@@ -8,7 +8,7 @@
 
 ## THE PROMPT
 
-> Investigate **TARGET = <company name + domain>** with full due-diligence rigor. Load `/deepsearch` and `/gov` methods. Run every track below; classify every finding as **CONFIRMED (≥2 independent sources)** / **SELF-REPORTED** / **SINGLE-SOURCED** / **CONTRADICTED** / **UNVERIFIABLE**. Never promote self-reported marketing to fact. Absence of a filing is not illegal per se — the finding is the *gap between marketing claims and the public record*. Deliver an HTML report (verdict grid → timeline → claims-vs-record → people table → red flags/mitigants → reporting authority map → sources table with confidence + retrieved dates). curl-verify every report URL (a WAF 403 with a real-browser load is OK — note it).
+> Investigate **TARGET = <company name + domain>** with full due-diligence rigor. Load `/deepsearch` and `/doge-service` methods. Run every track below; classify every finding as **CONFIRMED (≥2 independent sources)** / **SELF-REPORTED** / **SINGLE-SOURCED** / **CONTRADICTED** / **UNVERIFIABLE**. Never promote self-reported marketing to fact. Absence of a filing is not illegal per se — the finding is the *gap between marketing claims and the public record*. Deliver an HTML report (verdict grid → timeline → claims-vs-record → people table → red flags/mitigants → reporting authority map → sources table with confidence + retrieved dates). curl-verify every report URL (a WAF 403 with a real-browser load is OK — note it).
 
 ### Track 1 — Identity & age (cheap, do first)
 - `whois <domain>` — creation date, registrant org/state, registrar.
@@ -57,7 +57,7 @@ For each named portfolio company/customer/partner:
 - If deeper ownership tracing is needed: OpenCorporates, OCCRP Aleph (aleph.occrp.org), ICIJ Offshore Leaks (offshoreleaks.icij.org), Open Ownership register (per GIJN guide).
 
 ### Track 9 — Synthesis & delivery (deepsearch Phase 5–6)
-- Verdict grid (age / raised money? / legal status), verified timeline, claims-vs-record two-column, people track-record table, red flags vs mitigants, and a **reporting authority map** (gov style — exact URLs, verified live): SEC TCR (sec.gov/tcr), state regulator complaint portal (CA: dfpi.ca.gov/submit-a-complaint/), FTC (reportfraud.ftc.gov), platform reporting.
+- Verdict grid (age / raised money? / legal status), verified timeline, claims-vs-record two-column, people track-record table, red flags vs mitigants, and a **reporting authority map** (doge-service style — exact URLs, verified live): SEC TCR (sec.gov/tcr), state regulator complaint portal (CA: dfpi.ca.gov/submit-a-complaint/), FTC (reportfraud.ftc.gov), platform reporting.
 - Sources table: URL, what it established, confidence class, retrieved date. State what was NOT checked (county FBN, paywalled DBs) — calibrated uncertainty over silent gaps.
 
 ### Escalation rules (bot-walls)

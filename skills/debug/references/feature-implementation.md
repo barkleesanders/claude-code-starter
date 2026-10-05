@@ -296,7 +296,7 @@ bash "$L" start \
   --title "ralph: <feature>" \
   --prompt "Ralph: implement each highest-priority userStory in prd.json with passes:false — ONE per iteration — running the project quality checks after each, committing only when they pass." \
   --verify "<project quality check — e.g. npm run typecheck && npm test, or pytest -q, or cargo test>" \
-  --stop "max-iter=<#stories + 3>,no-progress=2,target=bash ~/.claude/skills/carmack/tools/ralph-prd-status.sh"
+  --stop "max-iter=<#stories + 3>,no-progress=2,target=bash ~/.claude/skills/code/tools/ralph-prd-status.sh"
 ```
 
 - `--verify` = the SAME quality checks Step 5 already runs (typecheck/lint/test). Exit 0 ⇒ this story holds. Use the real project command; only omit `--verify` (self-graded) if the repo genuinely has no check — and say so to the user.
@@ -408,6 +408,15 @@ When building ANY feature where admin writes data that users read, complete this
 - [ ] Data-driven indicators (progress bar, counts) and navigation indicators (Step X of Y) use the same source of truth
 
 If ANY checkbox is unchecked, the story is not done.
+
+**4b. Municipal / Experience Cloud catalog (MANDATORY when building a 311/civic submitter)**
+
+"File every listed type" is not a plan. Load Pattern #36 (`~/.claude/skills/debug/references/error-handling-patterns.md`) **before** writing catalog JSON or a submit envelope.
+
+- Persist official form models. A SUCCESS response with empty `sId` / `sCaseType` / questions is `captureFailure` — never dummy `modelFlags`.
+- Classify on field API names (`sFieldtoUpdate`), not question text. Refuse naming the official field (`Permit_Number__c`), not a class stub.
+- Never invent session-encrypted IDs; remint at submit. Unwrap toast/`objCaseConfigWrapper` before sending.
+- Proof = two live files of one pin-only type, then `/ship`. Not 77 tickets. `/code` does not `wrangler deploy`.
 
 **5. Demand Elegance (Balanced)**
 - For non-trivial changes: pause and ask "is there a more elegant way?"

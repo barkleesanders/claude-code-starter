@@ -14,7 +14,7 @@ description: >
 
 # /ios — Master iOS Skill (develop · debug · review · test · store assets)
 
-**Division of labor (mirrors /carmack ↔ /ship):** everything up to "put it in
+**Division of labor (mirrors /code ↔ /ship):** everything up to "put it in
 users' hands" lives HERE. Production release — archive, sign, TestFlight,
 App Store submit, OTA publish — is **/ship**'s iOS phase
 (`~/.claude/skills/ship/references/ios-release.md`). When the user says
@@ -121,7 +121,7 @@ Testing coverage.
 | Perf/jank/launch time | `axiom:performance-profiler` (xcprof); SwiftUI: `axiom:swiftui-performance-analyzer` |
 | Memory/leaks | `axiom:memory-auditor` |
 | Webview JS errors (Capacitor) | runtime log from build_run_sim; temp console probe in native bootstrap → rebuild → read log → REMOVE probe |
-| Web-layer bug in Capacitor app | /debug + /carmack — it's web code |
+| Web-layer bug in Capacitor app | /debug + /code — it's web code |
 | Any framework question (HealthKit, StoreKit, MapKit, …) | matching `all-ios-skills:*` / `axiom:axiom-*` skill |
 
 ## Review & compliance (development-time)

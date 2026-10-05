@@ -268,7 +268,7 @@ input.dispatchEvent(new Event('change', {bubbles:true}));
 Or just use Kuri/CDP `click` (real CDP click events bubble correctly through React). Confirm the change persisted by re-reading the public env config endpoint, NOT by re-snapshotting the dashboard.
 
 ### 12i. Hardware-bound Google sessions can't be cookie-extracted
-Modern Chrome stores Google session cookies (SID, HSID, `__Secure-1PSID`, etc.) bound to the OS keychain via DBSC (Device-Bound Session Credentials). Tools like unbrowse that read Chrome's SQLite cookie DB get the account-list cookies but not the auth tokens — every request lands on the passkey challenge. `gcloud` works because it has its own OAuth refresh token cached at `~/.config/gcloud/`, separate from Chrome.
+Modern Chrome stores Google session cookies (SID, HSID, `__Secure-1PSID`, etc.) bound to the OS keychain via DBSC (Device-Bound Session Credentials). Standalone tools that read Chrome's SQLite cookie DB get the account-list cookies but not the auth tokens — every request lands on the passkey challenge. `gcloud` works because it has its own OAuth refresh token cached at `~/.config/gcloud/`, separate from Chrome.
 
 To drive Google Cloud Console (or any Google product) headlessly, the realistic options are:
 1. CDP-attach to the user's existing logged-in Chrome — but Chrome refuses CDP on the default user-data-dir for security ("DevTools remote debugging requires a non-default data directory")

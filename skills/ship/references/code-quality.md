@@ -321,10 +321,10 @@ Don't test for the error strings alone — a broken local install exits 1 with a
 
 ```bash
 # Detector run (rg-based, zero deps). Exit 1 when any hit remains = loop not finished.
-~/.claude/skills/carmack/tools/detect-ts-slop.sh --threshold 0 src/ 2>&1
+~/.claude/skills/code/tools/detect-ts-slop.sh --threshold 0 src/ 2>&1
 
 # Or scope to this release's diff:
-# ~/.claude/skills/carmack/tools/detect-ts-slop.sh --threshold 0 --diff origin/main
+# ~/.claude/skills/code/tools/detect-ts-slop.sh --threshold 0 --diff origin/main
 ```
 
 Run the identical loop: fix every hit by adding evidence, re-run detector + typecheck, repeat until the detector exits 0 with **Σ 0 hits**; 5 failed attempts on one hit → STOP and surface. The detector's three patterns (generic structural guards, `as unknown as T` launder-casts, `(x as any).field` reach-casts) essentially never have a legitimate keep — in the rare case one genuinely is the right tool, the "fix" is an inline justification comment at the site plus a note in the ship report, never silent skipping. For actively-developed TS repos, also offer the `/install-anti-slop` skill so future ships get the fuller 18-rule Path A gate.

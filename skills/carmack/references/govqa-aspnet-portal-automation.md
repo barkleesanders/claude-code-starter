@@ -76,7 +76,7 @@ redirect + presence of the **"Logged in as <email>"** banner / authenticated app
 class as the third-party-signal-fixtures rule: capture a real authed vs. dead response and anchor
 on a distinguishing feature, not a substring present in both.)
 
-## 7. Government-accountability framing (gov overlap)
+## 7. Government-accountability framing (doge-service overlap)
 SF311 marking a case "Transferred - Caltrans" with **no Caltrans tracking number** is the
 accountability gap → file a **direct** Caltrans CSR for an independent ticket, then a **CPRA** for
 the paper trail. Post-2023 CPRA cites: `Gov. Code §7920.000 et seq.`, **§7922.530** (records
