@@ -152,3 +152,15 @@ To use those, work **inside** `~/ai-job-search` so the repo's `CLAUDE.md` profil
 - Never invent job listings, companies, salaries, or deadlines — every fact comes from CLI JSON output. If gated/empty, report that, don't fabricate.
 - Keep Danish characters intact (the CLIs decode HTML entities; don't re-mangle æ/ø/å).
 - Don't bump `@bunli/core` past 0.7.0 or remove the per-CLI `tsconfig.json` (typecheck OOMs without it).
+
+## jobs.now PERM ads — apply mechanics (verified 2026-10-05)
+
+jobs.now aggregates employer H1B PERM labor-market-test ads. Two facts that change how you automate it:
+
+1. **There is no auto-apply on jobs.now.** The only application-related control is a "Log Application" button — it only saves the posting to the users personal log and **submits nothing to the employer**. Never treat it as an apply path.
+## jobs.now PERM ads - apply mechanics (verified 2026-10-05)
+
+jobs.now aggregates employer H1B PERM labor-market-test ads. Two facts that change how you automate it:
+
+1. There is no auto-apply on jobs.now. The only application-related control is a "Log Application" button - it only saves the posting to the user's personal log and submits nothing to the employer. Never treat it as an apply path.
+2. Each ad body's "To apply" / "Application Instructions" paragraph names the employer's own channel plus a ref code. Common forms: "send resume to <email>, reference job #<REF>", "visit <site> and search for Job ID <REF>", or a postal mailing address. To apply programmatically: parse that paragraph for the channel (email, site, or mail), the target address/URL, and the ref code - then drive the employer's channel directly. The REF code in the ad title (e.g. [REF A23009]) is the employer's real job ID for that channel.
