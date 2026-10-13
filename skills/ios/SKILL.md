@@ -52,17 +52,6 @@ skipped 19-25); newer may exist — check, don't assume.
 Full routing table lives in the `/design` skill's Cross-Mode Rules; the HIG
 itself is `/design` → `references/apple-hig.md` (Phase 0.5, BINDING here).
 
-**SwiftUI agent guidance (2026-10-01, twostraws/swiftui-agent-skill):** for
-native SwiftUI work, run Paul Hudson's open-source agent skill (`npx skills
-add https://github.com/twostraws/swiftui-agent-skill --skill swiftui-pro`)
-before declaring the code done — it reviews AI-written SwiftUI for deprecated
-API usage (e.g. `foregroundColor()`, `Text` concatenation with `+`, stray
-`ObservableObject`), performance anti-patterns (view work in initializers or
-`body`, view breakup for the `@Observable` macro), accessibility (labeled
-controls, touch-target sizes, dynamic type), and Swift hygiene. Sibling repo
-`twostraws/swift-agent-skills` adds SwiftData, Swift Concurrency, and Swift
-Testing coverage.
-
 ## Dev loop (xcodebuildmcp — preferred over raw xcodebuild)
 
 1. `session_show_defaults` once per session; set projectPath/scheme/simulatorId/

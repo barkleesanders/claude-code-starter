@@ -4,7 +4,7 @@
 # present in shared/tool-error-recovery.md), group by signature, and write
 # a human-readable review file at ~/.claude/tool-errors-pending.md.
 #
-# When /carmack is invoked and that file exists non-empty, Claude should
+# When /code is invoked and that file exists non-empty, Claude should
 # offer to classify the pending patterns and append them to the catalog.
 #
 # Usage:
@@ -114,11 +114,11 @@ lines = [
     "",
     f"Scan of `{log_path}` found {len(novel)} signature(s) not yet documented in `{catalog_path}`.",
     "",
-    "When /carmack loads, review each entry below and either:",
+    "When /code loads, review each entry below and either:",
     "- Append a new numbered section to tool-error-recovery.md (What it means / How to recover / Prevention)",
     "- If already covered under a different wording, just note it and move on",
     "",
-    "After classifying, run `~/.claude/skills/carmack/tools/scan-tool-errors.sh --clear` to archive the log.",
+    "After classifying, run `~/.claude/skills/code/tools/scan-tool-errors.sh --clear` to archive the log.",
     "",
     "---",
     "",

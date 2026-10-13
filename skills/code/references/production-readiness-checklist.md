@@ -322,7 +322,7 @@ npm audit --omit=dev
 
 ```bash
 # Quick report mode — emit [PASS]/[FAIL] per item:
-bash ~/.claude/skills/carmack/scripts/production-readiness.sh   # if present
+bash ~/.claude/skills/code/scripts/production-readiness.sh   # if present
 # Otherwise walk sections S1–S9, D1–D6, DP1–DP6, C1–C5 in order.
 # Track failures, fix highest-severity first (S > D > DP > C).
 ```

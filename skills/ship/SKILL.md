@@ -343,7 +343,6 @@ semantic review, schema, provider, and post-deploy browser gates still apply.
 | 4.08 | Workers-Cache post-deploy verification (when the `cache` block was enabled/modified) | Staged enable; t+15/45/90s multi-route-class monitoring (<60s checks are NOT evidence — propagation >30s); semantic Cache-Control per class + HSTS present; sitewide-3xx tripwire → auto-disable + `wrangler tail` scheme probe |
 | 4.1-agents | **Agent-surface live check (when the repo serves `/llms.txt`, `/*.md` alternates, `/openapi.json`, `/developers`, or an `/mcp*` Worker)** | Run every curl in `~/.claude/skills/shared/agent-readiness-surfaces.md` §"/ship Phase 4.1 additions", cache-busted: each surface 200 with the right content-type; `Accept: text/markdown` → markdown + `x-markdown-tokens` + `vary: Accept` while a browser Accept still gets HTML; `/admin.md` `/nope.md` 404; **BIC controls**: `Python-urllib/3.12` UA → 200 on agent paths and still 403 on `/`; `POST /mcp tools/list` with `accept: application/json, text/event-stream`; `GET /mcp` + bogus Bearer → 200 docs (not the SPA `<title>`). If the diff added the BIC recipe as "NOT APPLIED" docs, /ship applies the zone config rule (snapshot GET body first, idempotent by description) and flips the doc status in the same run. Reference: AIVA 2026-09-19. |
 | 4.09 | Worker surface exposure + AUTO-HEAL (CF API probe: `tools/worker-surface-check.sh --apply`, runs EVERY ship — the surface regresses on each `wrangler deploy`) | ⚠️ The script reads the ROOT wrangler config only (measured 2026-09-19: it reported one worker for AIVA while `workers/benefits-finder` + `workers/muse-connector` also deploy). For every `workers/*/wrangler.jsonc` sub-worker, probe by NAME: `GET /accounts/{acct}/workers/scripts/<name>/subdomain` must show `enabled:false, previews_enabled:false`; POST it closed if not. | previews_enabled=false everywhere; workers.dev disabled on custom-domain workers; re-probe confirms closed + canonical URL 200 |
-| 4.10 | **Post-deploy search-indexing gate — EVERY ship of a public web property (added 2026-09-28)** | `sitemap.xml` + `robots.txt` + IndexNow key file live and correct; sitemap submitted to GSC; changed URLs submitted to IndexNow; new domains get a tracked GSC-verification action item. Redirect landers explicitly classified and skipped. |
 | 4.09b | **Orphan-worker CONTENT check (#41) — ACCOUNT-WIDE, runs EVERY ship, NEVER conditioned on the diff** | `python3 ~/.claude/skills/shared/tools/orphan-worker-content-check.py` — exit 0 ok / 1 flagged / 2 UNMEASURED (never a pass) / 3 no creds. Advisory: REPORT the finding, never delete a worker (that is outward + irreversible — Phase 1.56a). **Why this is a separate phase from 4.09, not a bigger 4.09:** 4.09 asks *"is THIS worker's twin closed?"* and is repo-scoped, so it is structurally blind to a worker that belongs to **no repo** — the exact shape that hid for nine months. This phase asks the account-level question instead: *does any public `*.workers.dev` twin claim (via og:url/canonical) to BE a hostname that a DIFFERENT worker owns?* **Key on the claimed host, never on the title** — a stale copy is stale precisely because its title drifted, so title-matching is self-defeating (measured: copy said `AIVA Claims Assistant`, live site said `Donor-Funded VA Claim Help For Veterans \| AIVA`); body-text similarity fails too (a pre-SSR SPA shell has ~21 chars of visible text, scoring 0.0 against an SSR site — indistinguishable from "unrelated"). Also do NOT screen on `modified_on`: an account-wide *settings* sweep bumps it, so the stray read `2026-07-07` while its CODE was from `2025-12-05`. Reference incident 2026-08-31 (example): worker `aiva-claims` publicly served a 9-month-old copy of the AIVA site still advertising the RETIRED outcome claim *"up to a 100% disability rating in as little as 80 days — up to 43% faster"* after the live site had changed to *"Processing times vary"*. Every gate passed and each was right to: it is named in no wrangler config, the real worker's own twin correctly 404s, and the two account-wide tools (`cf-account-harden.py`, `cf-security-insights.sh`) check POSTURE (DNSSEC/WAF/CAA/leaked-creds/security.txt/preview-lock) and had never once fetched what a worker SERVES. Measured surface at the time: **53 workers, 25 with a public twin, 1 flagged.** Test: `python3 ~/.claude/skills/shared/tools/test_orphan_worker_content_check.py` (real captured fixtures; negative-control verified — reverting the matcher to og:title turns 4 assertions red). |
 | 4.05 | Site security defaults (live URL) | All baseline items pass — security.txt, **sitemap.xml (must exist if robots.txt advertises it)**, HSTS, CSP, X-*, COOP/CORP. Cloudflare API items (TLS min, DNSSEC, CAA) auto-fix when creds available. |
 | 4.05g | **security.txt alias + site-matching mailbox (EVERY public HTML site, every ship)** | Run `~/.claude/skills/ship/tools/security-txt-check.sh <repo> --url https://<apex> --apply`. BLOCKING. (1) `/.well-known/security.txt` 200 with `Contact: mailto:security@<apex-of-THIS-site>` — never a generic inbox on another zone (`example.org`, gmail, a sibling product). `www.` is stripped so `www.example.com` advertises `security@example.com`. (2) `/security.txt` **301/302** to `/.well-known/security.txt` — a 200-on-well-known + 404-on-the-short-path is the 2026-09-01 improvecortland miss (RFC 9116 documents both). (3) Cloudflare Email Routing: enable MX/SPF if off, then an enabled rule `security@<apex>` → `you@example.com` (destination already verified on this account). `--apply` is idempotent. Skip only for non-HTML API/CLI workers (no custom_domain). |
@@ -380,52 +379,6 @@ for STALE in pnpm-lock.yaml package-lock.json bun.lock yarn.lock; do
   fi
 done
 ```
-
-## Phase 4.10 — Post-Deploy Search-Indexing Gate (detail)
-
-This is the standing indexing procedure, added 2026-09-28 after the waves that
-brought all 22 Cloudflare sites to verified, submitted, discoverable state.
-Every `/ship` of a public web property must leave that property discoverable
-and submitted — indexing is part of the deploy, not a follow-up project.
-
-**Step 1 — Classify the domain FIRST, with no-follow probes.** Probe status +
-`Location` headers WITHOUT following redirects (2026-09-28 rule: checks that
-followed 301s audited eleven redirect landers as live SPAs with sitemaps).
-If every path (`/`, `/robots.txt`, `/sitemap.xml`, a deep path) returns a bare
-301/302 to another domain, it is a redirect lander: it gets NO indexing
-artifacts — no sitemap, no robots indexing lines, no GSC property, no IndexNow
-— and the rest of this phase is skipped explicitly (recorded, not silent).
-
-**Step 2 — Live-artifact verification (BLOCK on failure).** Against the
-deployed production domain:
-- `GET /sitemap.xml` → 200, valid XML, every `<loc>` absolute and serving
-  200, touched routes' `lastmod` = today (pairs with Phase 1.4-lastmod).
-- `GET /robots.txt` → 200, contains
-  `Sitemap: https://<domain>/sitemap.xml`, no crawl-wide `Disallow: /`.
-  An intentionally-private site must say so explicitly instead of failing
-  this check quietly.
-- `GET /<key>.txt` → 200, body byte-exact equals the domain's registered
-  IndexNow key. NEVER rotate the key on deploy. Per-domain keys are
-  registered in the indexing goal's evidence table
-  (`~/workspace/goals/index-all-22-cloudflare-sites-correctly/hidden_files/evidence-table.md`).
-
-**Step 3 — Submissions.** Run from the Mac mini, where `gog` and the
-Cloudflare global key live:
-- **Google Search Console:** the Domain property must exist and be verified.
-  If not, create it and complete DNS-TXT verification via the CF API (Mini
-  `~/.cloudflared/cf-global-api-key.json`), confirming the TXT via 8.8.8.8
-  before the verify click. If a leg needs the user (browser session), record
-  it as a tracked action item and continue — never fake it. Then submit the
-  sitemap via the Search Console API. A transient "Couldn't fetch" on a
-  live-200 sitemap file is Google's retry queue, not a broken site.
-- **IndexNow:** POST the changed URL batch to
-  `https://api.indexnow.org/indexnow.json` with the domain's key
-  (`keyLocation` = the domain). HTTP 200/202 = accepted; acceptance is not
-  proof of indexing.
-
-**Step 4 — Evidence.** Record domain, sitemap status, GSC property state, and
-IndexNow response in the ship's bead. When the 22-site indexing goal is the
-context, update its evidence table too.
 
 ## AIVA / Cloudflare Worker Hard Gates
 
@@ -759,7 +712,7 @@ catch this exact stop. It was written after the 2026-08-07 incident and it
 names>: SKIP`. `/ship` is `disable-model-invocation: true`, so the model cannot
 Skill-invoke it and a user-typed `/ship` arrives as a `<command-name>` slash
 expansion — a shape that gate could not see. Verified on the 2026-08-24
-transcript: Skill names were `['code','security-review']` while
+transcript: Skill names were `['carmack','security-review']` while
 `<command-name>` held `/ship`. So BOTH layers were dark at once: the prose said
 "don't stop" and the guard silently skipped. Fixed by matching either
 invocation path (and reading `--audit`/`--staging-only` from `<command-args>`
@@ -847,7 +800,7 @@ Uses `systematic-debugging`:
 - Rate limit protector — public endpoints missing rate limiting
 
 ### Tier 3 — Deep Analysis (`--audit tier3`)
-Uses `code-mode-engineer`:
+Uses `carmack-mode-engineer`:
 - Code archaeology — "old/legacy" code that's actually critical
 - Critical systems guard — unprotected auth/payment/data-deletion paths
 - Build reproduction harnesses for complex issues

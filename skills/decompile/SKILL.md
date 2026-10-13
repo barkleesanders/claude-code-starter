@@ -775,8 +775,8 @@ mitmproxy --mode regular@8080
 
 `/code` invokes this skill when its mode detection matches RE patterns:
 - "decompile that APK", "open this .so in Ghidra", "what's inside this firmware blob", "RE this browser extension to port it to a CLI"
-- code-mode-engineer **loads this SKILL.md** when the task involves any artifact in the routing table.
-- After RE phase completes, code returns to its normal flow (closed-loop verification, fix-all-issues rule, no-suppression rule). RE outputs (decompiled source, extracted strings, BLE UUIDs, etc.) feed the engineering work.
+- carmack-mode-engineer **loads this SKILL.md** when the task involves any artifact in the routing table.
+- After RE phase completes, carmack returns to its normal flow (closed-loop verification, fix-all-issues rule, no-suppression rule). RE outputs (decompiled source, extracted strings, BLE UUIDs, etc.) feed the engineering work.
 
 **Reference incident (Whoop RE, 2026-05-28):** /goal kicked off "find software on a Whoop watch + decompile + probe my watch". The skill correctly routed to `jadx` (not Ghidra) because Whoop's app is Java/Kotlin, not native. Result in ~22 min: 3 GATT service families found in `~/re/whoop/jadx-out/sources/zo0/p.java`, including a previously-undocumented Whoop 5.0/MG family (`11500001-6215-11ee-8c99-0242ac120002`). This skill rename + reorg captures the lesson: **default to the routing table, not to Ghidra.** See `~/Downloads/whoop-re-findings-2026-05-28.html` for the worked example.
 

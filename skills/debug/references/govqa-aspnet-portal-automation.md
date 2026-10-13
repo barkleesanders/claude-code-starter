@@ -88,7 +88,7 @@ non-interactive-PATH trap in `blind-spots.md`. Short version:
 - **Pin the interpreter absolute path** (`/opt/homebrew/bin/node`) in the shim + launchd plist —
   `ssh host 'cmd'` / `bash -lc` / launchd run with a **bare PATH** (`which node` false-negatives).
 - Split work by the cron-routing rule: deterministic ping (keepalive) → **launchd** LaunchAgent;
-  interpret-and-notify (status tracker) → **`hermes cron create --no-agent --deliver origin`**
+  interpret-and-notify (status tracker) → **`hermes cron create --monitor-script … --deliver telegram`** (agent mode; do not pass `--no-agent`)
   (jobs in `~/.hermes/cron/jobs.json`, scripts in `~/.hermes/scripts/`, gateway = `ai.hermes.gateway`).
 - Verify on the runner via the **real invocation path** (`PATH=$HOME/.local/bin:/opt/homebrew/bin:$PATH hermes cron list`,
   `launchctl list | grep <job>`, run the actual tracker script), not an interactive shell.

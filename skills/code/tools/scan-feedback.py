@@ -53,7 +53,7 @@ def main() -> int:
         "",
         f"{len(items)} candidate(s) from `{log}`.",
         "",
-        "When /carmack loads, review each entry and either:",
+        "When /code loads, review each entry and either:",
         "- Save as a new memory (feedback type) via `bd remember \"...\"` or a memory file",
         "- Skip if it was a one-off, out-of-scope, or already captured",
         "",

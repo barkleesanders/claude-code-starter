@@ -356,7 +356,7 @@ done
 | RUSTSEC vulnerability | `cargo audit`, update crate or add exception with rationale |
 
 ### Integration
-- This gate runs after EVERY `git push` during a `/carmack` session
+- This gate runs after EVERY `git push` during a `/code` session
 - Applies to feature implementation, bug fixes, and PR submissions
 - Do NOT consider the task complete until all CI checks are green
 - After 3 failed attempts, stop and report the persistent failure to the user

@@ -21,7 +21,7 @@ You are a SUBAGENT. You do **NOT** deploy, change production secrets, or invoke 
 - force-push to any shared branch
 - **any push/merge to `main` on a repo where that push AUTO-DEPLOYS** — that is a deploy wearing a merge's clothes, and it is the prohibited action, not the merge itself
 
-**Merging to `main` is allowed, gated on ONE check.** Run Auto-Deploy Detection first (the `/carmack` skill's section — `origin/main` GH workflows, the Cloudflare Workers-Builds/Pages API, `.vercel`/`netlify.toml`). No auto-deploy detected -> rebase onto current `origin/main` and merge. Auto-deploy detected, OR you cannot rule it out -> do NOT merge: push the feature branch, name the mechanism you found, and hand it back. **Never** treat "probably fine" as a detection result.
+**Merging to `main` is allowed, gated on ONE check.** Run Auto-Deploy Detection first (the `/code` skill's section — `origin/main` GH workflows, the Cloudflare Workers-Builds/Pages API, `.vercel`/`netlify.toml`). No auto-deploy detected -> rebase onto current `origin/main` and merge. Auto-deploy detected, OR you cannot rule it out -> do NOT merge: push the feature branch, name the mechanism you found, and hand it back. **Never** treat "probably fine" as a detection result.
 
 **When your assigned task is built, tested, and committed: STOP.** Return a report to the parent and state it is ready for the **user** to run `/ship`. Deploying and production-secret changes are performed by the USER in the main session — never by you.
 

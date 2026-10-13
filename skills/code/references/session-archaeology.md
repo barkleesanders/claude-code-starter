@@ -7,7 +7,7 @@ Patterns learned from tasks where I wasted tool calls discovering things that sh
 When editing a JSON config owned by a running service, do NOT hand-roll `python3 -c` heredocs. Use the helper:
 
 ```bash
-~/.claude/skills/carmack/tools/json-patch.sh <config-path> '<jq-expression>' [--validate-cmd "<cmd>"] [--restart "<svc>"]
+~/.claude/skills/code/tools/json-patch.sh <config-path> '<jq-expression>' [--validate-cmd "<cmd>"] [--restart "<svc>"]
 ```
 
 It auto-backs up to `<path>.bak-<timestamp>`, applies the patch via `jq`, validates JSON, optionally runs a schema-validate command, optionally restarts a systemd service, and auto-rolls back if validation fails.

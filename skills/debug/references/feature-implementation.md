@@ -409,15 +409,6 @@ When building ANY feature where admin writes data that users read, complete this
 
 If ANY checkbox is unchecked, the story is not done.
 
-**4b. Municipal / Experience Cloud catalog (MANDATORY when building a 311/civic submitter)**
-
-"File every listed type" is not a plan. Load Pattern #36 (`~/.claude/skills/debug/references/error-handling-patterns.md`) **before** writing catalog JSON or a submit envelope.
-
-- Persist official form models. A SUCCESS response with empty `sId` / `sCaseType` / questions is `captureFailure` — never dummy `modelFlags`.
-- Classify on field API names (`sFieldtoUpdate`), not question text. Refuse naming the official field (`Permit_Number__c`), not a class stub.
-- Never invent session-encrypted IDs; remint at submit. Unwrap toast/`objCaseConfigWrapper` before sending.
-- Proof = two live files of one pin-only type, then `/ship`. Not 77 tickets. `/code` does not `wrangler deploy`.
-
 **5. Demand Elegance (Balanced)**
 - For non-trivial changes: pause and ask "is there a more elegant way?"
 - If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"

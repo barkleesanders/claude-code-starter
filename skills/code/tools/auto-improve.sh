@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Unified self-improvement runner. Invoked at the start of /carmack.
+# Unified self-improvement runner. Invoked at the start of /code.
 # Runs all scanners, surfaces any pending reviews to stdout so Claude
 # can see them and act. Exit is always 0.
 #

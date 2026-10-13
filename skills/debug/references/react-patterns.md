@@ -174,6 +174,7 @@ grep -rn "document.documentElement.style" --include="*.tsx" src/react-app/ | gre
 - **Quick Detection**: `grep -rn "onClick.*async" --include="*.tsx" src/ | grep -v "disabled="`
 - **Fix**: Add `isLoading` state, `disabled={isLoading}`, spinner, try/finally reset
 - **Incident (2026-03-15)**: Dashboard "Complete Step" buttons had no disabled state during async
+- **Persist/queue/filing is a stronger class.** Disable-while-await + `finally` re-enable is **not** enough when a second tap must not file until explicit edit/resubmit. Load `error-handling-patterns.md` Pattern #42.
 
 ---
 
