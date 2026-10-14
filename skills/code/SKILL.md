@@ -266,6 +266,49 @@ All reference files are in `~/.claude/skills/code/references/`.
 
 ---
 
+## Playbooks — verbatim step lists by task shape (added 2026-10-13, pstack derivation)
+
+Mode Detection (above) routes you to the *knowledge* for a task. A playbook is the *sequence*: when a task starts, pick the playbook matching its shape and copy its steps VERBATIM into the todo/plan, then work the steps. Steps cite the existing gates by name — a playbook never invents a new procedure, it orders the ones this skill already owns. For multi-milestone work the playbook runs inside the `/exec-plan` sprint contract, not instead of it.
+
+**Bug fix**
+1. Reproduce first: name the correct-vs-broken final state in advance; observe the broken state twice with a reset between.
+2. Run the bug-fix preflight (existing-fix check → regression history via `git log -S`/`--follow`) BEFORE forming hypotheses.
+3. Tier every root-cause claim (Direct / Supported / Inferred / Speculative) with its citation adjacent.
+4. Fix the call-site CLASS, not the instance you were looking at; minimal diff.
+5. Add the regression test that fails on the old code (`/test-audit` rules); induce any triggered path and watch it fire.
+6. Close with the No-Lie Post-Fix Gate on the built/deployed artifact, not the source.
+
+**Feature**
+1. Open with intent playback in the brief: understood goal, exit condition, out-of-scope (bot-router skill, "Assignment content").
+2. Screen the design against the red-flags list (shallow modules, information leakage, temporal decomposition, pass-through methods, escape-hatch types); two candidates for one-way doors, one for settled shapes.
+3. Write acceptance criteria before code (sprint contract for anything multi-step).
+4. Build the smallest end-to-end slice first; reuse an existing helper over writing a second copy.
+5. Tests for the new behavior + a negative control for any new check; instrument the boundaries you added.
+6. Verify on the real artifact; deploys hand to `/ship` — /code never deploys.
+
+**Refactor**
+1. Pin the current behavior first (characterization test or equivalence harness — `tsc` and lint are NOT a pin).
+2. State the reader-load reduction the change is buying; if you can't, don't start.
+3. Subtract before adding; move in small steps that keep the pin green.
+4. Migrate every caller and delete the old API in the same wave — no shims, no dual paths.
+5. Prove equivalence on the real artifact. A bug the cleanup reveals is a separate fix, structural change first.
+6. Keep the change only if reader load actually dropped — otherwise revert it.
+
+**Investigation**
+1. State the question and the observation that would settle it, before reading anything.
+2. Run the cheapest decisive probe FIRST, against the live source — notes, memory, and "Verified" comments are hypotheses.
+3. If two hypotheses survive the probe, run both in parallel and graft the winner (the arena move) instead of serially betting on one.
+4. Tier every claim; end with an explicit "what we don't know."
+5. Write the finding back into the owning skill/memory the same day, or the investigation didn't compound.
+
+**Perf (hillclimb)**
+1. Freeze the harness and prove its sensitivity (it must go red on a known regression) before trusting any number.
+2. Baseline as median-of-N; report every result as a gap to the floor (`performance-ceiling.md`), never a delta from the start.
+3. One change, one measurement, keep or revert; one commit per accepted win; log to `decisions.tsv`.
+4. Stop when the target is met AND the minimum iteration count has run — not at the first green number.
+
+---
+
 ## Hard Rules (NEVER VIOLATE)
 
 ### Deployment Prohibition — never CAUSE a production deploy (UPDATED 2026-06-25)

@@ -178,6 +178,25 @@ A "fixed" symptom is one that fails to reproduce on the *deployed/built artifact
 
 **Reference incident (2026-05-18):** /code agent reported "no stale '10,000' strings — `rg` clean" but never curl'd the live URL. Old build was still serving until /ship deployed. The fix wasn't a fix until the deployed artifact was re-tested.
 
+## The Mining Sweep — estate-level root cause (MANDATORY procedure — added 2026-10-13, pstack `/correct` derivation)
+
+Everything above debugs ONE symptom. This procedure debugs the *corpus of past symptoms*. Invoke: `/debug sweep [domain]`.
+
+**Why it exists.** The standing loop fixes mistakes incident-by-incident and writes each lesson into the owning skill the same day. That loop has a blind spot: nobody periodically asks which mistake *classes* keep recurring ACROSS domains, and why a class with three convictions is still enforced by a prose paragraph instead of a check. A lesson that lives only in prose will be re-learned the hard way (the ship skill's learning loop says the same thing about its own domain). The sweep is the retrospective pass that moves rules up the enforcement ladder. It is the estate-scale sibling of the tripwire above ("recurring symptom after a documented remediation = the runbook's causal model is wrong") — same insight, applied to the correction history instead of one runbook.
+
+**Procedure (bounded — one domain per pass):**
+
+1. **Bound the pass.** One domain (e.g. ship/player, records, genealogy). A sweep over everything produces a report about nothing.
+2. **Harvest the corpus.** The domain's correction sources: AGENTS.md dated lessons, `~/memory/*.md` + MEMORY.md entries, mission logs and build-progress logs in the domain's goal `hidden_files/`, and the owning skills' own lesson appendices. Read them; do not work from recollection.
+3. **Cluster into classes.** Group incidents by the *mechanism* of the mistake, not the surface symptom. A class needs ≥2 sightings to count as recurring; note explicitly when a class recurs across domains — that is the highest-value finding a single-incident loop can never produce.
+4. **Build the rule → enforcer table.** One row per class: the rule stated once, the sightings (dated, sourced), the CURRENT enforcer, and its level on the ladder: **CLI/code gate → scripted proof in a maintained map → named review lens → prose rule**. Prose is the weakest level; every row at prose level after ≥2 sightings is a finding.
+5. **Convert the top classes.** For the top 1–3 prose-only classes, name the concrete structural enforcer (a CLI preflight check, a feature-gate pattern, an evidence-presence check, a review lens) and either implement it in the same pass (if it lives in skill/workflow files) or record it as a proposed enforcer with its owning step — never silently leave it as "we should."
+6. **File the pass.** Write the table + findings to `mining-sweeps/<date>-<domain>.md` next to this skill, and write any rule changes back into the owning skills the same day (the standing write-back rule). A sweep that produces only a report has not happened.
+
+**Cadence:** run one after any domain accumulates ~3 new convicted lessons, or monthly per active domain, whichever comes first. The genealogy loop's a scheduled sweep script is the proven automated shape if a domain wants this on a cadence.
+
+**Worked example:** keep each pass beside this skill under `mining-sweeps/<date>-<domain>.md`. A real first pass over a shipping/player domain tabled 6 rules; its top prose-only classes were: declared/proxy state trusted over a live probe of the real artifact, recovery paths that don't record the failure they recover from, and environment preconditions carried in memory instead of preflight checks.
+
 ## Usage
 
 ```
