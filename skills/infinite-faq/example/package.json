@@ -8,10 +8,12 @@
     "build:island": "esbuild src/faq/faq-island.tsx --bundle --format=esm --minify --target=es2022 --jsx=automatic --jsx-import-source=hono/jsx/dom --outfile=public/faq-island.js",
     "typecheck": "tsc --noEmit",
     "dev": "npm run build:island && wrangler dev --remote",
-    "dev:local": "npm run build:island && wrangler dev"
+    "dev:local": "npm run build:island && wrangler dev",
+    "check:runtime": "node scripts/verify-runtime.mjs",
+    "check": "npm run check-template && npm run typecheck && npm run build:island && npm run check:runtime && npm audit --ignore-scripts --audit-level=low"
   },
   "dependencies": {
-    "hono": "^4.13.5",
+    "hono": "^4.13.13",
     "zod": "^4.6.1"
   },
   "devDependencies": {
