@@ -51,7 +51,7 @@ try {
   for (const path of ['/faq.css', '/faq-island.js']) {
     const response = await harness.fetch(path);
     assert.equal(response.status, 200);
-    assert.ok((await response.text()).length > 100);
+    assert.equal(await response.text(), readFileSync(resolve(`public${path}`), 'utf8'));
   }
   for (const [body, expected] of [
     ['{}', 400],
