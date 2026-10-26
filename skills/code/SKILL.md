@@ -961,3 +961,52 @@ CRITICAL (context quality): Use the Grep → Read loop as the default investigat
 IMPORTANT: After EVERY git push, check if the repo has GitHub Actions workflows. If yes, watch all checks until they complete. If any check fails, read the failure logs, fix the issue, commit, push, and repeat — up to 3 retry cycles.
 CRITICAL: Do NOT deploy to production. Do NOT run wrangler deploy, npm run deploy, vercel deploy --prod, or any production deployment command. When implementation is complete, STOP and tell the user to run /ship for deployment.
 ```
+
+---
+
+## Review Convergence Protocol (added 2026-10-26 — Anthropic code-review adoption)
+
+Automated and agent review loops do not converge on their own: left unbounded, a reviewer keeps finding new line-level nits while the change underneath it never gets re-examined. (Anthropic's Claude Code team, "How the Claude Code team does code review," Oct 15, 2026, saw one PR cycle 50+ times overnight, and found ~59% of repeated flags were pre-existing code the change never touched.) These rules bound the loop:
+
+1. **Three cycles, hard cap.** A change gets at most **3 review cycles** (one cycle = a full review pass plus the fixes it produced). Cycles-to-pass is recorded for the change and tracked over time as the convergence metric — a rising mean means the review prompts or the change quality need work, not more cycles.
+2. **Cycle 3 challenges the approach, not the lines.** If a change reaches cycle 3 without passing, the reviewer stops raising new line-level findings and instead answers one question in writing: *is the approach itself wrong, and if so, what approach would pass?* The next move is an approach change or an explicit decision to ship as-is under the existing gates — never a fourth line-level cycle.
+3. **Re-review covers only the new diff.** After the first full review, every later pass reviews only what changed since the previous pass. Re-reading the whole change each cycle is how old findings and pre-existing code re-enter the loop.
+4. **Never re-report a seen finding.** Each review maintains a seen-findings list for the change (finding class + location). A finding already raised is tracked to resolution, never raised again as if new; a finding the author dispositions with a reason stays dispositioned unless the new diff reopens it.
+5. **Report the bug CLASS, with all its instances.** A finding names the class ("unsanitized input reaching a query builder") and lists every instance found in the change — never one line at a time across cycles. One class, one finding, all instances, one fix.
+
+This protocol bounds review *iteration* only. It changes no existing gate: every gate that applied before still applies, and a change that fails a gate fails, converged or not.
+
+---
+
+## The REVIEW.md Contract (added 2026-10-26 — Anthropic code-review adoption)
+
+A reviewer — human or agent — cannot know what failure means in a repo it did not write. A per-repo `REVIEW.md`, authored and owned by the code owner, is the contract that carries that knowledge. When a repo has a `REVIEW.md` at its root, **every review of that repo must read it first and review under it**; when it does not, reviews proceed under this skill's defaults and the gap is worth one line in the review summary.
+
+A `REVIEW.md` defines:
+
+- **What failure means here** — the repo-specific consequences that make a bug serious (data loss, a wrong deploy, a broken public page), so severity is judged against the repo's real stakes, not generic ones.
+- **Paths the reviewer ignores** — generated code, vendored dependencies, fixtures, build output: named paths or globs that review passes over instead of flagging.
+- **Severity labels** — exactly three: **Important** (must fix before merge), **Nit** (worth fixing, never blocks), **Pre-existing** (real, but not introduced by this change). A change is **never penalized for Pre-existing findings** — they are recorded, optionally filed, and excluded from the change's pass/fail.
+- **Evidence format** — every finding carries a `file:line` reference into the actual diff or tree. A filename the reviewer has not opened is never cited; a location that cannot be referenced is not a finding yet.
+- **Report format** — every review opens with a top-level summary: the finding count by severity, and, when the change is clean, an explicit "No issues found." statement. A review with no summary has not reported.
+
+Starter template (copy to the repo root and fill in):
+
+```markdown
+# REVIEW.md — <repo name>
+
+## What failure means here
+<The 2–4 consequences that make a bug serious in THIS repo.>
+
+## Paths the reviewer ignores
+- <generated / vendored / fixture paths or globs>
+
+## Severity
+- Important — must fix before merge.
+- Nit — worth fixing; never blocks.
+- Pre-existing — not introduced by this change; record it, never count it against the change.
+
+## Report format
+- Open with: N findings (X Important, Y Nit, Z Pre-existing) — or "No issues found."
+- Every finding: `file:line`, the bug class, and every instance of that class in the change.
+```
